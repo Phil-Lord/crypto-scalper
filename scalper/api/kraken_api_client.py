@@ -16,5 +16,5 @@ class KrakenApiClient:
             raise RuntimeError('Failed to parse JSON repsonse.')
 
     def handle_errors(self, response: Dict[str, Any]) -> None:
-        if 'error' in response and response['Error']:
-            raise RuntimeError(f'API Error: {response['Error']}')
+        if 'error' in response and response['error']:
+            raise RuntimeError(f'API Error: {response['error']}')
