@@ -7,7 +7,7 @@ class KrakenService:
     def __init__(self, client: KrakenApiClient):
         self.client = client
 
-    def fetch_data(self, endpoint: str, params: Dict[str: Any]) -> Dict[str, Any]:
+    def fetch_data(self, endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
         response = self.client.make_request(endpoint, params)
         self.client.handle_errors(response)
         return response['result']
