@@ -1,1 +1,1 @@
-from ohlc_service import OhlcService
+from .ohlc_service import OhlcService
