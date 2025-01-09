@@ -2,6 +2,8 @@ from typing import Any, Dict
 
 import requests
 
+from .exceptions import KrakenTooManyRequestsError
+
 
 class KrakenApiClient:
     BASE_URL = 'https://api.kraken.com/0/public/'
@@ -18,4 +20,7 @@ class KrakenApiClient:
 
     def handle_errors(self, response: Dict[str, Any]) -> None:
         if 'error' in response and response['error']:
-            raise RuntimeError(f'API Error: {response['error']}.')
+            if response['error'] == ['EGeneral:Too many requests']:
+                raise KrakenTooManyRequestsError()
+            else:
+                raise RuntimeError(f'API Error: {response['error']}.')
