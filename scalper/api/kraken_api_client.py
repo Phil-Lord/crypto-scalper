@@ -10,11 +10,11 @@ class KrakenApiClient:
             response = requests.get(f'{self.BASE_URL}{endpoint}', params=params)
             response.raise_for_status()
             return response.json()
-        except requests.RequestException as e:
-            raise RuntimeError(f'Error making request to {endpoint}')
+        except requests.RequestException:
+            raise RuntimeError(f'Error making request to {endpoint}.')
         except ValueError:
-            raise RuntimeError('Failed to parse JSON repsonse.')
+            raise RuntimeError('Failed to parse JSON response.')
 
     def handle_errors(self, response: Dict[str, Any]) -> None:
         if 'error' in response and response['error']:
-            raise RuntimeError(f'API Error: {response['error']}')
+            raise RuntimeError(f'API Error: {response['error']}.')
