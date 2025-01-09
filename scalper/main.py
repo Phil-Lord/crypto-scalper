@@ -1,3 +1,4 @@
+import csv
 import datetime
 import time
 
@@ -27,11 +28,15 @@ def test_trades():
     client = KrakenApiClient()
     service = TradesService(client)
 
-    since = convert_datetime_to_timestamp(2024, 12, 25, 0, 0, 0)
-    until = convert_datetime_to_timestamp(2024, 12, 30, 23, 59, 59)
+    since = convert_datetime_to_timestamp(2023, 12, 31, 0, 0, 0)
+    until = convert_datetime_to_timestamp(2025, 1, 5, 0, 0, 0)
 
     data = service.fetch_trades(BITCOIN, since, until)
-    print(data)
+
+    with open('trades.csv', 'w', newline='') as csv_file:
+        writer = csv.writer(csv_file, delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        for trade in data:
+            writer.writerow(trade)
 
 
 def convert_datetime_to_timestamp(year, month, day, hour, minute, second):
