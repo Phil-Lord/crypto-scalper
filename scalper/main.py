@@ -4,6 +4,9 @@ import time
 from api import KrakenApiClient
 from services import OhlcService, TradesService
 
+BITCOIN = 'XXBTZGBP'
+DOGECOIN = 'XDGGBP'
+
 
 def main():
     # test_ohlc()
@@ -16,7 +19,7 @@ def test_ohlc():
 
     since = convert_datetime_to_timestamp(2024, 12, 28, 16, 0, 0)
 
-    data = service.fetch_ohlc('XDGGBP', 1, since)
+    data = service.fetch_ohlc(DOGECOIN, 1, since)
     print(data)
 
 
@@ -27,7 +30,7 @@ def test_trades():
     since = convert_datetime_to_timestamp(2024, 12, 25, 0, 0, 0)
     until = convert_datetime_to_timestamp(2024, 12, 30, 23, 59, 59)
 
-    data = service.fetch_trades('XXBTZGBP', since, until)
+    data = service.fetch_trades(BITCOIN, since, until)
     print(data)
 
 
