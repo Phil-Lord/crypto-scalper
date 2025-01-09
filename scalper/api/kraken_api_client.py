@@ -1,5 +1,6 @@
-import requests
 from typing import Any, Dict
+
+import requests
 
 
 class KrakenApiClient:
