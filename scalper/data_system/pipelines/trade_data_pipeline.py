@@ -19,7 +19,10 @@ class TradeDataPipeline:
         columns = ['price', 'volume', 'time', 'buy/sell',
                    'market/limit', 'miscellaneous', 'trade_id']
         trades_df = pd.DataFrame(trades_raw, columns=columns)
+        trades_df.dropna(inplace=True)
+        trades_df = trades_df.drop_duplicates(subset='trade_id').set_index('trade_id')
 
-        trades_df.drop(['miscellaneous'], axis=1)
+        trades_df.drop(columns=['miscellaneous'], inplace=True)
         trades_df['time'] = pd.to_datetime(trades_df['time'], unit='s')
+
         trades_df.to_csv('trades.csv')
