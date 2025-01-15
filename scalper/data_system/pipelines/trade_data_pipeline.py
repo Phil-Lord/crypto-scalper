@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 
 from api import KrakenApiClient
@@ -36,11 +37,16 @@ class TradeDataPipeline:
 
     def __store_trades(self, new_trades_df):
         # Read existing stored trade data.
-        stored_trades_df = pd.read_csv('./trades.csv', index_col='trade_id')
+        if not os.path.exists(f'{self.pair}-trades.csv'):
+            columns = ['price', 'volume', 'time', 'buy/sell', 'market/limit', 'trade_id']
+            empty_df = pd.DataFrame(columns=columns).set_index('trade_id')
+            empty_df.to_csv(f'./{self.pair}-trades.csv')
+
+        stored_trades_df = pd.read_csv(f'./{self.pair}-trades.csv', index_col='trade_id')
 
         # Filter out any new trades found in the existing stored data, then concatenate and sort.
         new_trades_df = new_trades_df[~new_trades_df.index.isin(stored_trades_df.index)]
         trades_df = pd.concat([stored_trades_df, new_trades_df])
         trades_df.sort_index(inplace=True)
 
-        trades_df.to_csv('trades.csv')
+        trades_df.to_csv(f'{self.pair}-trades.csv')
