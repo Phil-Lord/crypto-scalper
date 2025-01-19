@@ -1,1 +1,1 @@
-from .trade_data_pipeline import TradeDataPipeline
+from .trade_csv_pipeline import TradeCsvPipeline

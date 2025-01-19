@@ -4,7 +4,7 @@ from storage.csv import CsvHandler
 from utils import format_trades
 
 
-class TradeDataPipeline:
+class TradeCsvPipeline:
     def __init__(self, pair: str, since: int, until: int):
         client = KrakenApiClient()
         self.service = TradesService(client)
