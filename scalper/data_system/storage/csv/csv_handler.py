@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import pandas as pd
 
@@ -14,7 +15,9 @@ class CsvHandler:
         os.makedirs(storage_folder, exist_ok=True)
         self.storage_path = f'{storage_folder}/{pair}-trades.csv'
 
-    def save_trades(self, trades: pd.DataFrame) -> None:
+    def save_trades(self, raw_trades: list[list[Any]]) -> None:
+        trades = self.__process_raw_trades(raw_trades)
+
         # Filter out any new trades found in the existing stored data, then concatenate.
         existing_trades = self.load_trades(True)
         trades = trades[~trades.index.isin(existing_trades.index)]
@@ -41,7 +44,25 @@ class CsvHandler:
         '''
         Create, save, and return an empty dataframe matching the trade schema.
         '''
-        columns = ['price', 'volume', 'time', 'buy/sell', 'market/limit', 'trade_id']
+        columns = ['price', 'volume', 'timestamp', 'side', 'order_type', 'trade_id']
         empty_df = pd.DataFrame(columns=columns).set_index('trade_id')
         empty_df.to_csv(self.storage_path)
         return empty_df
+
+    def __process_raw_trades(self, raw_trades: list[list[Any]]) -> pd.DataFrame:
+        '''
+        Convert a raw list of trades to a pandas DataFrame, then clean and format the data.
+        '''
+        # Convert raw data into a DataFrame.
+        columns = ['price', 'volume', 'timestamp', 'side',
+                   'order_type', 'miscellaneous', 'trade_id']
+        trades_df = pd.DataFrame(raw_trades, columns=columns)
+
+        # Clean data and set the index to trade_id.
+        trades_df.dropna(inplace=True)
+        trades_df = trades_df.drop_duplicates(subset='trade_id').set_index('trade_id')
+
+        # Drop miscellaneous column.
+        trades_df.drop(columns=['miscellaneous'], inplace=True)
+
+        return trades_df

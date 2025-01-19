@@ -1,7 +1,6 @@
 from api import KrakenApiClient
 from services import TradesService
 from storage.csv import CsvHandler
-from utils import format_trades
 
 
 class TradeCsvPipeline:
@@ -15,6 +14,5 @@ class TradeCsvPipeline:
         self.until = until
 
     def update_stored_trades(self):
-        trades_raw = self.service.fetch_trades(self.pair, self.since, self.until)
-        trades_df = format_trades(trades_raw)
-        self.storage.save_trades(trades_df)
+        raw_trades = self.service.fetch_trades(self.pair, self.since, self.until)
+        self.storage.save_trades(raw_trades)
