@@ -8,7 +8,7 @@ from .exceptions import MissingTradesFileException
 class CsvHandler:
     def __init__(self, pair: str):
         self.pair = pair
-        storage_folder = os.path.join(os.path.dirname(__file__), 'store')
+        storage_folder = os.path.join(os.path.dirname(__file__), 'store/csv')
         os.makedirs(storage_folder, exist_ok=True)
         self.storage_path = f'{storage_folder}/{pair}-trades.csv'
 
