@@ -1,6 +1,6 @@
 from api import KrakenApiClient
 from services import TradesService
-from storage import CsvHandler
+from storage.csv import CsvHandler
 from utils import format_trades
 
 
