@@ -8,11 +8,13 @@ from .exceptions import MissingTradesFileException
 class CsvHandler:
     def __init__(self, pair: str):
         self.pair = pair
-        storage_folder = os.path.join(os.path.dirname(__file__), 'store/csv')
+
+        # Get the store directory and a create path to the trading-pair-specific csv file.
+        storage_folder = os.path.join(os.path.dirname(__file__), 'store')
         os.makedirs(storage_folder, exist_ok=True)
         self.storage_path = f'{storage_folder}/{pair}-trades.csv'
 
-    def save_trades(self, trades: pd.DataFrame):
+    def save_trades(self, trades: pd.DataFrame) -> None:
         # Filter out any new trades found in the existing stored data, then concatenate.
         existing_trades = self.load_trades(True)
         trades = trades[~trades.index.isin(existing_trades.index)]
@@ -22,7 +24,7 @@ class CsvHandler:
         trades_df.sort_index(inplace=True)
         trades_df.to_csv(self.storage_path)
 
-    def load_trades(self, create_if_missing: bool = False):
+    def load_trades(self, create_if_missing: bool = False) -> pd.DataFrame:
         # Check for existing data for the passed pair.
         # If none exists and create_if_missing is True, create and return an empty file.
         if not os.path.exists(self.storage_path):
