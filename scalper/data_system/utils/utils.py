@@ -15,15 +15,14 @@ def format_trades(trades_raw: list[list[Any]]) -> pd.DataFrame:
     Convert a raw list of trades to a pandas DataFrame, then clean and format the data.
     '''
     # Convert raw data into a DataFrame.
-    columns = ['price', 'volume', 'time', 'buy/sell', 'market/limit', 'miscellaneous', 'trade_id']
+    columns = ['price', 'volume', 'timestamp', 'side', 'order_type', 'miscellaneous', 'trade_id']
     trades_df = pd.DataFrame(trades_raw, columns=columns)
 
     # Clean data and set the index to trade_id.
     trades_df.dropna(inplace=True)
     trades_df = trades_df.drop_duplicates(subset='trade_id').set_index('trade_id')
 
-    # Drop miscellaneous column and convert timestamps to datetimes.
+    # Drop miscellaneous column.
     trades_df.drop(columns=['miscellaneous'], inplace=True)
-    trades_df['time'] = pd.to_datetime(trades_df['time'], unit='s')
 
     return trades_df
