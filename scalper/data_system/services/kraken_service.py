@@ -20,7 +20,7 @@ class KrakenService:
         before=before_log(logger, logging.INFO),
         after=after_log(logger, logging.INFO)
     )
-    def fetch_data(self, endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    def fetch_data(self, endpoint: str, params: Dict[str, Any]) -> list[list[Any]]:
         response = self.client.make_request(endpoint, params)
         self.client.handle_errors(response)
         return response['result']

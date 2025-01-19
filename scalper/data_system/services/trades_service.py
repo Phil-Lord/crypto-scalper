@@ -4,7 +4,7 @@ from .kraken_service import KrakenService
 
 
 class TradesService(KrakenService):
-    def fetch_trades(self, pair: str, since: int, until: int) -> List[Dict[str, Any]]:
+    def fetch_trades(self, pair: str, since: int, until: int) -> List[List[Any]]:
         self.validate_pair(pair)
         trades = []
         current_since = since

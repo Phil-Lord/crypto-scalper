@@ -7,7 +7,7 @@ DATABASE_URL = 'sqlite:///trades.db'
 
 # Create an engine and a factory for constructing session objects against it.
 engine = create_engine(DATABASE_URL, echo=True)
-LocalSession = sessionmaker(bind=engine)
+SessionLocal = sessionmaker(bind=engine)
 
 
 def initialise_database():
