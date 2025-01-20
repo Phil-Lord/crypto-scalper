@@ -9,7 +9,7 @@ class TradeCRUD:
     def __init__(self, session: Session):
         self.session = session
 
-    def insert_trades(self, raw_trades: list[Trade], pair: str) -> None:
+    def insert_trades(self, raw_trades:  list[list[Any]], pair: str) -> None:
         trades = self.__process_raw_trades(raw_trades, pair)
         self.session.bulk_save_objects(trades)
         self.session.commit()
