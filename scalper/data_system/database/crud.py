@@ -1,5 +1,3 @@
-from typing import Any
-
 from sqlalchemy.orm import Session
 
 from .models import Trade
@@ -9,18 +7,18 @@ class TradeCRUD:
     def __init__(self, session: Session):
         self.session = session
 
-    def insert_trades(self, raw_trades:  list[list[Any]], pair: str) -> None:
+    def add_trades(self, raw_trades:  list[list[any]], pair: str) -> None:
         trades = self.__process_raw_trades(raw_trades, pair)
         self.session.bulk_save_objects(trades)
         self.session.commit()
 
-    def get_trades_for_pair(self, pair: str, start: int, end: int) -> list[Trade]:
+    def get_trades(self, pair: str, start: int, end: int) -> list[Trade]:
         return self.session.query(Trade).filter(
             Trade.pair == pair,
             Trade.timestamp.between(start, end)
         ).all()
 
-    def __process_raw_trades(self, raw_trades: list[list[Any]], pair: str) -> list[Trade]:
+    def __process_raw_trades(self, raw_trades: list[list[any]], pair: str) -> list[Trade]:
         '''
         Converts raw trade data into a list of Trade model objects, dropping the miscellaneous column.
         '''
