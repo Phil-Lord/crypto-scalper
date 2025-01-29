@@ -1,9 +1,8 @@
 import logging
-from typing import Any, Dict
 
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_log, after_log
 
-from api import KrakenTooManyRequestsError, KrakenApiClient
+from exchange_connector.api import KrakenTooManyRequestsError, KrakenApiClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,7 +19,7 @@ class KrakenService:
         before=before_log(logger, logging.INFO),
         after=after_log(logger, logging.INFO)
     )
-    def fetch_data(self, endpoint: str, params: Dict[str, Any]) -> list[list[Any]]:
+    def fetch_data(self, endpoint: str, params: dict[str, any]) -> list[list[any]]:
         response = self.client.make_request(endpoint, params)
         self.client.handle_errors(response)
         return response['result']

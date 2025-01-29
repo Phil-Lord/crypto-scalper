@@ -1,10 +1,8 @@
-from typing import Any, Dict, List
-
 from .kraken_service import KrakenService
 
 
 class TradesService(KrakenService):
-    def fetch_trades(self, pair: str, since: int, until: int) -> List[List[Any]]:
+    def fetch_trades(self, pair: str, since: int, until: int) -> list[dict]:
         self.validate_pair(pair)
         trades = []
         current_since = since
