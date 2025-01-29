@@ -1,0 +1,1 @@
+from .repositories.trades_repository import TradesRepository
