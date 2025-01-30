@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from data_system import TradesRepository
-from utils import get_timestamp, Pair, parse_datetime
+from utils import get_second_timestamp, Pair, parse_datetime
 
 
 @click.command()
@@ -14,11 +14,10 @@ def fetch_trades(pair: str, start: str, end: str) -> None:
     repository = TradesRepository()
 
     kraken_pair = Pair[pair].value
-    start_timestamp = get_timestamp(*parse_datetime(start))
-    end_timestamp = get_timestamp(*parse_datetime(end))
+    start_timestamp = get_second_timestamp(*parse_datetime(start))
+    end_timestamp = get_second_timestamp(*parse_datetime(end))
 
     trades = repository.get(kraken_pair, start_timestamp, end_timestamp)
-    print('trades:', trades)
 
     trades["timestamp"] = pd.to_datetime(trades["timestamp"], unit="s")
 

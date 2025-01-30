@@ -15,8 +15,8 @@ class TradeCRUD:
 
     def get_trades(self, pair: str, start: int, end: int) -> pd.DataFrame:
         query = self.session.query(Trade).filter(
-            Trade.pair == pair
-            # Trade.timestamp.between(start, end)
+            Trade.pair == pair,
+            Trade.timestamp.between(start, end)
         ).statement
         return pd.read_sql(query, self.session.bind)
 
