@@ -1,5 +1,7 @@
+import pandas as pd
+
 from .base_repository import Repository
-from data_system.database import SessionLocal, TradeCRUD, Trade
+from data_system.database import SessionLocal, TradeCRUD
 
 
 class TradesRepository(Repository):
@@ -11,10 +13,10 @@ class TradesRepository(Repository):
             crud = TradeCRUD(session)
             crud.add_trades(trades, pair)
 
-    def get(self, pair: str, start: int, end: int) -> list[Trade]:
+    def get(self, pair: str, start: int, end: int) -> pd.DataFrame:
         '''
         Fetch trades for a certain pair between a start and end date.
         '''
         with SessionLocal() as session:
             crud = TradeCRUD(session)
-            crud.get_trades(pair, start, end)
+            return crud.get_trades(pair, start, end)
