@@ -7,4 +7,4 @@ class SmaStrategy(Strategy):
         self.prices = []
 
     def evaluate(self, price: float) -> str:
-        return f'hold, price: £{price}'
+        return 'hold'

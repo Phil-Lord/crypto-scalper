@@ -12,9 +12,13 @@ class BacktestingEngine:
         self.strategy = StrategyManager().get_strategy(strategy_name, **strategy_params)
         self.data = None
 
-    def run(self):
+    def run(self) -> pd.DataFrame:
         if self.data is None:
             self.__load_data()
+
+        # Apply the strategy evaluation to each row.
+        self.data['signal'] = self.data['price'].apply(self.strategy.evaluate)
+        return self.data
 
     def __load_data(self) -> None:
         # Get trade data from the database using a Trades Repository.

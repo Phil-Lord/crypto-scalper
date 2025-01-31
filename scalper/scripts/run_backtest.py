@@ -16,7 +16,9 @@ def run_backtest(pair: str, start: str, end: str, strategy_name: str) -> None:
     params = {'window_size': 20}
 
     engine = BacktestingEngine(kraken_pair, start_timestamp, end_timestamp, strategy_name, **params)
-    engine.run()
+    results = engine.run()
+
+    print(results)
 
 
 if __name__ == '__main__':
