@@ -24,4 +24,6 @@ class BacktestingEngine:
         trades["timestamp"] = pd.to_datetime(trades["timestamp"], unit="s")
         trades.set_index("timestamp", inplace=True)
 
-        self.data = trades.resample('1T')
+        # Resample trades into minutely bins, keeping the last price of each minute.
+        # If a minute has no trades, forward-fill it with the previous minute's price.
+        self.data = trades.resample('1min').agg({'price': 'last'}).ffill()
