@@ -1,4 +1,6 @@
 import click
+import matplotlib.pyplot as plt
+import pandas as pd
 
 from backtesting_engine import BacktestingEngine
 from utils import get_second_timestamp, Pair, parse_datetime
@@ -18,7 +20,25 @@ def run_backtest(pair: str, start: str, end: str, strategy_name: str) -> None:
     engine = BacktestingEngine(kraken_pair, start_timestamp, end_timestamp, strategy_name, **params)
     results = engine.run()
 
-    print(results)
+    plot_trade_results(results, pair)
+
+
+def plot_trade_results(results: pd.DataFrame, pair: str) -> None:
+    buys = results[results["signal"] == "buy"]
+    sells = results[results["signal"] == "sell"]
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(results.index, results["price"], label="Price", color="blue", linewidth=1)
+    plt.scatter(buys.index, buys["price"], color="green",
+                label="Buy Signal", marker="^", s=100)
+    plt.scatter(sells.index, sells["price"], color="red",
+                label="Sell Signal", marker="v", s=100)
+    plt.xlabel("Time")
+    plt.ylabel("Price")
+    plt.title(f"Price Movement for {pair}")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
 
 if __name__ == '__main__':
