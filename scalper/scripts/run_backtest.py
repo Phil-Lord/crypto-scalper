@@ -15,11 +15,12 @@ def run_backtest(pair: str, start: str, end: str, strategy_name: str) -> None:
     kraken_pair = Pair[pair].value
     start_timestamp = get_second_timestamp(*parse_datetime(start))
     end_timestamp = get_second_timestamp(*parse_datetime(end))
-    params = {'window_size': 20}
+    params = {'short_window': 50, 'long_window': 200}
 
     engine = BacktestingEngine(kraken_pair, start_timestamp, end_timestamp, strategy_name, **params)
-    results = engine.run()
-
+    engine.run()
+    results = engine.get_strategy_results()
+    print(results)
     plot_trade_results(results, pair)
 
 
@@ -29,6 +30,20 @@ def plot_trade_results(results: pd.DataFrame, pair: str) -> None:
 
     plt.figure(figsize=(12, 6))
     plt.plot(results.index, results["price"], label="Price", color="blue", linewidth=1)
+    plt.plot(
+        results.index,
+        results['short_sma'],
+        label='SMA Short',
+        color='green',
+        linestyle='--'
+    )
+    plt.plot(
+        results.index,
+        results['long_sma'],
+        label='SMA Long',
+        color='green',
+        linestyle='--'
+    )
     plt.scatter(buys.index, buys["price"], color="green",
                 label="Buy Signal", marker="^", s=100)
     plt.scatter(sells.index, sells["price"], color="red",

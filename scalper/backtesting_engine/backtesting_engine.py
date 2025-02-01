@@ -20,6 +20,9 @@ class BacktestingEngine:
         self.data['signal'] = self.data['price'].apply(self.strategy.evaluate)
         return self.data
 
+    def get_strategy_results(self) -> pd.DataFrame:
+        return self.strategy.get_results()
+
     def __load_data(self) -> None:
         # Get trade data from the database using a Trades Repository.
         trades = TradesRepository().get(self.pair, self.start, self.end)
