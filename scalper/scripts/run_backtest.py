@@ -19,6 +19,7 @@ def run_backtest(pair: str, start: str, end: str, strategy_name: str) -> None:
 
     engine = BacktestingEngine(kraken_pair, start_timestamp, end_timestamp, strategy_name, **params)
     engine.run()
+
     results = engine.get_strategy_results()
     print(results)
     plot_trade_results(results, pair)
