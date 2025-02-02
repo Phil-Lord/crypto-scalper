@@ -4,7 +4,7 @@ from .base_strategy import Strategy
 
 
 class SmaStrategy(Strategy):
-    def __init__(self, short_window, long_window):
+        super().__init__()
         self.short_window = short_window
         self.long_window = long_window
 
@@ -47,6 +47,3 @@ class SmaStrategy(Strategy):
         self.results.loc[len(self.results)] = [price, short_sma, long_sma, signal]
 
         return signal
-
-    def get_results(self) -> pd.DataFrame:
-        return self.results
