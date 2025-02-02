@@ -13,7 +13,7 @@ class TradesRepository(Repository):
             crud = TradeCRUD(session)
             crud.add_trades(trades, pair)
 
-    def get(self, pair: str, start: int, end: int) -> pd.DataFrame:
+    def get(self, pair: str, start: int = None, end: int = None) -> pd.DataFrame:
         '''
         Fetch trades for a certain pair between a start and end date.
         '''

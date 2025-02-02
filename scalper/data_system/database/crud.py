@@ -1,5 +1,5 @@
 import pandas as pd
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from .models import Trade
@@ -20,7 +20,15 @@ class TradeCRUD:
         self.session.execute(stmt, trades)
         self.session.commit()
 
-    def get_trades(self, pair: str, start: int, end: int) -> pd.DataFrame:
+    def get_trades(self, pair: str, start: int = None, end: int = None) -> pd.DataFrame:
+        if start is None:
+            start = self.session.query(func.min(Trade.timestamp)).filter(
+                Trade.pair == pair).scalar()
+
+        if end is None:
+            end = self.session.query(func.max(Trade.timestamp)).filter(
+                Trade.pair == pair).scalar()
+
         query = self.session.query(Trade).filter(
             Trade.pair == pair,
             Trade.timestamp.between(start, end)
