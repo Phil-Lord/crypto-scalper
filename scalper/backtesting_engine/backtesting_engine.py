@@ -21,7 +21,9 @@ class BacktestingEngine:
             self.__load_minutely_data()
 
         # Apply the strategy evaluation to each row.
-        self.minutely_data['signal'] = self.minutely_data['price'].apply(self.strategy.evaluate)
+        tqdm.pandas()
+        self.minutely_data['signal'] = self.minutely_data['price'].progress_apply(
+            self.strategy.evaluate)
         return self.minutely_data
 
     def get_strategy_results(self) -> pd.DataFrame:
