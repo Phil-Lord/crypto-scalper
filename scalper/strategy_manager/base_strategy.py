@@ -5,7 +5,7 @@ import pandas as pd
 
 class Strategy(ABC):
     def __init__(self):
-        # The results of a run for analysis.
+        # Optional results of a run to provide additional data for analysis.
         self.results = pd.DataFrame()
 
     @abstractmethod

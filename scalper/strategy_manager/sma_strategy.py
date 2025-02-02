@@ -13,7 +13,7 @@ class SmaStrategy(Strategy):
         # The rolling price data for the long window to be used during evaluation.
         self.rolling_prices = pd.DataFrame(columns=['price'])
 
-        # The results of a run for analysis.
+        # The order and SMA results of a run for analysis.
         self.results = pd.DataFrame(columns=['price', 'short_sma', 'long_sma', 'signal'])
 
     def evaluate(self, price: float) -> str:
