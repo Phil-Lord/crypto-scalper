@@ -17,6 +17,16 @@ class SmaStrategy(Strategy):
         self.results = pd.DataFrame(columns=['price', 'short_sma', 'long_sma', 'signal'])
 
     def evaluate(self, price: float) -> str:
+        # Roll prices and return 'hold' if there aren't enough to calculate the long SMA.
+        ready_to_evaluate = self.__roll_prices(price)
+        if not ready_to_evaluate:
+            return 'hold'
+
+        # Calculate SMAs and return signal.
+        signal = self.__calculate_smas_for_signal(price)
+        return signal
+
+    def __roll_prices(self, price: float) -> bool:
         # Add the new price to the end of the long data window.
         self.rolling_prices.loc[len(self.rolling_prices)] = [price]
 
@@ -24,14 +34,13 @@ class SmaStrategy(Strategy):
         if len(self.rolling_prices) > self.long_window:
             self.rolling_prices = self.rolling_prices.iloc[1:].reset_index(drop=True)
 
-        # Initialise the signal as hold.
-        signal = 'hold'
-
-        # If we don't have enough data to calculate the long SMA, return 'hold'.
+        # If we don't have enough data to calculate the long SMA, add 'hold' to results.
         if len(self.rolling_prices) < self.long_window:
-            self.results.loc[len(self.results)] = [price, None, None, signal]
-            return signal
+            self.results.loc[len(self.results)] = [price, None, None, 'hold']
+            return False
+        return True
 
+    def __calculate_smas_for_signal(self, price: float) -> str:
         # Calculate the short-term and long-term SMAs.
         short_sma = self.rolling_prices['price'].tail(self.short_window).mean()
         long_sma = self.rolling_prices['price'].tail(self.long_window).mean()
@@ -43,8 +52,9 @@ class SmaStrategy(Strategy):
         elif short_sma < long_sma and self.last_signal != 'sell':
             signal = 'sell'
             self.last_signal = 'sell'
+        else:
+            signal = 'hold'
 
         # Store the results.
         self.results.loc[len(self.results)] = [price, short_sma, long_sma, signal]
-
         return signal
