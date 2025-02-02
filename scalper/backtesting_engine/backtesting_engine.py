@@ -1,11 +1,12 @@
 import pandas as pd
+from tqdm import tqdm
 
 from data_system import TradesRepository
 from strategy_manager import StrategyManager
 
 
 class BacktestingEngine:
-    def __init__(self, pair: str, start: float, end: float, strategy_name: str, **strategy_params):
+    def __init__(self, pair: str, strategy_name: str, start: float = None, end: float = None, **strategy_params):
         self.pair = pair
         self.start = start
         self.end = end

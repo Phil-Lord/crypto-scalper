@@ -6,16 +6,19 @@ from utils import get_second_timestamp, Pair, parse_datetime, plot_sma_results
 
 @click.command()
 @click.option('--pair', required=True, help='Trading pair (e.g. BTC)')
-@click.option('--start', required=True, help='Start timestamp (e.g. 2025-1-1-0-0-0)')
-@click.option('--end', required=True, help='End timestamp (e.g. 2025-1-1-23-59-59)')
 @click.option('--strategy_name', required=True, help='Strategy name (e.g. sma)')
-def run_backtest(pair: str, start: str, end: str, strategy_name: str) -> None:
+@click.option('--start', required=False, help='Start timestamp (e.g. 2025-1-1-0-0-0)')
+@click.option('--end', required=False, help='End timestamp (e.g. 2025-1-1-23-59-59)')
+def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = None) -> None:
     kraken_pair = Pair[pair].value
-    start_timestamp = get_second_timestamp(*parse_datetime(start))
-    end_timestamp = get_second_timestamp(*parse_datetime(end))
     params = {'short_window': 50, 'long_window': 200}
 
-    engine = BacktestingEngine(kraken_pair, start_timestamp, end_timestamp, strategy_name, **params)
+    if start is not None:
+        start = get_second_timestamp(*parse_datetime(start))
+    if end is not None:
+        end = get_second_timestamp(*parse_datetime(end))
+
+    engine = BacktestingEngine(kraken_pair, strategy_name, start, end, **params)
     engine.run()
 
     results = engine.get_strategy_results()
