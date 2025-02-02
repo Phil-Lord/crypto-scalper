@@ -49,7 +49,7 @@ class SmaStrategy(Strategy):
         if short_sma > long_sma and self.last_signal != 'buy':
             signal = 'buy'
             self.last_signal = 'buy'
-        elif short_sma < long_sma and self.last_signal != 'sell':
+        elif short_sma < long_sma and self.last_signal == 'buy':
             signal = 'sell'
             self.last_signal = 'sell'
         else:
