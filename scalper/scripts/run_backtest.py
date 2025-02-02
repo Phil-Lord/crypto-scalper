@@ -32,14 +32,14 @@ def plot_trade_results(results: pd.DataFrame, pair: str) -> None:
     plt.figure(figsize=(12, 6))
 
     # Plot price.
-    plt.plot(results.index, results["price"], label="Price", color="blue", alpha=0.7)
+    plt.plot(results.index, results["price"], label="Price", color="blue", alpha=0.4)
 
     # Plot SMAs.
     plt.plot(
         results.index,
         results['short_sma'],
         label='Short SMA',
-        color='orange',
+        color='purple',
         linestyle='--'
     )
     plt.plot(
