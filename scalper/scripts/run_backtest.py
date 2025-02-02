@@ -25,34 +25,43 @@ def run_backtest(pair: str, start: str, end: str, strategy_name: str) -> None:
 
 
 def plot_trade_results(results: pd.DataFrame, pair: str) -> None:
+    # Extract buys and sells.
     buys = results[results["signal"] == "buy"]
     sells = results[results["signal"] == "sell"]
 
     plt.figure(figsize=(12, 6))
-    plt.plot(results.index, results["price"], label="Price", color="blue", linewidth=1)
+
+    # Plot price.
+    plt.plot(results.index, results["price"], label="Price", color="blue", alpha=0.7)
+
+    # Plot SMAs.
     plt.plot(
         results.index,
         results['short_sma'],
-        label='SMA Short',
-        color='green',
+        label='Short SMA',
+        color='orange',
         linestyle='--'
     )
     plt.plot(
         results.index,
         results['long_sma'],
-        label='SMA Long',
+        label='Long SMA',
         color='green',
         linestyle='--'
     )
+
+    # Plot buys and sells.
     plt.scatter(buys.index, buys["price"], color="green",
-                label="Buy Signal", marker="^", s=100)
+                label="Buy Signal", marker="^", alpha=1, s=100)
     plt.scatter(sells.index, sells["price"], color="red",
-                label="Sell Signal", marker="v", s=100)
+                label="Sell Signal", marker="v", alpha=1, s=100)
+
+    # Titles, legends, etc.
+    plt.title(f"Price Movement for {pair}")
     plt.xlabel("Time")
     plt.ylabel("Price")
-    plt.title(f"Price Movement for {pair}")
     plt.legend()
-    plt.grid(True)
+    plt.grid(alpha=0.3)
     plt.show()
 
 
