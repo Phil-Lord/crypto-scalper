@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from data_system import TradesRepository
-from utils import get_second_timestamp, Pair, parse_datetime
+from utils import get_second_timestamp, Pair, parse_datetime, plot_trade_data_from_db
 
 
 @click.command()
@@ -18,22 +18,7 @@ def fetch_trades(pair: str, start: str, end: str) -> None:
     end_timestamp = get_second_timestamp(*parse_datetime(end))
 
     trades = repository.get(kraken_pair, start_timestamp, end_timestamp)
-
-    trades["timestamp"] = pd.to_datetime(trades["timestamp"], unit="s")
-
-    plt.figure(figsize=(10, 5))
-    plt.plot(
-        trades['timestamp'],
-        trades['price'],
-        label='Trade Price',
-        color='blue'
-    )
-    plt.xlabel('Time')
-    plt.ylabel('Price')
-    plt.title("ETH/USD Trade Prices Over Time")
-    plt.legend()
-    plt.grid()
-    plt.show()
+    plot_trade_data_from_db(trades)
 
 
 if __name__ == '__main__':

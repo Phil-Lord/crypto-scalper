@@ -41,3 +41,21 @@ def plot_sma_results(results: pd.DataFrame, pair: str) -> None:
     plt.legend()
     plt.grid(alpha=0.3)
     plt.show()
+
+
+def plot_trade_data_from_db(trades: pd.DataFrame) -> None:
+    trades["timestamp"] = pd.to_datetime(trades["timestamp"], unit="s")
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(
+        trades['timestamp'],
+        trades['price'],
+        label='Trade Price',
+        color='blue'
+    )
+    plt.xlabel('Time')
+    plt.ylabel('Price')
+    plt.title("Trade Prices Over Time")
+    plt.legend()
+    plt.grid()
+    plt.show()
