@@ -1,6 +1,8 @@
 import pandas as pd
 
 from .base_strategy import Strategy
+from .indicators import sma
+from .rules import golden_cross
 
 
 class SmaStrategy(Strategy):
@@ -11,7 +13,7 @@ class SmaStrategy(Strategy):
         self.last_signal = 'hold'
 
         # The rolling price data for the long window to be used during evaluation.
-        self.rolling_prices = pd.DataFrame(columns=['price'])
+        self.rolling_prices = pd.Series(dtype=float)
 
         # The order and SMA results of a run for analysis.
         self.results = pd.DataFrame(columns=['price', 'short_sma', 'long_sma', 'signal'])
@@ -23,12 +25,12 @@ class SmaStrategy(Strategy):
             return 'hold'
 
         # Calculate SMAs and return signal.
-        signal = self.__calculate_smas_for_signal(price)
-        return signal
+        return self.__calculate(price)
 
     def __roll_prices(self, price: float) -> bool:
         # Add the new price to the end of the long data window.
-        self.rolling_prices.loc[len(self.rolling_prices)] = [price]
+        self.rolling_prices = pd.concat(
+            [self.rolling_prices, pd.Series([price])], ignore_index=True)
 
         # If the data exceeds the length of the long window, drop the oldest row.
         if len(self.rolling_prices) > self.long_window:
@@ -40,20 +42,13 @@ class SmaStrategy(Strategy):
             return False
         return True
 
-    def __calculate_smas_for_signal(self, price: float) -> str:
+    def __calculate(self, price: float) -> str:
         # Calculate the short-term and long-term SMAs.
-        short_sma = self.rolling_prices['price'].tail(self.short_window).mean()
-        long_sma = self.rolling_prices['price'].tail(self.long_window).mean()
+        short_sma = sma(self.rolling_prices, self.short_window)
+        long_sma = sma(self.rolling_prices, self.long_window)
 
         # Generate a signal based on the golden cross or death cross.
-        if short_sma > long_sma and self.last_signal != 'buy':
-            signal = 'buy'
-            self.last_signal = 'buy'
-        elif short_sma < long_sma and self.last_signal == 'buy':
-            signal = 'sell'
-            self.last_signal = 'sell'
-        else:
-            signal = 'hold'
+        signal, self.last_signal = golden_cross(short_sma, long_sma, self.last_signal)
 
         # Store the results.
         self.results.loc[len(self.results)] = [price, short_sma, long_sma, signal]
