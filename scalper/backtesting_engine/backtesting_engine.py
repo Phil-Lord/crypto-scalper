@@ -23,13 +23,13 @@ class BacktestingEngine:
 
         results = []
 
-        for _, row in self.minutely_data.iterrows():
-            result = self.strategy.evaluate(row['price'])
-            result['price'] = row['price']
-            result['timestamp'] = row.index
+        for row in self.minutely_data.itertuples(index=True, name='Row'):
+            result = self.strategy.evaluate(row.price)
+            result['price'] = row.price
+            result['timestamp'] = row.Index
             results.append(result)
 
-        self.results = pd.DataFrame(results)
+        self.results = pd.DataFrame(results).set_index('timestamp')
         return self.results
 
     def get_results(self) -> pd.DataFrame:
