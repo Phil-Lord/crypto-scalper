@@ -23,7 +23,11 @@ class BacktestingEngine:
 
         results = []
 
-        for row in self.minutely_data.itertuples(index=True, name='Row'):
+        for row in tqdm(
+            self.minutely_data.itertuples(index=True, name='Row'),
+            total=len(self.minutely_data),
+            desc='Evaluating Strategy'
+        ):
             result = self.strategy.evaluate(row.price)
             result['price'] = row.price
             result['timestamp'] = row.Index
@@ -41,7 +45,7 @@ class BacktestingEngine:
     def __load_minutely_data(self) -> None:
         '''
         Load trade data from the database, indexed by timestamp (as datetimes).
-        Then resample into minutely, forward-filled closing prices. 
+        Then resample into minutely, forward-filled closing prices.
         '''
         # Get trade data from the database using a Trades Repository.
         trades = TradesRepository().get(self.pair, self.start, self.end)
