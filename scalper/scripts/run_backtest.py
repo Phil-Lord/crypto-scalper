@@ -19,9 +19,8 @@ def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = No
         end = get_second_timestamp(*parse_datetime(end))
 
     engine = BacktestingEngine(kraken_pair, strategy_name, start, end, **params)
-    engine.run()
+    results = engine.run()
 
-    results = engine.get_strategy_results()
     plot_sma_results(results, pair)
 
 

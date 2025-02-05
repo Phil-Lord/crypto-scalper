@@ -12,6 +12,7 @@ class BacktestingEngine:
         self.end = end
         self.strategy = StrategyManager().get_strategy(strategy_name, **strategy_params)
         self.minutely_data = None
+        self.results = None
 
     def run(self) -> pd.DataFrame:
         '''
@@ -20,17 +21,22 @@ class BacktestingEngine:
         if self.minutely_data is None:
             self.__load_minutely_data()
 
-        # Apply the strategy evaluation to each row.
-        tqdm.pandas()
-        self.minutely_data['signal'] = self.minutely_data['price'].progress_apply(
-            self.strategy.evaluate)
-        return self.minutely_data
+        results = []
 
-    def get_strategy_results(self) -> pd.DataFrame:
+        for _, row in self.minutely_data.iterrows():
+            result = self.strategy.evaluate(row['price'])
+            result['price'] = row['price']
+            result['timestamp'] = row.index
+            results.append(result)
+
+        self.results = pd.DataFrame(results)
+        return self.results
+
+    def get_results(self) -> pd.DataFrame:
         '''
         Get results composed by the strategy throughout the training run.
         '''
-        return self.strategy.get_results()
+        return self.results
 
     def __load_minutely_data(self) -> None:
         '''
