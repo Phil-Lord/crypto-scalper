@@ -1,7 +1,8 @@
 import pandas as pd
 
 
-def sma(prices: pd.Series, window: int) -> float:
+def sma(prices: list[int], window: int) -> float:
+    prices = pd.Series(prices)
     return prices.rolling(window=window).mean().iloc[-1]
 
 

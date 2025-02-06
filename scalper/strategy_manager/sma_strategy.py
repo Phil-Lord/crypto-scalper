@@ -11,39 +11,30 @@ class SmaStrategy(Strategy):
         self.short_window = short_window
         self.long_window = long_window
         self.last_signal = 'hold'
-
-        # The rolling price data for the long window to be used during evaluation.
-        self.rolling_prices = pd.Series(dtype=float)
+        self.rolling_prices = []
 
     def evaluate(self, price: float) -> dict:
-        # Roll prices and return 'hold' if there aren't enough to calculate the long SMA.
+        ''' Roll prices and compute signal based on SMA. '''
         ready_to_evaluate = self.__roll_prices(price)
         if not ready_to_evaluate:
-            return {'status': 'hold', 'short_sma': None, 'long_sma': None}
+            return {'signal': 'hold', 'short_sma': None, 'long_sma': None}
 
-        # Calculate SMAs and return signal.
-        return self.__calculate()
+        return self.__compute_signal()
 
     def __roll_prices(self, price: float) -> bool:
-        # Add the new price to the end of the long data window.
-        self.rolling_prices = pd.concat(
-            [self.rolling_prices, pd.Series([price])], ignore_index=True)
+        ''' Roll prices and return false until we can calculate the long SMA. '''
+        self.rolling_prices.append(price)
 
-        # If the data exceeds the length of the long window, drop the oldest row.
         if len(self.rolling_prices) > self.long_window:
-            self.rolling_prices = self.rolling_prices.iloc[1:].reset_index(drop=True)
+            self.rolling_prices.pop(0)
 
-        # If we don't have enough data to calculate the long SMA, add 'hold' to results.
-        if len(self.rolling_prices) < self.long_window:
-            return False
-        return True
+        return len(self.rolling_prices) >= self.long_window
 
-    def __calculate(self) -> dict:
-        # Calculate the short-term and long-term SMAs.
+    def __compute_signal(self) -> dict:
+        ''' Calculate SMAs and generate signal based on the Golden or Death Cross. '''
         short_sma = sma(self.rolling_prices, self.short_window)
         long_sma = sma(self.rolling_prices, self.long_window)
 
-        # Generate a signal based on the golden cross or death cross.
         signal, self.last_signal = golden_cross(short_sma, long_sma, self.last_signal)
 
         return {'signal': signal, 'short_sma': short_sma, 'long_sma': long_sma}
