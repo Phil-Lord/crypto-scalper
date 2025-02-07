@@ -6,21 +6,22 @@ from strategy_manager import StrategyManager
 
 
 class BacktestingEngine:
-    def __init__(self, pair: str, strategy_name: str, start: float = None, end: float = None, **strategy_params):
+    def __init__(self, pair: str, strategy_name: str, start: float = None, end: float = None, interval: int = 1, **strategy_params):
         self.pair = pair
         self.start = start
         self.end = end
+        self.interval = interval
         self.strategy = StrategyManager().get_strategy(strategy_name, **strategy_params)
-        self.minutely_data = None
+        self.interval_data = None
         self.results = None
 
     def run(self) -> pd.DataFrame:
         ''' Load trades from the database and generate a strategy signal for each interval. '''
-        if self.minutely_data is None:
-            self.__load_minutely_data()
+        if self.interval_data is None:
+            self.__load_interval_data()
 
         results = []
-        for row in tqdm(self.minutely_data.itertuples(index=True, name='Row')):
+        for row in tqdm(self.interval_data.itertuples(index=True, name='Row')):
             result = self.strategy.generate_signal(row.price)
             result.update({'price': row.price, 'timestamp': row.Index})
             results.append(result)
@@ -32,7 +33,7 @@ class BacktestingEngine:
         ''' Get price and indicator results from the backtesting run. '''
         return self.results
 
-    def __load_minutely_data(self) -> None:
+    def __load_interval_data(self) -> None:
         '''
         Load trade data from the database, indexed by timestamp (as datetimes).
         Then resample into minutely, forward-filled closing prices.
@@ -46,4 +47,4 @@ class BacktestingEngine:
 
         # Resample trades into minutely bins, keeping the last price of each minute.
         # If a minute has no trades, forward-fill it with the previous minute's price.
-        self.minutely_data = trades.resample('1min').agg({'price': 'last'}).ffill()
+        self.interval_data = trades.resample(f'{self.interval}min').agg({'price': 'last'}).ffill()
