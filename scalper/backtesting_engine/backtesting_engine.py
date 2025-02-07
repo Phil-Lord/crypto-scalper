@@ -15,31 +15,21 @@ class BacktestingEngine:
         self.results = None
 
     def run(self) -> pd.DataFrame:
-        '''
-        Load data from the database and run strategy evaluation on each minute.
-        '''
+        ''' Load trades from the database and generate a strategy signal for each interval. '''
         if self.minutely_data is None:
             self.__load_minutely_data()
 
         results = []
-
-        for row in tqdm(
-            self.minutely_data.itertuples(index=True, name='Row'),
-            total=len(self.minutely_data),
-            desc='Evaluating Strategy'
-        ):
-            result = self.strategy.evaluate(row.price)
-            result['price'] = row.price
-            result['timestamp'] = row.Index
+        for row in tqdm(self.minutely_data.itertuples(index=True, name='Row')):
+            result = self.strategy.generate_signal(row.price)
+            result.update({'price': row.price, 'timestamp': row.Index})
             results.append(result)
 
         self.results = pd.DataFrame(results).set_index('timestamp')
         return self.results
 
     def get_results(self) -> pd.DataFrame:
-        '''
-        Get results composed by the strategy throughout the training run.
-        '''
+        ''' Get price and indicator results from the backtesting run. '''
         return self.results
 
     def __load_minutely_data(self) -> None:

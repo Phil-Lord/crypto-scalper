@@ -3,6 +3,6 @@ from abc import ABC, abstractmethod
 
 class Strategy(ABC):
     @abstractmethod
-    def evaluate(self, price: float) -> dict:
+    def generate_signal(self, price: float) -> dict:
         ''' Returns a 'buy', 'sell', or 'hold' signal based on the passed price. '''
         pass

@@ -1,3 +1,5 @@
+from collections import deque
+
 from .base_strategy import Strategy
 from .indicators import sma
 from .rules import golden_cross
@@ -9,9 +11,9 @@ class SmaStrategy(Strategy):
         self.short_window = short_window
         self.long_window = long_window
         self.last_signal = 'hold'
-        self.rolling_prices = []
+        self.rolling_prices = deque(maxlen=long_window)
 
-    def evaluate(self, price: float) -> dict:
+    def generate_signal(self, price: float) -> dict:
         ''' Roll prices and compute signal based on SMA. '''
         self.__roll_prices(price)
         if len(self.rolling_prices) < self.long_window:
@@ -20,8 +22,6 @@ class SmaStrategy(Strategy):
 
     def __roll_prices(self, price: float) -> None:
         self.rolling_prices.append(price)
-        if len(self.rolling_prices) > self.long_window:
-            self.rolling_prices.pop(0)
 
     def __compute_signal(self) -> dict:
         ''' Calculate SMAs and generate signal based on the Golden or Death Cross. '''
