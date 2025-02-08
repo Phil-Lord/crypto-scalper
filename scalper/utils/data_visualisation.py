@@ -2,6 +2,17 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
+def plot_position_profits(position_profits: pd.DataFrame) -> None:
+    plt.figure(figsize=(10, 5))
+    plt.bar(position_profits.index, position_profits["profit"], color=[
+            "green" if p >= 0 else "red" for p in position_profits["profit"]])
+    plt.axhline(0, color="black", linewidth=1)
+    plt.xlabel("Trade Index")
+    plt.ylabel("Profit per Position (Quote Currency)")
+    plt.title("Profit per Position")
+    plt.show()
+
+
 def plot_sma_results(results: pd.DataFrame, pair: str) -> None:
     # Extract buys and sells.
     buys = results[results["signal"] == "buy"]
