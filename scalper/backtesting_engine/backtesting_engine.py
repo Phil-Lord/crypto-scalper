@@ -6,11 +6,11 @@ from strategy_manager import StrategyManager
 
 
 class BacktestingEngine:
-    def __init__(self, pair: str, strategy_name: str, start: float = None, end: float = None, interval: int = 1, **strategy_params):
+    def __init__(self, pair: str, strategy_name: str, start: float = None, end: float = None, interval: int = None, **strategy_params):
         self.pair = pair
         self.start = start
         self.end = end
-        self.interval = interval
+        self.interval = interval if interval is not None else 1
         self.strategy = StrategyManager().get_strategy(strategy_name, **strategy_params)
         self.resampled_prices = None
         self.results = None
