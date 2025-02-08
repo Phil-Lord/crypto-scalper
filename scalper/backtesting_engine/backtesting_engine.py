@@ -12,16 +12,16 @@ class BacktestingEngine:
         self.end = end
         self.interval = interval
         self.strategy = StrategyManager().get_strategy(strategy_name, **strategy_params)
-        self.interval_data = None
+        self.resampled_prices = None
         self.results = None
 
     def run(self) -> pd.DataFrame:
         ''' Load trades from the database and generate a strategy signal for each interval. '''
-        if self.interval_data is None:
-            self.__load_interval_data()
+        if self.resampled_prices is None:
+            self.__load_resampled_prices()
 
         results = []
-        for row in tqdm(self.interval_data.itertuples(index=True, name='Row')):
+        for row in tqdm(self.resampled_prices.itertuples(index=True, name='Row')):
             result = self.strategy.generate_signal(row.price)
             result.update({'price': row.price, 'timestamp': row.Index})
             results.append(result)
@@ -33,18 +33,13 @@ class BacktestingEngine:
         ''' Get price and indicator results from the backtesting run. '''
         return self.results
 
-    def __load_interval_data(self) -> None:
+    def __load_resampled_prices(self) -> None:
         '''
-        Load trade data from the database, indexed by timestamp (as datetimes).
-        Then resample into minutely, forward-filled closing prices.
+        Load trade data from the database, indexed by timestamp (as millisecond-precise datetimes).
+        Then resample into forward-filled closing prices for each interval.
         '''
-        # Get trade data from the database using a Trades Repository.
         trades = TradesRepository().get(self.pair, self.start, self.end)
-
-        # Convert timestamps to datetime format (retaining millisecond precision).
         trades["timestamp"] = pd.to_datetime(trades["timestamp"], unit="s")
         trades.set_index("timestamp", inplace=True)
-
-        # Resample trades into minutely bins, keeping the last price of each minute.
-        # If a minute has no trades, forward-fill it with the previous minute's price.
-        self.interval_data = trades.resample(f'{self.interval}min').agg({'price': 'last'}).ffill()
+        self.resampled_prices = trades.resample(
+            f'{self.interval}min').agg({'price': 'last'}).ffill()
