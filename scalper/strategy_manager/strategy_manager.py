@@ -1,11 +1,13 @@
 from .base_strategy import Strategy
+from .ema_strategy import EmaStrategy
 from .sma_strategy import SmaStrategy
 
 
 class StrategyManager:
     def __init__(self):
         self.strategies = {
-            'sma': SmaStrategy
+            'sma': SmaStrategy,
+            'ema': EmaStrategy
         }
 
     def get_strategy(self, strategy_name: str, **kwargs) -> Strategy:

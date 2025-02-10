@@ -1,7 +1,7 @@
 import click
 
 from backtesting_engine import BacktestingEngine
-from utils import get_second_timestamp, Pair, parse_datetime, plot_position_profits, plot_sma_results, SMA_50_200
+from utils import get_second_timestamp, Pair, parse_datetime, plot_position_profits, plot_sma_results, SMA_50_200, SMA_EMA_RSI
 
 
 @click.command()
@@ -12,7 +12,7 @@ from utils import get_second_timestamp, Pair, parse_datetime, plot_position_prof
 @click.option('--interval', required=False, help='Interval (e.g. 1, 3, 5, 15, etc.')
 def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = None, interval: int = 1) -> None:
     kraken_pair = Pair[pair].value
-    params = SMA_50_200
+    params = SMA_EMA_RSI
 
     if start is not None:
         start = get_second_timestamp(*parse_datetime(start))

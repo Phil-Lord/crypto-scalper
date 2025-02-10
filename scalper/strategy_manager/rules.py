@@ -6,7 +6,7 @@ def golden_cross(short_sma: float, long_sma: float, last_signal: str) -> tuple:
     return 'hold', last_signal
 
 
-def rsi_overbought_undersold(rsi: float, overbought=70, oversold=30) -> str:
+def rsi_overbought_undersold(rsi: float, overbought: float, oversold: float) -> str:
     if rsi > overbought:
         return 'sell'
     elif rsi < oversold:

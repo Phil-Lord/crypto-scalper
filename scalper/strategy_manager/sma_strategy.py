@@ -7,7 +7,6 @@ from .rules import golden_cross
 
 class SmaStrategy(Strategy):
     def __init__(self, short_window: int, long_window: int):
-        super().__init__()
         self.short_window = short_window
         self.long_window = long_window
         self.last_signal = 'hold'
