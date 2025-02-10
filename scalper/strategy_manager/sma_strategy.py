@@ -2,7 +2,7 @@ from collections import deque
 
 from .base_strategy import Strategy
 from .indicators import sma
-from .rules import golden_cross
+from .rules import crossover
 
 
 class SmaStrategy(Strategy):
@@ -26,5 +26,5 @@ class SmaStrategy(Strategy):
         ''' Calculate SMAs and generate signal based on the Golden or Death Cross. '''
         short_sma = sma(self.rolling_prices, self.short_window)
         long_sma = sma(self.rolling_prices, self.long_window)
-        signal, self.last_signal = golden_cross(short_sma, long_sma, self.last_signal)
+        signal, self.last_signal = crossover(short_sma, long_sma, self.last_signal)
         return {'signal': signal, 'short_sma': short_sma, 'long_sma': long_sma}

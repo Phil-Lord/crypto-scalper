@@ -1,8 +1,8 @@
 from collections import deque
 
 from .base_strategy import Strategy
-from .indicators import ema, rsi, sma
-from .rules import golden_cross, rsi_overbought_undersold
+from .indicators import ema_trend, rsi, sma_trend
+from .rules import trending_crossover, rsi_overbought_undersold
 
 
 class EmaStrategy(Strategy):
@@ -27,11 +27,12 @@ class EmaStrategy(Strategy):
 
     def __compute_signal(self) -> dict:
         ''' Calculate MAs/RSI and generate signal based on the Golden Cross and RSI. '''
-        short_sma = ema(self.rolling_prices, self.short_window)
-        long_sma = sma(self.rolling_prices, self.long_window)
+        prev_short_sma, short_sma = ema_trend(self.rolling_prices, self.short_window)
+        prev_long_sma, long_sma = sma_trend(self.rolling_prices, self.long_window)
         rsi_value = rsi(self.rolling_prices, self.rsi_window)
 
-        sma_signal, sma_last_signal = golden_cross(short_sma, long_sma, self.last_signal)
+        sma_signal, sma_last_signal = trending_crossover(
+            prev_short_sma, prev_long_sma, short_sma, long_sma, self.last_signal)
         rsi_signal = rsi_overbought_undersold(rsi_value, self.overbought, self.oversold)
 
         if sma_signal == rsi_signal:
