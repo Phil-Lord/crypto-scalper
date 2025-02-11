@@ -1,8 +1,8 @@
 from collections import deque
 
 from .base_strategy import Strategy
-from .indicators import ema, rsi, sma
-from .rules import trending_crossover, rsi_overbought_undersold
+from .indicators import adx, ema, rsi
+from .rules import trending_crossover, rsi_overbought_undersold, get_adx_signal
 
 
 class EmaStrategy(Strategy):
@@ -32,12 +32,15 @@ class EmaStrategy(Strategy):
         short_sma = ema(self.rolling_prices, self.short_window)
         long_sma = ema(self.rolling_prices, self.long_window)
         rsi_value = rsi(self.rolling_prices, self.rsi_window)
+        adx_results = adx(self.rolling_prices, self.rsi_window)
+        adx_value, plus_di, minus_di = adx_results['adx'], adx_results['+di'], adx_results['-di']
 
         sma_signal, sma_last_signal, self.trend_counter = trending_crossover(
             short_sma, long_sma, self.last_signal, self.trend_counter, self.trend_threshold)
         rsi_signal = rsi_overbought_undersold(rsi_value, self.overbought, self.oversold)
+        adx_signal = get_adx_signal(adx_value, plus_di, minus_di)
 
-        if sma_signal == rsi_signal:
+        if sma_signal == rsi_signal == adx_signal:
             signal = sma_signal
             self.last_signal = sma_last_signal
         else:

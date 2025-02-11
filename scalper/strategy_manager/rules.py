@@ -27,3 +27,16 @@ def rsi_overbought_undersold(rsi: float, overbought: float, oversold: float) -> 
     elif rsi < 50 and rsi > oversold:
         return 'buy'
     return 'hold'
+
+
+def get_adx_signal(adx, plus_di, minus_di):
+    if adx is not None and adx > 25:  # Only trade in strong trends
+        if plus_di > minus_di:
+            signal = 'buy'
+        elif minus_di > plus_di:
+            signal = 'sell'
+        else:
+            signal = 'hold'
+    else:
+        signal = 'hold'
+    return signal
