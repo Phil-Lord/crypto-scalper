@@ -6,18 +6,24 @@ def crossover(short_sma: float, long_sma: float, last_signal: str) -> tuple:
     return 'hold', last_signal
 
 
-def trending_crossover(prev_short_sma: float, prev_long_sma: float, short_sma: float, long_sma: float, last_signal: str):
+def trending_crossover(short_sma: float, long_sma: float, last_signal: str, counter: int, threshold: int):
     """ Determines buy/sell signals based on SMA crossover with trend confirmation. """
-    if prev_short_sma <= prev_long_sma and short_sma > long_sma and last_signal != 'buy':
-        return 'buy', 'buy'
-    elif prev_short_sma >= prev_long_sma and short_sma < long_sma and last_signal == 'buy':
-        return 'sell', 'sell'
-    return 'hold', last_signal
+    if short_sma > long_sma:
+        counter += 1
+        if counter >= threshold and last_signal != 'buy':
+            return 'buy', 'buy', counter
+    elif short_sma < long_sma:
+        counter += 1
+        if counter >= threshold and last_signal == 'buy':
+            return 'sell', 'sell', counter
+    else:
+        counter = 0
+    return 'hold', last_signal, counter
 
 
 def rsi_overbought_undersold(rsi: float, overbought: float, oversold: float) -> str:
-    if rsi > overbought:
+    if rsi > 50 and rsi < overbought:
         return 'sell'
-    elif rsi < oversold:
+    elif rsi < 50 and rsi > oversold:
         return 'buy'
     return 'hold'

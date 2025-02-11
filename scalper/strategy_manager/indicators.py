@@ -6,21 +6,9 @@ def sma(prices: list[float], window: int) -> float:
     return prices.rolling(window=window).mean().iloc[-1]
 
 
-def sma_trend(prices: list[float], window: int) -> tuple:
-    prices = pd.Series(prices)
-    sma = prices.rolling(window=window).mean()
-    return sma.iloc[-2], sma.iloc[-1]
-
-
 def ema(prices: list[float], window: int) -> float:
     prices = pd.Series(prices)
     return prices.ewm(span=window, adjust=False).mean().iloc[-1]
-
-
-def ema_trend(prices: list[float], window: int) -> tuple:
-    prices = pd.Series(prices)
-    ema = prices.ewm(span=window, adjust=False).mean()
-    return ema.iloc[-2], ema.iloc[-1]
 
 
 def rsi(prices: list[float], window: float) -> float:

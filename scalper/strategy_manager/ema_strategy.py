@@ -1,7 +1,7 @@
 from collections import deque
 
 from .base_strategy import Strategy
-from .indicators import ema_trend, rsi, sma_trend
+from .indicators import ema, rsi, sma
 from .rules import trending_crossover, rsi_overbought_undersold
 
 
@@ -14,6 +14,8 @@ class EmaStrategy(Strategy):
         self.oversold = oversold
         self.last_signal = 'hold'
         self.rolling_prices = deque(maxlen=long_window)
+        self.trend_counter = 0
+        self.trend_threshold = 0
 
     def generate_signal(self, price: float) -> dict:
         ''' Roll prices and compute signal based on SMA, EMA, and RSI. '''
@@ -26,13 +28,13 @@ class EmaStrategy(Strategy):
         self.rolling_prices.append(price)
 
     def __compute_signal(self) -> dict:
-        ''' Calculate MAs/RSI and generate signal based on the Golden Cross and RSI. '''
-        prev_short_sma, short_sma = ema_trend(self.rolling_prices, self.short_window)
-        prev_long_sma, long_sma = sma_trend(self.rolling_prices, self.long_window)
+        ''' Calculate MAs/RSI and generate signal based on trending crossovers and RSI. '''
+        short_sma = ema(self.rolling_prices, self.short_window)
+        long_sma = ema(self.rolling_prices, self.long_window)
         rsi_value = rsi(self.rolling_prices, self.rsi_window)
 
-        sma_signal, sma_last_signal = trending_crossover(
-            prev_short_sma, prev_long_sma, short_sma, long_sma, self.last_signal)
+        sma_signal, sma_last_signal, self.trend_counter = trending_crossover(
+            short_sma, long_sma, self.last_signal, self.trend_counter, self.trend_threshold)
         rsi_signal = rsi_overbought_undersold(rsi_value, self.overbought, self.oversold)
 
         if sma_signal == rsi_signal:
