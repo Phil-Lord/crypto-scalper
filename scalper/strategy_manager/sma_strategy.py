@@ -14,13 +14,10 @@ class SmaStrategy(Strategy):
 
     def generate_signal(self, price: float) -> dict:
         ''' Roll prices and compute signal based on SMA. '''
-        self.__roll_prices(price)
+        self.rolling_prices.append(price)
         if len(self.rolling_prices) < self.long_window:
             return {'signal': 'hold', 'short_sma': None, 'long_sma': None}
         return self.__compute_signal()
-
-    def __roll_prices(self, price: float) -> None:
-        self.rolling_prices.append(price)
 
     def __compute_signal(self) -> dict:
         ''' Calculate SMAs and generate signal based on the Golden or Death Cross. '''
