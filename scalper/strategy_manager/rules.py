@@ -22,15 +22,15 @@ def trending_crossover(short_sma: float, long_sma: float, last_signal: str, coun
 
 
 def rsi_overbought_undersold(rsi: float, overbought: float, oversold: float) -> str:
-    if rsi > 50 and rsi < overbought:
+    if rsi > overbought:
         return 'sell'
-    elif rsi < 50 and rsi > oversold:
+    elif rsi < oversold:
         return 'buy'
     return 'hold'
 
 
 def get_adx_signal(adx, plus_di, minus_di):
-    if adx is not None and adx > 25:  # Only trade in strong trends
+    if adx is not None and adx > 20:  # Only trade in strong trends
         if plus_di > minus_di:
             signal = 'buy'
         elif minus_di > plus_di:
