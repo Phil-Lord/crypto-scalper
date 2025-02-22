@@ -23,9 +23,12 @@ class MaCrossoverRule(Rule):
         return 'hold'
 
     def compute_vectorised(self, data: pd.DataFrame) -> pd.Series:
-        # Q: What's going on here?
-        return pd.Series(
-            np.where(data[self.short_ma] > data[self.long_ma], 'buy',
-                     np.where(data[self.short_ma] < data[self.long_ma], 'sell', 'hold')),
-            index=data.index
-        )
+        short_ma = data[self.short_ma]
+        long_ma = data[self.long_ma]
+        cross_above = (short_ma > long_ma) & (short_ma.shift(1) <= long_ma.shift(1))
+        cross_below = (short_ma < long_ma) & (short_ma.shift(1) >= long_ma.shift(1))
+
+        signals = pd.Series('hold', index=data.index)
+        signals[cross_above] = 'buy'
+        signals[cross_below] = 'sell'
+        return signals

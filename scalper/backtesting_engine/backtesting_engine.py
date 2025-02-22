@@ -21,7 +21,6 @@ class BacktestingEngine:
         if self.resampled_prices is None:
             self.__load_resampled_prices()
 
-        # Q: How do we get timestamp in there?
         self.results = self.strategy.vectorised_compute(self.resampled_prices['price'])
 
         # results = []

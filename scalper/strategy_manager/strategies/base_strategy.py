@@ -24,7 +24,7 @@ class Strategy:
         for rule_name, rule in self.rules.items():
             signals[rule_name] = rule.check({**indicator_values, **self.state})
 
-        self.__update_state(signals)
+        self._update_state(signals)
         return {'signals': signals, 'indicators': indicator_values, 'price': price}
 
     def vectorised_compute(self, prices: pd.Series) -> pd.DataFrame:
@@ -40,7 +40,7 @@ class Strategy:
 
         return self._simulate_state_transitions(data)
 
-    def __update_state(self, signals: dict):
+    def _update_state(self, signals: dict):
         pass
 
     def _simulate_state_transitions(self, data: pd.DataFrame) -> pd.DataFrame:
