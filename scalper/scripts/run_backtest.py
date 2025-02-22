@@ -21,10 +21,10 @@ def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = No
 
     engine = BacktestingEngine(kraken_pair, strategy_name, start, end, interval, **params)
     results = engine.run()
-    position_profits = engine.calculate_profit(1000)
+    # position_profits = engine.calculate_profit(1000)
 
     plot_sma_results(results, pair)
-    plot_position_profits(position_profits)
+    # plot_position_profits(position_profits)
 
 
 if __name__ == '__main__':

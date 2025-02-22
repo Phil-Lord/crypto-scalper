@@ -38,10 +38,10 @@ class Strategy:
         for rule_name, rule in self.rules.items():
             data[rule_name] = rule.compute_vectorised(data)
 
-        return self.__simulate_state_transitions(data)
+        return self._simulate_state_transitions(data)
 
     def __update_state(self, signals: dict):
         pass
 
-    def __simulate_state_transitions(self, data: pd.DataFrame) -> pd.DataFrame:
+    def _simulate_state_transitions(self, data: pd.DataFrame) -> pd.DataFrame:
         pass

@@ -15,8 +15,8 @@ def plot_position_profits(position_profits: pd.DataFrame) -> None:
 
 def plot_sma_results(results: pd.DataFrame, pair: str) -> None:
     # Extract buys and sells.
-    buys = results[results["signal"] == "buy"]
-    sells = results[results["signal"] == "sell"]
+    buys = results[results["crossover"] == "buy"]
+    sells = results[results["crossover"] == "sell"]
 
     plt.figure(figsize=(12, 6))
 
