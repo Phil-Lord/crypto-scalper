@@ -9,7 +9,6 @@ class SmaIndicator(Indicator):
         self.prices = []
 
     def update(self, price: float) -> float:
-        # Q: Do I still need to use a dequeue here?
         self.prices.append(price)
         if len(self.prices) < self.window:
             return None
