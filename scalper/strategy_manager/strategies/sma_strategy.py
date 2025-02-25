@@ -21,13 +21,12 @@ class SmaStrategy(Strategy):
 
     def _simulate_state_transitions(self, data: pd.DataFrame) -> pd.DataFrame:
         df = data.copy()
-        signals = df['crossover']
 
         # Create boolean masks for buy/sell signals.
-        buy_signals = (signals == 'buy')
-        sell_signals = (signals == 'sell')
+        buy_signals = (df['crossover'] == 'buy')
+        sell_signals = (df['crossover'] == 'sell')
 
-        # Convert to numeric state changes (+1 buy, -1 sell) and calculate cumulative position state.
+        # Convert to numeric state changes (+1 buy, -1 sell) to calculate cumulative position state.
         state_changes = buy_signals.astype(int) - sell_signals.astype(int)
         cumulative_state = state_changes.cumsum().clip(lower=0, upper=1)
 

@@ -28,11 +28,11 @@ class Strategy:
         return {'signals': signals, 'indicators': indicator_values, 'price': price}
 
     def vectorised_compute(self, prices: pd.Series) -> pd.DataFrame:
+        ''' Compute indicators and rules for a series of prices, then simulate state transitions. '''
         indicator_data = {
             name: indicator.compute_vectorised(prices)
             for name, indicator in self.indicators.items()
         }
-
         data = pd.DataFrame({'price': prices, **indicator_data})
 
         for rule_name, rule in self.rules.items():
@@ -44,4 +44,5 @@ class Strategy:
         pass
 
     def _simulate_state_transitions(self, data: pd.DataFrame) -> pd.DataFrame:
+        ''' Simulates state transitions across a trading run in a vectorised way. '''
         pass

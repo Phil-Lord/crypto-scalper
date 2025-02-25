@@ -22,6 +22,7 @@ class MaCrossoverRule(Rule):
         return 'hold'
 
     def compute_vectorised(self, data: pd.DataFrame) -> pd.Series:
+        ''' Calculate MAs across the entire dataset. '''
         short_ma = data[self.short_ma]
         long_ma = data[self.long_ma]
         cross_above = (short_ma > long_ma) & (short_ma.shift(1) <= long_ma.shift(1))
