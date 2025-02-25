@@ -10,6 +10,6 @@ class Rule(ABC):
         pass
 
     @abstractmethod
-    def compute_vectorised(self, data: pd.DataFrame) -> pd.Series:
-        ''' Compute rule signals across dataframe for backtesting. '''
+    def compute_vectorised(self, results: pd.DataFrame) -> pd.Series:
+        ''' Compute rule signals across the results dataframe for backtesting. '''
         pass

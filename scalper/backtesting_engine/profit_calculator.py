@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 
@@ -27,3 +28,19 @@ def calculate_position_profits(results: pd.DataFrame, initial_quote_balance: flo
     print(quote_balance)
 
     return pd.DataFrame(positions)
+
+
+def simulate_state_transitions(results: pd.DataFrame) -> pd.DataFrame:
+    df = results.copy()
+
+    # Create boolean masks for buy/sell signals.
+    buy_signals = (df['signal'] == 'buy')
+    sell_signals = (df['signal'] == 'sell')
+
+    # Convert to numeric state changes (+1 buy, -1 sell) to calculate cumulative position state.
+    state_changes = buy_signals.astype(int) - sell_signals.astype(int)
+    cumulative_state = state_changes.cumsum().clip(lower=0, upper=1)
+
+    # Map numeric states to position labels.
+    df['position'] = np.where(cumulative_state, 'long', 'out')
+    return df

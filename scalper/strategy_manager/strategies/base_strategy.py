@@ -16,7 +16,7 @@ class Strategy:
     def register_rule(self, name: str, rule: Rule):
         self.rules[name] = rule
 
-    def live_update(self, price: float) -> dict:
+    def generate_signal(self, price: float) -> dict:
         indicator_values = {name: indicator.update(price)
                             for name, indicator in self.indicators.items()}
 
@@ -28,21 +28,21 @@ class Strategy:
         return {'signals': signals, 'indicators': indicator_values, 'price': price}
 
     def vectorised_compute(self, prices: pd.Series) -> pd.DataFrame:
-        ''' Compute indicators and rules for a series of prices, then simulate state transitions. '''
-        indicator_data = {
+        ''' Compute indicators and rules for a series of prices, then generate signals. '''
+        indicator_results = {
             name: indicator.compute_vectorised(prices)
             for name, indicator in self.indicators.items()
         }
-        data = pd.DataFrame({'price': prices, **indicator_data})
+        results = pd.DataFrame({'price': prices, **indicator_results})
 
         for rule_name, rule in self.rules.items():
-            data[rule_name] = rule.compute_vectorised(data)
+            results[rule_name] = rule.compute_vectorised(results)
 
-        return self._simulate_state_transitions(data)
+        return self._generate_signals(results)
 
     def _update_state(self, signals: dict):
         pass
 
-    def _simulate_state_transitions(self, data: pd.DataFrame) -> pd.DataFrame:
-        ''' Simulates state transitions across a trading run in a vectorised way. '''
+    def _generate_signals(self, results: pd.DataFrame) -> pd.DataFrame:
+        ''' Generates signals based the results of a vectorised trading run. '''
         pass

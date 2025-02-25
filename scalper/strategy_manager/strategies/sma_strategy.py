@@ -19,17 +19,6 @@ class SmaStrategy(Strategy):
         elif signals['crossover'] == 'sell':
             self.state['position'] = 'out'
 
-    def _simulate_state_transitions(self, data: pd.DataFrame) -> pd.DataFrame:
-        df = data.copy()
-
-        # Create boolean masks for buy/sell signals.
-        buy_signals = (df['crossover'] == 'buy')
-        sell_signals = (df['crossover'] == 'sell')
-
-        # Convert to numeric state changes (+1 buy, -1 sell) to calculate cumulative position state.
-        state_changes = buy_signals.astype(int) - sell_signals.astype(int)
-        cumulative_state = state_changes.cumsum().clip(lower=0, upper=1)
-
-        # Map numeric states to position labels.
-        df['position'] = np.where(cumulative_state, 'long', 'out')
-        return df
+    def _generate_signals(self, results: pd.DataFrame) -> pd.DataFrame:
+        results['signal'] = results['crossover']
+        return results

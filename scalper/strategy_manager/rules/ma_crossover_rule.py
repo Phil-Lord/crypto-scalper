@@ -21,14 +21,14 @@ class MaCrossoverRule(Rule):
             return 'sell'
         return 'hold'
 
-    def compute_vectorised(self, data: pd.DataFrame) -> pd.Series:
-        ''' Calculate MAs across the entire dataset. '''
-        short_ma = data[self.short_ma]
-        long_ma = data[self.long_ma]
+    def compute_vectorised(self, results: pd.DataFrame) -> pd.Series:
+        ''' Generate signals based on short and long MAs across the entire trading run. '''
+        short_ma = results[self.short_ma]
+        long_ma = results[self.long_ma]
         cross_above = (short_ma > long_ma) & (short_ma.shift(1) <= long_ma.shift(1))
         cross_below = (short_ma < long_ma) & (short_ma.shift(1) >= long_ma.shift(1))
 
-        signals = pd.Series('hold', index=data.index)
+        signals = pd.Series('hold', index=results.index)
         signals[cross_above] = 'buy'
         signals[cross_below] = 'sell'
         return signals
