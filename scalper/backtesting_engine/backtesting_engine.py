@@ -1,5 +1,4 @@
 import pandas as pd
-from tqdm import tqdm
 
 from data_system import TradesRepository
 from .profit_calculator import calculate_position_profits
@@ -20,16 +19,7 @@ class BacktestingEngine:
         ''' Load trades from the database and generate a strategy signal for each interval. '''
         if self.resampled_prices is None:
             self.__load_resampled_prices()
-
         self.results = self.strategy.vectorised_compute(self.resampled_prices['price'])
-
-        # results = []
-        # for row in tqdm(self.resampled_prices.itertuples(index=True, name='Row')):
-        #     result = self.strategy.generate_signal(row.price)
-        #     result.update({'price': row.price, 'timestamp': row.Index})
-        #     results.append(result)
-
-        # self.results = pd.DataFrame(results).set_index('timestamp')
         return self.results
 
     def get_results(self) -> pd.DataFrame:
