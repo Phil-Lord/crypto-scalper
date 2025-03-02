@@ -42,7 +42,8 @@ class Strategy:
         for rule_name, rule in self.rules.items():
             results[rule_name] = rule.compute_vectorised(results)
 
-        return self._generate_signals(results)
+        results['signal'] = self._generate_signals(results)
+        return results
 
     def _generate_signal(self, rule_results: dict) -> str:
         ''' Generate a signal based on the rule results of a training run interval. '''
