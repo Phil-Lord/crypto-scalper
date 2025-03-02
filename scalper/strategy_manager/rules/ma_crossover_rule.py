@@ -11,13 +11,18 @@ class MaCrossoverRule(Rule):
     def check(self, current_state: dict) -> str:
         short_ma = current_state[self.short_ma]
         long_ma = current_state[self.long_ma]
+        prev_short_ma = current_state.get(f'prev_{self.short_ma}', None)
+        prev_long_ma = current_state.get(f'prev_{self.long_ma}', None)
 
-        if short_ma is None or long_ma is None:
+        if short_ma is None or long_ma is None or prev_short_ma is None or prev_long_ma is None:
             return 'hold'
 
-        if short_ma > long_ma and current_state['last_action'] != 'buy':
+        cross_above = (short_ma > long_ma) and (prev_short_ma <= prev_long_ma)
+        cross_below = (short_ma < long_ma) and (prev_short_ma >= prev_long_ma)
+
+        if cross_above and current_state['last_action'] != 'buy':
             return 'buy'
-        elif short_ma < long_ma and current_state['last_action'] == 'buy':
+        elif cross_below and current_state['last_action'] == 'buy':
             return 'sell'
         return 'hold'
 

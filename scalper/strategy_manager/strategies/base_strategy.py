@@ -9,6 +9,7 @@ class Strategy:
         self.indicators: dict[str, Indicator] = {}
         self.rules: dict[str, Rule] = {}
         self.last_action = 'sell'
+        self.prev_indicator_values = {}
 
     def register_indicator(self, name: str, indicator: Indicator):
         self.indicators[name] = indicator
@@ -22,10 +23,18 @@ class Strategy:
             name: indicator.update(price)
             for name, indicator in self.indicators.items()
         }
+
+        current_state = {**indicator_results,
+                         'last_action': self.last_action, **self.prev_indicator_values}
         rule_results = {
-            rule_name: rule.check({**indicator_results, 'last_action': self.last_action})
+            rule_name: rule.check(current_state)
             for rule_name, rule in self.rules.items()
         }
+
+        self.prev_indicator_values = {
+            f'prev_{name}': value for name, value in indicator_results.items()
+        }
+
         signal = self._generate_signal(rule_results)
         if signal in ['buy', 'sell']:
             self.last_action = signal
