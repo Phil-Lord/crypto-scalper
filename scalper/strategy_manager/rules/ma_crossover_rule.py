@@ -15,9 +15,9 @@ class MaCrossoverRule(Rule):
         if short_ma is None or long_ma is None:
             return 'hold'
 
-        if short_ma > long_ma and current_state['position'] != 'long':
+        if short_ma > long_ma and current_state['last_action'] != 'buy':
             return 'buy'
-        elif short_ma < long_ma and current_state['position'] == 'long':
+        elif short_ma < long_ma and current_state['last_action'] == 'buy':
             return 'sell'
         return 'hold'
 

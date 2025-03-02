@@ -8,7 +8,7 @@ class Strategy:
     def __init__(self):
         self.indicators: dict[str, Indicator] = {}
         self.rules: dict[str, Rule] = {}
-        self.state = {'position': 'out'}
+        self.last_action = 'sell'
 
     def register_indicator(self, name: str, indicator: Indicator):
         self.indicators[name] = indicator
@@ -17,15 +17,19 @@ class Strategy:
         self.rules[name] = rule
 
     def generate_signal(self, price: float) -> dict:
-        indicator_values = {name: indicator.update(price)
-                            for name, indicator in self.indicators.items()}
-
-        signals = {}
-        for rule_name, rule in self.rules.items():
-            signals[rule_name] = rule.check({**indicator_values, **self.state})
-
-        self._update_state(signals)
-        return {'signals': signals, 'indicators': indicator_values, 'price': price}
+        ''' Compute indicators and rules. '''
+        indicator_results = {
+            name: indicator.update(price)
+            for name, indicator in self.indicators.items()
+        }
+        rule_results = {
+            rule_name: rule.check({**indicator_results, 'last_action': self.last_action})
+            for rule_name, rule in self.rules.items()
+        }
+        signal = self._generate_signal(rule_results)
+        if signal in ['buy', 'sell']:
+            self.last_action = signal
+        return {'price': price, **indicator_results, **rule_results, 'signal': signal}
 
     def vectorised_compute(self, prices: pd.Series) -> pd.DataFrame:
         ''' Compute indicators and rules for a series of prices, then generate signals. '''
@@ -40,7 +44,7 @@ class Strategy:
 
         return self._generate_signals(results)
 
-    def _update_state(self, signals: dict):
+    def _generate_signal(self, rule_results: dict) -> str:
         pass
 
     def _generate_signals(self, results: pd.DataFrame) -> pd.DataFrame:

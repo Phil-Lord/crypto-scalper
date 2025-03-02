@@ -12,11 +12,8 @@ class SmaStrategy(Strategy):
         self.register_indicator('long_sma', SmaIndicator(long_window))
         self.register_rule('crossover', MaCrossoverRule('short_sma', 'long_sma'))
 
-    def _update_state(self, signals: dict):
-        if signals['crossover'] == 'buy':
-            self.state['position'] = 'long'
-        elif signals['crossover'] == 'sell':
-            self.state['position'] = 'out'
+    def _generate_signal(self, rule_results: dict) -> str:
+        return rule_results['crossover']
 
     def _generate_signals(self, results: pd.DataFrame) -> pd.DataFrame:
         results['signal'] = results['crossover']
