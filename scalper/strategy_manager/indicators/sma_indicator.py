@@ -12,7 +12,7 @@ class SmaIndicator(Indicator):
         self.prices.append(price)
         if len(self.prices) < self.window:
             return None
-        return sum(self.prices[-self.window:])/self.window
+        return sum(self.prices[-self.window:]) / self.window
 
     def compute_vectorised(self, prices: pd.Series) -> pd.Series:
         return prices.rolling(self.window).mean()

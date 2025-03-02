@@ -17,7 +17,7 @@ class Strategy:
         self.rules[name] = rule
 
     def generate_signal(self, price: float) -> dict:
-        ''' Compute indicators and rules. '''
+        ''' Compute indicators and rules given a new price, then generate signal. '''
         indicator_results = {
             name: indicator.update(price)
             for name, indicator in self.indicators.items()
@@ -45,8 +45,9 @@ class Strategy:
         return self._generate_signals(results)
 
     def _generate_signal(self, rule_results: dict) -> str:
+        ''' Generate a signal based on the rule results of a training run interval. '''
         pass
 
     def _generate_signals(self, results: pd.DataFrame) -> pd.DataFrame:
-        ''' Generates signals based the results of a vectorised trading run. '''
+        ''' Generate signals based on the results of a vectorised trading run. '''
         pass
