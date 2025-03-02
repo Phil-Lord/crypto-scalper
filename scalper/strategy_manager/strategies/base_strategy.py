@@ -30,7 +30,6 @@ class Strategy:
             rule_name: rule.check(current_state)
             for rule_name, rule in self.rules.items()
         }
-
         self.prev_indicator_values = {
             f'prev_{name}': value for name, value in indicator_results.items()
         }

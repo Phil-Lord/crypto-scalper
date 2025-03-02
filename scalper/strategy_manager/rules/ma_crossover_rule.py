@@ -9,6 +9,7 @@ class MaCrossoverRule(Rule):
         self.long_ma = long_ma
 
     def check(self, current_state: dict) -> str:
+        ''' Generate a signal based on the current and previous MAs and the last action.  '''
         short_ma = current_state[self.short_ma]
         long_ma = current_state[self.long_ma]
         prev_short_ma = current_state.get(f'prev_{self.short_ma}', None)
@@ -34,6 +35,12 @@ class MaCrossoverRule(Rule):
         cross_below = (short_ma < long_ma) & (short_ma.shift(1) >= long_ma.shift(1))
 
         signals = pd.Series('hold', index=results.index)
-        signals[cross_above] = 'buy'
-        signals[cross_below] = 'sell'
+        last_action = 'sell'
+        for i in range(len(results)):
+            if cross_above.iloc[i] and last_action != 'buy':
+                signals.iloc[i] = 'buy'
+                last_action = 'buy'
+            elif cross_below.iloc[i] and last_action == 'buy':
+                signals.iloc[i] = 'sell'
+                last_action = 'sell'
         return signals
