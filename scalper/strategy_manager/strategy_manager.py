@@ -1,15 +1,13 @@
-# from .base_strategy import Strategy
-# from .ema_strategy import EmaStrategy
-# from .sma_strategy import SmaStrategy
-from .strategies.base_strategy import Strategy
-from .strategies.sma_strategy import SmaStrategy
+from .legacy import SmaStrategyLegacy, EmaStrategyLegacy
+from .strategies import Strategy, SmaStrategy
 
 
 class StrategyManager:
     def __init__(self):
         self.strategies = {
-            'sma': SmaStrategy
-            # 'ema': EmaStrategy
+            'sma': SmaStrategy,
+            'sma_legacy': SmaStrategyLegacy,
+            'ema_legacy': EmaStrategyLegacy
         }
 
     def get_strategy(self, strategy_name: str, **kwargs) -> Strategy:

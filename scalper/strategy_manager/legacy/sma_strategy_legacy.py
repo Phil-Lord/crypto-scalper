@@ -1,11 +1,11 @@
 from collections import deque
 
-from .base_strategy import Strategy
+from .base_strategy_legacy import StrategyLegacy
 from .indicators import sma
 from .rules import crossover
 
 
-class SmaStrategy(Strategy):
+class SmaStrategyLegacy(StrategyLegacy):
     def __init__(self, short_window: int, long_window: int):
         self.short_window = short_window
         self.long_window = long_window

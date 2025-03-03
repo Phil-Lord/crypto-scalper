@@ -1,11 +1,11 @@
 from collections import deque
 
-from .base_strategy import Strategy
+from .base_strategy_legacy import StrategyLegacy
 from .indicators import adx, ema, rsi
 from .rules import trending_crossover, rsi_overbought_undersold, get_adx_signal
 
 
-class EmaStrategy(Strategy):
+class EmaStrategyLegacy(StrategyLegacy):
     def __init__(self, short_window: int, long_window: int, rsi_window: int, overbought: float, oversold: float):
         self.short_window = short_window
         self.long_window = long_window
