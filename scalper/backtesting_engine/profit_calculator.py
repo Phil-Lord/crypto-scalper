@@ -24,10 +24,28 @@ def calculate_position_profits(results: pd.DataFrame, initial_quote_balance: flo
             base_balance = 0
 
     if base_balance > 0:
-        quote_balance = base_balance * results.iloc[-1]['price']
+        quote_balance += base_balance * results.iloc[-1]['price']
     print(quote_balance)
 
     return pd.DataFrame(positions)
+
+
+def get_final_quote_balance(results: pd.DataFrame, initial_quote_balance: float = 1000) -> float:
+    quote_balance = initial_quote_balance
+    base_balance = 0
+
+    for index, row in results.iterrows():
+        if row['signal'] == 'buy' and quote_balance > 0:
+            base_balance = quote_balance / row['price']
+            quote_balance = 0
+        elif row['signal'] == 'sell' and base_balance > 0:
+            quote_balance = base_balance * row['price']
+            base_balance = 0
+
+    if base_balance > 0:
+        quote_balance += base_balance * results.iloc[-1]['price']
+
+    return quote_balance
 
 
 def simulate_state_transitions(results: pd.DataFrame) -> pd.DataFrame:

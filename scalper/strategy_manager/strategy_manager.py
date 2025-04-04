@@ -5,9 +5,9 @@ from .strategies import Strategy, SmaStrategy
 class StrategyManager:
     def __init__(self):
         self.strategies = {
-            'sma': SmaStrategy,
-            'sma_legacy': SmaStrategyLegacy,
-            'ema_legacy': EmaStrategyLegacy
+            'SmaStrategy': SmaStrategy,
+            'SmaStrategyLegacy': SmaStrategyLegacy,
+            'EmaStrategyLegacy': EmaStrategyLegacy
         }
 
     def get_strategy(self, strategy_name: str, **kwargs) -> Strategy:

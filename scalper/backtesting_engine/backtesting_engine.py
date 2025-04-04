@@ -2,7 +2,8 @@ import pandas as pd
 from tqdm import tqdm
 
 from data_system import TradesRepository
-from .profit_calculator import calculate_position_profits
+from .profit_calculator import calculate_position_profits, get_final_quote_balance
+from .parameter_optimisation import optimise_parameters
 from strategy_manager import StrategyManager
 
 
@@ -35,6 +36,9 @@ class BacktestingEngine:
 
         return self.results
 
+    def optimise_parameters(self, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
+        return optimise_parameters(self, param_grid, n_trials)
+
     def get_results(self) -> pd.DataFrame:
         ''' Get price and indicator results from the backtesting run. '''
         return self.results
@@ -43,6 +47,11 @@ class BacktestingEngine:
         if self.results is None:
             raise ValueError('Backtest yet to be ran, call run() first.')
         return calculate_position_profits(self.results, initial_quote_balance)
+
+    def get_final_quote_balance(self, initial_quote_balance: float = 1000) -> float:
+        if self.results is None:
+            raise ValueError('Backtest yet to be ran, call run() first.')
+        return get_final_quote_balance(self.results, initial_quote_balance)
 
     def __load_resampled_prices(self) -> None:
         '''
