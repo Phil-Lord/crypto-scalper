@@ -1,3 +1,6 @@
+import os
+import sqlite3
+
 import optuna
 
 from strategy_manager import StrategyManager
@@ -17,6 +20,10 @@ def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int 
         print(f'{trial.number}: {final_quote_balance} {params}')
         return final_quote_balance
 
+    db_dir = os.path.join(os.path.dirname(__file__))
+    os.makedirs(db_dir, exist_ok=True)
+    db_url = f'sqlite:///{db_dir}/optimisation_shared/optimisation.db'
+
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
         direction='maximize',
@@ -25,8 +32,17 @@ def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int 
             multivariate=True,
             group=True,
             constant_liar=True
-        )
+        ),
+        storage=db_url,
+        load_if_exists=True
     )
+
+    # Enable Write-Ahead Logging (WAL) mode
+    conn = sqlite3.connect(f'{db_dir}/optimisation_shared/optimisation.db')
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")  # Better performance than FULL
+    conn.close()
+
     study.optimize(objective, n_trials=n_trials, n_jobs=-1)
 
     return {
