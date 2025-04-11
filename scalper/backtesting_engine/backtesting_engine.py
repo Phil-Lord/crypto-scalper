@@ -37,6 +37,8 @@ class BacktestingEngine:
         return self.results
 
     def optimise_parameters(self, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
+        if self.resampled_prices is None:
+            self.__load_resampled_prices()
         return optimise_parameters(self, param_grid, n_trials)
 
     def get_results(self) -> pd.DataFrame:
