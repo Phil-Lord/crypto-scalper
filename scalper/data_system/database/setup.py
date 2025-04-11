@@ -5,13 +5,13 @@ from sqlalchemy.orm import sessionmaker
 
 from .models import Base
 
-# Get the store directory and a create path to the trading-pair-specific csv file.
+# Get the store directory and a create path to the trading-pair-specific db file.
 DATABASE_DIR = os.path.join(os.path.dirname(__file__))
 os.makedirs(DATABASE_DIR, exist_ok=True)
 DATABASE_URL = f'sqlite:///{DATABASE_DIR}/trades.db'
 
 # Create an engine and a factory for constructing session objects against it.
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
 

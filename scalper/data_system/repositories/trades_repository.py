@@ -9,6 +9,7 @@ class TradesRepository(Repository):
         '''
         Insert a list of trades for a certain pair in their raw format from the Kraken API.
         '''
+        print(f'Inserting {pair} trades.')
         with SessionLocal() as session:
             crud = TradeCRUD(session)
             crud.add_trades(trades, pair)
@@ -17,6 +18,7 @@ class TradesRepository(Repository):
         '''
         Fetch trades for a certain pair between a start and end date.
         '''
+        print(f'Fetching {pair} trades from {start} to {end}.')
         with SessionLocal() as session:
             crud = TradeCRUD(session)
             return crud.get_trades(pair, start, end)
