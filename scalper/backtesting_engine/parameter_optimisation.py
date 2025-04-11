@@ -20,7 +20,12 @@ def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
         direction='maximize',
-        sampler=optuna.samplers.TPESampler(n_startup_trials=10, multivariate=True)
+        sampler=optuna.samplers.TPESampler(
+            n_startup_trials=10,
+            multivariate=True,
+            group=True,
+            constant_liar=True
+        )
     )
     study.optimize(objective, n_trials=n_trials, n_jobs=-1)
 
