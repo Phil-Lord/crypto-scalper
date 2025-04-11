@@ -2,7 +2,7 @@ import click
 
 from backtesting_engine import BacktestingEngine
 from strategy_manager import StrategyManager
-from utils import get_second_timestamp, Pair, parse_datetime, plot_position_profits, plot_sma_results, SMA_50_200, SMA_GRID
+from utils import get_second_timestamp, Pair, parse_datetime, plot_position_profits, plot_sma_results, SMA_GRID
 
 
 @click.command()
@@ -16,7 +16,7 @@ from utils import get_second_timestamp, Pair, parse_datetime, plot_position_prof
 def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = None,
                  interval: int = 1, vectorised: bool = None, optimise: bool = False) -> None:
     kraken_pair = Pair[pair].value
-    params = SMA_50_200
+    params = {'short_window': 50, 'long_window': 93}
     param_grid = SMA_GRID
 
     if start is not None:
@@ -28,7 +28,7 @@ def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = No
                                end, interval, vectorised, **params)
 
     if optimise:
-        optimisation_results = engine.optimise_parameters(param_grid, 1000)
+        optimisation_results = engine.optimise_parameters(param_grid, 50)
 
         print("Best Parameters:", optimisation_results['best_params'])
         print("Best Profit:", optimisation_results['best_profit'])
