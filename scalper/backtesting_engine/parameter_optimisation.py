@@ -7,7 +7,7 @@ from strategy_manager import StrategyManager
 
 
 def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
-    def objective(trial):
+    def objective(trial: optuna.Trial) -> float:
         params = {}
         for param_name, param_range in param_grid.items():
             params[param_name] = trial.suggest_int(param_name, param_range[0], param_range[1])
@@ -50,3 +50,39 @@ def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int 
         'best_profit': study.best_value,
         'study': study
     }
+
+
+def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
+    def objective(trial: optuna.Trial) -> float:
+        params = {}
+        for param_name, param_range in param_grid.items():
+            params[param_name] = trial.suggest_int(param_name, param_range[0], param_range[1])
+
+        strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
+        engine.strategy = strategy
+        engine.run()
+        final_quote_balance = engine.get_final_quote_balance()
+
+        print(f'{trial.number}: {final_quote_balance} {params}')
+        return final_quote_balance
+
+    study_name = f'{engine.strategy.__class__.__name__}-{engine.pair}-{engine.start}-{engine.end}'
+    db_url = ''
+    storage = optuna.storages.RDBStorage(
+        url=db_url,
+        engine_kwargs={'pool_size': 10, 'max_overflow': 10, 'pool_pre_ping': True}
+    )
+
+    study = optuna.create_study(
+        study_name=study_name,
+        storage=storage,
+        load_if_exists=True,
+        direction='maximize',
+        sampler=optuna.samplers.TPESampler(
+            n_startup_trials=10,
+            multivariate=True,
+            group=True,
+            constant_liar=True
+        )
+    )
+    study.optimize(objective, n_trials=n_trials, n_jobs=-1)
