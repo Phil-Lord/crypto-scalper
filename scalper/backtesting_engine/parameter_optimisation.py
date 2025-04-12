@@ -2,6 +2,7 @@ import os
 import sqlite3
 
 import optuna
+import pandas as pd
 
 from strategy_manager import StrategyManager
 
@@ -54,6 +55,7 @@ def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int 
 
 def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
     def objective(trial: optuna.Trial) -> float:
+        ''' Optimisation Objective: Maximise final quote balance.  '''
         params = {}
         for param_name, param_range in param_grid.items():
             params[param_name] = trial.suggest_int(param_name, param_range[0], param_range[1])
@@ -66,23 +68,46 @@ def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_tri
         print(f'{trial.number}: {final_quote_balance} {params}')
         return final_quote_balance
 
-    study_name = f'{engine.strategy.__class__.__name__}-{engine.pair}-{engine.start}-{engine.end}'
+    # Create study name using backtest params.
+    study_name = (
+        f'{engine.strategy.__class__.__name__}_'
+        f'{engine.pair}_'
+        f'{pd.to_datetime(engine.start, unit='s').strftime('%Y%m%d')}-'
+        f'{pd.to_datetime(engine.end, unit='s').strftime('%Y%m%d')}'
+    )
+
+    # Create postgres Optuna storage instance.
     db_url = ''
     storage = optuna.storages.RDBStorage(
         url=db_url,
-        engine_kwargs={'pool_size': 10, 'max_overflow': 10, 'pool_pre_ping': True}
+        engine_kwargs={
+            'pool_size': 10,
+            'max_overflow': 10,
+            'pool_pre_ping': True,
+            'connect_args': {
+                'application_name': f'worker_{os.getpid()}',  # For PgAdmin monitoring.
+                'keepalives_idle': 30  # Prevent cloud timeouts.
+            }
+        }
     )
 
-    study = optuna.create_study(
-        study_name=study_name,
-        storage=storage,
-        load_if_exists=True,
-        direction='maximize',
-        sampler=optuna.samplers.TPESampler(
-            n_startup_trials=10,
-            multivariate=True,
-            group=True,
-            constant_liar=True
+    # Create study.
+    try:
+        study = optuna.create_study(
+            study_name=study_name,
+            storage=storage,
+            load_if_exists=True,
+            direction='maximize',
+            sampler=optuna.samplers.TPESampler(
+                n_startup_trials=min(20, n_trials//5),  # Dynamic startup.
+                multivariate=True,
+                group=True,
+                constant_liar=True
+            )
         )
-    )
+    except optuna.exceptions.DuplicatedStudyError:
+        # Handle concurrent study creation.
+        study = optuna.load_study(study_name=study_name, storage=storage)
+
+    # Run optimisation.
     study.optimize(objective, n_trials=n_trials, n_jobs=-1)
