@@ -163,3 +163,5 @@ cython_debug/
 
 # Databases
 *.db
+*.db-shm
+*.db-wal

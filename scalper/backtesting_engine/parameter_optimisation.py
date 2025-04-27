@@ -113,6 +113,7 @@ def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_tri
         study = optuna.load_study(study_name=study_name, storage=storage)
 
     # Run optimisation.
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
     study.optimize(objective, n_trials=n_trials, n_jobs=-1)
     return {
         'best_params': study.best_params,
