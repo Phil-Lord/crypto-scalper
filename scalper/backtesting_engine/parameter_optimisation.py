@@ -114,3 +114,8 @@ def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_tri
 
     # Run optimisation.
     study.optimize(objective, n_trials=n_trials, n_jobs=-1)
+    return {
+        'best_params': study.best_params,
+        'best_profit': study.best_value,
+        'study': study
+    }
