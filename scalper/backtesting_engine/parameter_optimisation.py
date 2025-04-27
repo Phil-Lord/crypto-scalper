@@ -77,7 +77,10 @@ def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_tri
     )
 
     # Create postgres Optuna storage instance.
-    db_url = ''
+    db_url = (
+        'postgresql://optuna_user:password@localhost:5432/optuna_db'
+        '?application_name=optuna_worker'
+    )
     storage = optuna.storages.RDBStorage(
         url=db_url,
         engine_kwargs={
@@ -86,7 +89,7 @@ def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_tri
             'pool_pre_ping': True,
             'connect_args': {
                 'application_name': f'worker_{os.getpid()}',  # For PgAdmin monitoring.
-                'keepalives_idle': 30  # Prevent cloud timeouts.
+                'keepalives_idle': 30  # Prevent timeouts.
             }
         }
     )
