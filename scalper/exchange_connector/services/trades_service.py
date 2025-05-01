@@ -1,9 +1,12 @@
+import logging
+
 from .kraken_service import KrakenService
 
 
 class TradesService(KrakenService):
     def fetch_trades(self, pair: str, since: int, until: int) -> list[dict]:
         self.validate_pair(pair)
+        logging.basicConfig(level=logging.INFO)
         trades = []
         current_since = since
 

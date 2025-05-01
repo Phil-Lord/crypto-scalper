@@ -24,8 +24,7 @@ class TradeExecutor:
 
     def run_strategy(self, price: float) -> str:
         ''' Call strategy manager to get trade signal. '''
-        result = self.strategy.generate_signal(price)
-        return result['signal']
+        return self.strategy.generate_signal(price)['signal']
 
     def execute_trade(self, signal: str):
         ''' Call exchange connector to add order. '''

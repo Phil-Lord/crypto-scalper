@@ -4,7 +4,6 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 from exchange_connector.api import KrakenTooManyRequestsError, KrakenApiClient
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
