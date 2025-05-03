@@ -4,11 +4,16 @@ from .exceptions import KrakenTooManyRequestsError
 
 
 class KrakenApiClient:
-    BASE_URL = 'https://api.kraken.com/0/public/'
+    BASE_URL = 'https://api.kraken.com'
 
-    def make_request(self, endpoint: str, params: dict[str, any]) -> dict[str, any]:
+    def make_request(self, method: str, endpoint: str, body: str, headers: dict) -> dict[str, any]:
         try:
-            response = requests.get(f'{self.BASE_URL}{endpoint}', params=params)
+            response = requests.request(
+                method,
+                self.BASE_URL + endpoint,
+                data=body,
+                headers=headers
+            )
             response.raise_for_status()
             return response.json()
         except requests.RequestException:
