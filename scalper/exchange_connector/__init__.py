@@ -1,2 +1,3 @@
-from .connectors.trades_connector import TradesConnector
+from .connectors.add_order_connector import AddOrderConnector
 from .connectors.ticker_connector import TickerConnector
+from .connectors.trades_connector import TradesConnector
