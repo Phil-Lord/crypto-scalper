@@ -10,7 +10,8 @@ from utils import Pair
 def add_order(pair: str, signal: str) -> None:
     kraken_pair = Pair[pair].value
     connector = AddOrderConnector()
-    connector.add_order(kraken_pair, signal)
+    result = connector.add_order(kraken_pair, signal)
+    print(result)
 
 
 if __name__ == '__main__':

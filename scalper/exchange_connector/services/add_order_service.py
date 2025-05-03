@@ -6,6 +6,7 @@ import logging
 import time
 
 from .kraken_service import KrakenService
+from utils import get_env_var
 
 
 class AddOrderService(KrakenService):
@@ -15,8 +16,8 @@ class AddOrderService(KrakenService):
 
         method = 'POST'
         endpoint = '/0/private/AddOrder'
-        public_key = ''
-        private_key = ''
+        public_key = get_env_var('KRAKEN_TRADING_API_KEY')
+        private_key = get_env_var('KRAKEN_TRADING_API_SECRET')
         nonce = self.get_nonce()
 
         body = json.dumps({
@@ -25,7 +26,7 @@ class AddOrderService(KrakenService):
             'type': signal,
             'pair': pair,
             'oflags': 'viqc',
-            'volume': '1'
+            'volume': '8'
         })
         headers = {
             'Content-Type': 'application/json',
