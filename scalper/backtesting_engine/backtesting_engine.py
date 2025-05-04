@@ -3,7 +3,7 @@ from tqdm import tqdm
 
 from data_system import TradesRepository
 from .profit_calculation import calculate_position_profits, get_final_quote_balance
-from .parameter_optimisation import optimise_parameters, optimise_parameters_postgres
+from .parameter_optimisation import optimise_parameters_postgres
 from strategy_manager import StrategyManager
 
 

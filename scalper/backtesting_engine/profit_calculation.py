@@ -13,12 +13,12 @@ def calculate_position_profits(results: pd.DataFrame, initial_quote_balance: flo
         signal, price = row['signal'], row['price']
 
         if signal == 'buy' and quote_balance > 0:
-            base_balance = quote_balance / price
+            base_balance = quote_balance / price * (1 - 0.0004)
             entry_price = price
             entry_time = index
             quote_balance = 0
         elif signal == 'sell' and base_balance > 0:
-            profit = (price - entry_price) * base_balance
+            profit = (price - entry_price) * base_balance * (1 - 0.0004)
             positions.append({'entry_time': entry_time, 'exit_time': index, 'profit': profit})
             quote_balance = base_balance * price
             base_balance = 0
@@ -36,10 +36,10 @@ def get_final_quote_balance(results: pd.DataFrame, initial_quote_balance: float 
 
     for index, row in results.iterrows():
         if row['signal'] == 'buy' and quote_balance > 0:
-            base_balance = quote_balance / row['price']
+            base_balance = quote_balance / row['price'] * (1 - 0.0004)
             quote_balance = 0
         elif row['signal'] == 'sell' and base_balance > 0:
-            quote_balance = base_balance * row['price']
+            quote_balance = base_balance * row['price'] * (1 - 0.0004)
             base_balance = 0
 
     if base_balance > 0:
