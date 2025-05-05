@@ -1,9 +1,9 @@
-from .base_connector import Connector
+from .base_connectors import FetchConnector
 from api import KrakenApiClient
 from services import OhlcService
 
 
-class OhlcConnector(Connector):
+class OhlcConnector(FetchConnector):
     def __init__(self):
         self.client = KrakenApiClient()
         self.service = OhlcService(self.client)
