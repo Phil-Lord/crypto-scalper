@@ -6,14 +6,13 @@ from .exceptions import KrakenTooManyRequestsError
 class KrakenApiClient:
     BASE_URL = 'https://api.kraken.com'
 
-    def make_request(self, method: str, endpoint: str, body: str, headers: dict) -> dict[str, any]:
+    def make_request(self, method: str, endpoint: str, params: dict, headers: dict) -> dict[str, any]:
         try:
-            response = requests.request(
-                method,
-                self.BASE_URL + endpoint,
-                data=body,
-                headers=headers
-            )
+            url = self.BASE_URL + endpoint
+            if method.upper() == 'GET':
+                response = requests.get(url, params=params)
+            elif method.upper() == 'POST':
+                response = requests.post(url, data=params, headers=headers)
             response.raise_for_status()
             return response.json()
         except requests.RequestException:

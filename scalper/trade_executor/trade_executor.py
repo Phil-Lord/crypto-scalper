@@ -8,7 +8,7 @@ class TradeExecutor:
     def __init__(self, pair: str, interval: int, strategy_name: str, **strategy_params):
         self.pair = pair
         self.interval = interval
-        self.connector = TickerConnector()
+        self.ticker_connector = TickerConnector()
         self.strategy = StrategyManager().get_strategy(strategy_name, **strategy_params)
 
     def start(self) -> None:
@@ -20,7 +20,7 @@ class TradeExecutor:
 
     def get_price(self) -> float:
         ''' Call exchange connector to get ticker price data. '''
-        return float(self.connector.fetch(self.pair)['c'][0])
+        return float(self.ticker_connector.fetch(self.pair)['c'][0])
 
     def run_strategy(self, price: float) -> str:
         ''' Call strategy manager to get trade signal. '''

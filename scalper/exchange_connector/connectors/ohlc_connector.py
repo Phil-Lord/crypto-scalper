@@ -8,5 +8,5 @@ class OhlcConnector(Connector):
         self.client = KrakenApiClient()
         self.service = OhlcService(self.client)
 
-    def fetch(self, pair: str, interval: int, start: int) -> list[dict[str, any]]:
+    def fetch(self, pair: str, interval: int, start: int) -> list[list[any]]:
         return self.service.fetch_ohlc(pair, interval, start)

@@ -7,4 +7,5 @@ class TickerService(KrakenService):
     def fetch_ticker(self, pair: str) -> dict:
         self.validate_pair(pair)
         logging.basicConfig(level=logging.ERROR)
-        return self.fetch_data('Ticker', {'pair': pair})[pair]
+
+        return self.make_request('GET', '/0/public/Ticker', {'pair': pair}, {})[pair]

@@ -1,46 +1,45 @@
 import base64
 import hashlib
 import hmac
-import json
 import logging
 import time
+import urllib
 
 from .kraken_service import KrakenService
 from utils import get_env_var
 
 
 class AddOrderService(KrakenService):
-    def add_order(self, pair: str, signal: str):
+    def add_order(self, pair: str, signal: str) -> dict:
         self.validate_pair(pair)
         logging.basicConfig(level=logging.INFO)
 
-        method = 'POST'
         endpoint = '/0/private/AddOrder'
         public_key = get_env_var('KRAKEN_TRADING_API_KEY')
         private_key = get_env_var('KRAKEN_TRADING_API_SECRET')
         nonce = self.get_nonce()
 
-        body = json.dumps({
+        params = {
             'nonce': nonce,
             'ordertype': 'market',
             'type': signal,
             'pair': pair,
             'oflags': 'viqc',
-            'volume': '8'
-        })
+            'volume': '1'
+        }
         headers = {
-            'Content-Type': 'application/json',
             'API-Key': public_key,
-            'API-Sign': self.get_signature(private_key, body, nonce, endpoint)
+            'API-Sign': self.get_signature(private_key, params, nonce, endpoint)
         }
 
-        return self.make_request(method, endpoint, body, headers)
+        return self.make_request('POST', endpoint, params, headers)
 
     def get_nonce(self) -> str:
         return str(int(time.time() * 1000))
 
-    def get_signature(self, private_key: str, data: str, nonce: str, endpoint: str) -> str:
-        message = endpoint.encode() + hashlib.sha256((nonce + data).encode()).digest()
+    def get_signature(self, private_key: str, params: str, nonce: str, endpoint: str) -> str:
+        post_params = urllib.parse.urlencode(params)
+        message = endpoint.encode() + hashlib.sha256((nonce + post_params).encode()).digest()
         return self.sign(private_key, message)
 
     def sign(self, private_key: str, message: bytes) -> str:

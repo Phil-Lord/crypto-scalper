@@ -18,8 +18,8 @@ class KrakenService:
         before=before_log(logger, logging.INFO),
         after=after_log(logger, logging.INFO)
     )
-    def make_request(self, method: str, endpoint: str, body: str, headers: dict) -> list[list[any]]:
-        response = self.client.make_request(method, endpoint, body, headers)
+    def make_request(self, method: str, endpoint: str, params: dict, headers: dict) -> dict:
+        response = self.client.make_request(method, endpoint, params, headers)
         self.client.handle_errors(response)
         return response['result']
 

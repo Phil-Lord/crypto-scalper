@@ -8,5 +8,5 @@ class TradesConnector(Connector):
         self.client = KrakenApiClient()
         self.service = TradesService(self.client)
 
-    def fetch(self, pair: str, start: int, end: int) -> list[dict]:
+    def fetch(self, pair: str, start: int, end: int) -> list[list[any]]:
         return self.service.fetch_trades(pair, start, end)
