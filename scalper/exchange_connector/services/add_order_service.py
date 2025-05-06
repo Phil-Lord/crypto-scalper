@@ -10,13 +10,23 @@ class AddOrderService(KrakenService):
         logging.basicConfig(level=logging.INFO)
 
         endpoint = '/0/private/AddOrder'
+
+        if signal == 'buy':
+            oflags = 'viqc'
+            # Get quote amount in wallet
+            volume = 0
+        elif signal == 'sell':
+            oflags = ''
+            # Get base amount in wallet
+            volume = 0
+
         params = {
             'nonce': get_nonce(),
             'ordertype': 'market',
             'type': signal,
             'pair': pair,
-            'oflags': 'viqc',
-            'volume': '1'
+            'oflags': oflags,
+            'volume': volume
         }
 
         return self.make_request('POST', endpoint, params)
