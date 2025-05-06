@@ -9,4 +9,4 @@ class OhlcService(KrakenService):
         logging.basicConfig(level=logging.INFO)
 
         params = {'pair': pair, 'interval': interval, 'since': since}
-        return self.make_request('GET', '/0/public/OHLC', params, {})[pair]
+        return self.make_request('GET', '/0/public/OHLC', params)[pair]

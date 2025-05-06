@@ -1,17 +1,19 @@
 import requests
 
 from .exceptions import KrakenTooManyRequestsError
+from exchange_connector.utils import get_headers
 
 
 class KrakenApiClient:
     BASE_URL = 'https://api.kraken.com'
 
-    def make_request(self, method: str, endpoint: str, params: dict, headers: dict) -> dict[str, any]:
+    def make_request(self, method: str, endpoint: str, params: dict) -> dict[str, any]:
         try:
             url = self.BASE_URL + endpoint
             if method.upper() == 'GET':
                 response = requests.get(url, params=params)
             elif method.upper() == 'POST':
+                headers = get_headers(params, endpoint)
                 response = requests.post(url, data=params, headers=headers)
             response.raise_for_status()
             return response.json()
