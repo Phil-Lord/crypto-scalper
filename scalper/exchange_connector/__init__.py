@@ -1,3 +1,4 @@
 from .connectors.add_order_connector import AddOrderConnector
+from .connectors.balance_connector import BalanceConnector
 from .connectors.ticker_connector import TickerConnector
 from .connectors.trades_connector import TradesConnector
