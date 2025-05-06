@@ -16,7 +16,7 @@ from utils import get_second_timestamp, Pair, parse_datetime, plot_position_prof
 def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = None,
                  interval: int = 1, vectorised: bool = None, optimise: bool = False) -> None:
     kraken_pair = Pair[pair].value
-    params = {'short_window': 6, 'long_window': 202}
+    params = {'short_window': 99, 'long_window': 399}
     param_grid = SMA_GRID
 
     if start is not None:
