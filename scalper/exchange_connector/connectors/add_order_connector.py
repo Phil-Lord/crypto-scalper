@@ -8,5 +8,6 @@ class AddOrderConnector(PlaceConnector):
         self.client = KrakenApiClient()
         self.service = AddOrderService(self.client)
 
-    def place(self, pair: str, signal: str) -> dict:
-        return self.service.add_order(pair, signal)
+    def place(self, pair: str, signal: str, volume: float) -> dict:
+        ''' Place a market order. Buy volume in quote, sell volume in base. '''
+        return self.service.add_order(pair, signal, volume)
