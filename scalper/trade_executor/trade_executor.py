@@ -1,6 +1,6 @@
 import time
 
-from exchange_connector import TickerConnector
+from exchange_connector import AddOrderConnector, BalanceConnector, TickerConnector
 from strategy_manager import StrategyManager
 
 
@@ -9,13 +9,16 @@ class TradeExecutor:
         self.pair = pair
         self.interval = interval
         self.ticker_connector = TickerConnector()
+        self.balance_connector = BalanceConnector()
+        self.add_order_connector = AddOrderConnector()
         self.strategy = StrategyManager().get_strategy(strategy_name, **strategy_params)
 
     def start(self) -> None:
         while True:
             price = self.get_price()
             signal = self.run_strategy(price)
-            self.execute_trade(signal)
+            if signal != 'hold':
+                self.execute_trade(signal)
             time.sleep(self.interval * 60)
 
     def get_price(self) -> float:
@@ -28,9 +31,11 @@ class TradeExecutor:
 
     def execute_trade(self, signal: str):
         ''' Call exchange connector to add order. '''
-        if (signal == 'buy'):
-            print('buy')
-        elif (signal == 'sell'):
-            print('sell')
-        elif (signal == 'hold'):
-            print('hold')
+        balances = self.balance_connector.fetch()
+        volume = balances['ZGBP'] if signal == 'buy' else balances['XXBT']
+        order_result = self.add_order_connector.place(self.pair, signal, volume)
+
+    def log_interval_results(self):
+        ''' Log the results of the interval. '''
+        # Time, ticker price, signal
+        # If buy/sell: execution time, execution price, volume, fee, order Id
