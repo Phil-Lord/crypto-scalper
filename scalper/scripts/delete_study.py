@@ -7,9 +7,12 @@ import optuna
 def delete_study(study: str):
     db_url = ('postgresql://optuna_user:password@localhost:5432/optuna_db')
     storage = optuna.storages.RDBStorage(url=db_url)
-    optuna.delete_study(study_name=study, storage=storage)
 
-    print('Study deleted. Remaining studies:')
+    if study != 'l':
+        optuna.delete_study(study_name=study, storage=storage)
+        print(f'Study {study} deleted.')
+
+    print('Remaining studies:')
     for study in optuna.study.get_all_study_summaries(storage=storage):
         print(study.study_name)
 
