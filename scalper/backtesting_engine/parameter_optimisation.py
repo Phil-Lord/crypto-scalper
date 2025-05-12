@@ -7,8 +7,9 @@ import pandas as pd
 from strategy_manager import StrategyManager
 
 
-def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
+def get_objective(engine, param_grid: dict[str, list[any]]):
     def objective(trial: optuna.Trial) -> float:
+        ''' Optimisation Objective: Maximise final quote balance.  '''
         params = {}
         for param_name, param_range in param_grid.items():
             params[param_name] = trial.suggest_int(param_name, param_range[0], param_range[1])
@@ -20,7 +21,10 @@ def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int 
 
         print(f'{trial.number}: {final_quote_balance} {params}')
         return final_quote_balance
+    return objective
 
+
+def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
     db_dir = os.path.join(os.path.dirname(__file__))
     os.makedirs(db_dir, exist_ok=True)
     db_url = f'sqlite:///{db_dir}/optimisation_shared/optimisation.db'
@@ -44,7 +48,7 @@ def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int 
     conn.execute("PRAGMA synchronous=NORMAL")  # Better performance than FULL
     conn.close()
 
-    study.optimize(objective, n_trials=n_trials, n_jobs=-1)
+    study.optimize(get_objective(engine, param_grid), n_trials=n_trials, n_jobs=-1)
 
     return {
         'best_params': study.best_params,
@@ -54,20 +58,6 @@ def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int 
 
 
 def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
-    def objective(trial: optuna.Trial) -> float:
-        ''' Optimisation Objective: Maximise final quote balance.  '''
-        params = {}
-        for param_name, param_range in param_grid.items():
-            params[param_name] = trial.suggest_int(param_name, param_range[0], param_range[1])
-
-        strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
-        engine.strategy = strategy
-        engine.run()
-        final_quote_balance = engine.get_final_quote_balance()
-
-        print(f'{trial.number}: {final_quote_balance} {params}')
-        return final_quote_balance
-
     # Create study name using backtest params.
     study_name = (
         f'{engine.strategy.__class__.__name__}_'
@@ -114,7 +104,7 @@ def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_tri
 
     # Run optimisation.
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    study.optimize(objective, n_trials=n_trials, n_jobs=-1)
+    study.optimize(get_objective(engine, param_grid), n_trials=n_trials, n_jobs=-1)
     return {
         'best_params': study.best_params,
         'best_profit': study.best_value,
