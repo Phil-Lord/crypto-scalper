@@ -10,7 +10,7 @@ from utils import Pair
 @click.option('--strategy_name', required=True, help='Strategy name (e.g. SmaStrategy)')
 def start_scalping(pair: str, interval: int, strategy_name: str) -> None:
     kraken_pair = Pair[pair].value
-    params = {'short_window': 6, 'long_window': 202}
+    params = {'short_window': 101, 'long_window': 1000}
 
     executor = TradeExecutor(kraken_pair, interval, strategy_name, **params)
     executor.start()

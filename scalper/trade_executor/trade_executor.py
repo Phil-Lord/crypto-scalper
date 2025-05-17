@@ -1,7 +1,19 @@
 import time
+import logging
 
 from exchange_connector import AddOrderConnector, BalanceConnector, TickerConnector
 from strategy_manager import StrategyManager
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    handlers=[
+        logging.FileHandler('trading.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 
 class TradeExecutor:
@@ -14,11 +26,18 @@ class TradeExecutor:
         self.strategy = StrategyManager().get_strategy(strategy_name, **strategy_params)
 
     def start(self) -> None:
+        logger.info(
+            f'TradeExecutor started for {self.pair} using {self.strategy.__class__.__name__}')
+
         while True:
-            price = self.get_price()
-            signal = self.run_strategy(price)
-            if signal != 'hold':
-                self.execute_trade(signal)
+            try:
+                price = self.get_price()
+                signal = self.run_strategy(price)
+                self.log_interval_results(price, signal)
+                if signal != 'hold':
+                    self.execute_trade(signal)
+            except Exception as e:
+                logger.error(f'Error in TradeExecutor: {e}', exc_info=True)
             time.sleep(self.interval * 60)
 
     def get_price(self) -> float:
@@ -33,9 +52,17 @@ class TradeExecutor:
         ''' Call exchange connector to add order. '''
         balances = self.balance_connector.fetch()
         volume = balances['ZGBP'] if signal == 'buy' else balances['XXBT']
-        order_result = self.add_order_connector.place(self.pair, signal, volume)
+        logger.info(f'Placing {signal.upper()} order: volume={volume}')
+        try:
+            order_result = self.add_order_connector.place(self.pair, signal, volume)
+            logger.info(
+                f'Trade executed: id: {order_result['txid']}, volume: {order_result['desc']['order']}')
+        except Exception as e:
+            logger.error(f'Trade execution failed: {e}', exc_info=True)
 
-    def log_interval_results(self):
+    def log_interval_results(self, price: float, signal: str):
         ''' Log the results of the interval. '''
+        logger.info(f'Interval result: price={price:.2f}, signal={signal}')
+
         # Time, ticker price, signal
         # If buy/sell: execution time, execution price, volume, fee, order Id
