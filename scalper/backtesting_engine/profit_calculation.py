@@ -5,21 +5,22 @@ import pandas as pd
 def calculate_position_profits(results: pd.DataFrame, initial_quote_balance: float = 1000) -> pd.DataFrame:
     positions = []
     quote_balance = initial_quote_balance
-    base_balance = 0
+    base_balance = 0.0
     entry_price = None
     entry_time = None
+    fee = 0.0004
 
-    for index, row in results.iterrows():
-        signal, price = row['signal'], row['price']
+    for row in results.itertuples():
+        signal, price, index = row.signal, row.price, row.Index
 
         if signal == 'buy' and quote_balance > 0:
-            base_balance = quote_balance / price * (1 - 0.0004)
+            base_balance = (quote_balance / price) * (1 - fee)
             entry_price = price
             entry_time = index
             quote_balance = 0
         elif signal == 'sell' and base_balance > 0:
             gross_sell = base_balance * price
-            net_sell = gross_sell * (1 - 0.0004)
+            net_sell = gross_sell * (1 - fee)
             profit = net_sell - (entry_price * base_balance)
             positions.append({'entry_time': entry_time, 'exit_time': index, 'profit': profit})
             quote_balance = net_sell
