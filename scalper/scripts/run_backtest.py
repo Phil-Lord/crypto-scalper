@@ -16,17 +16,21 @@ from utils import get_second_timestamp, Pair, parse_datetime, plot_position_prof
 @click.option('--optimise', is_flag=True, help='Enable parameter optimisation.')
 def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = None,
                  interval: int = 1, vectorised: bool = None, optimise: bool = False) -> None:
+    ''' Run a backtest on the specified trading pair and strategy. '''
+    # Create engine.
     engine = create_engine(pair, strategy_name, start, end, interval, vectorised)
 
+    # Optimise parameters if requested.
     if optimise:
         engine = optimise_parameters(engine, strategy_name)
 
+    # Run backtest.
     results = engine.run()
-
     output_results(engine, results, pair)
 
 
 def create_engine(pair: str, strategy_name: str, start: str, end: str, interval: int, vectorised: bool) -> BacktestingEngine:
+    ''' Create a backtesting engine with the specified parameters. '''
     kraken_pair = Pair[pair].value
     params = SMA_50_200
 
@@ -40,6 +44,7 @@ def create_engine(pair: str, strategy_name: str, start: str, end: str, interval:
 
 
 def optimise_parameters(engine: BacktestingEngine, strategy_name: str) -> BacktestingEngine:
+    ''' Optimise parameters for the specified strategy. '''
     param_grid = SMA_GRID
     n_trials = 100
 
@@ -54,6 +59,7 @@ def optimise_parameters(engine: BacktestingEngine, strategy_name: str) -> Backte
 
 
 def output_results(engine: BacktestingEngine, results: pd.DataFrame, pair: str) -> None:
+    ''' Output the results of the backtest. '''
     print(f'Final Quote Balance: {engine.get_final_quote_balance(1000)}')
     position_profits = engine.calculate_position_profits(1000)
     plot_sma_results(results, pair)
