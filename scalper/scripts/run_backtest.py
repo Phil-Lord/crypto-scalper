@@ -1,8 +1,9 @@
 import click
+import pandas as pd
 
 from backtesting_engine import BacktestingEngine
 from strategy_manager import StrategyManager
-from utils import get_second_timestamp, Pair, parse_datetime, plot_position_profits, plot_sma_results, SMA_GRID
+from utils import get_second_timestamp, Pair, parse_datetime, plot_position_profits, plot_sma_results, SMA_GRID, SMA_50_200
 
 
 @click.command()
@@ -15,32 +16,46 @@ from utils import get_second_timestamp, Pair, parse_datetime, plot_position_prof
 @click.option('--optimise', is_flag=True, help='Enable parameter optimisation.')
 def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = None,
                  interval: int = 1, vectorised: bool = None, optimise: bool = False) -> None:
+    engine = create_engine(pair, strategy_name, start, end, interval, vectorised)
+
+    if optimise:
+        engine = optimise_parameters(engine, strategy_name)
+
+    results = engine.run()
+
+    output_results(engine, results, pair)
+
+
+def create_engine(pair: str, strategy_name: str, start: str, end: str, interval: int, vectorised: bool) -> BacktestingEngine:
     kraken_pair = Pair[pair].value
-    params = {'short_window': 2400, 'long_window': 6193}
-    param_grid = SMA_GRID
+    params = SMA_50_200
 
     if start is not None:
         start = get_second_timestamp(*parse_datetime(start))
     if end is not None:
         end = get_second_timestamp(*parse_datetime(end))
 
-    engine = BacktestingEngine(kraken_pair, strategy_name, start,
-                               end, interval, vectorised, **params)
+    return BacktestingEngine(kraken_pair, strategy_name, start,
+                             end, interval, vectorised, **params)
 
-    if optimise:
-        optimisation_results = engine.optimise_parameters(param_grid, 5)
 
-        print("Best Parameters:", optimisation_results['best_params'])
-        print("Best Profit:", optimisation_results['best_profit'])
+def optimise_parameters(engine: BacktestingEngine, strategy_name: str) -> BacktestingEngine:
+    param_grid = SMA_GRID
+    n_trials = 100
 
-        engine.strategy = StrategyManager().get_strategy(
-            strategy_name, **optimisation_results['best_params'])
+    optimisation_results = engine.optimise_parameters(param_grid, n_trials)
+    print(f'Best Parameters: {optimisation_results['best_params']}')
+    print(f'Best Profit: {optimisation_results['best_profit']}')
 
-    results = engine.run()
-    final_quote_balance = engine.get_final_quote_balance(1000)
+    engine.strategy = StrategyManager().get_strategy(
+        strategy_name, **optimisation_results['best_params'])
+
+    return engine
+
+
+def output_results(engine: BacktestingEngine, results: pd.DataFrame, pair: str) -> None:
+    print(f'Final Quote Balance: {engine.get_final_quote_balance(1000)}')
     position_profits = engine.calculate_position_profits(1000)
-
-    print(f'Final Quote Balance: {final_quote_balance}')
     plot_sma_results(results, pair)
     plot_position_profits(position_profits)
 
