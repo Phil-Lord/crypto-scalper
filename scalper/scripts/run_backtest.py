@@ -37,8 +37,10 @@ def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = No
             strategy_name, **optimisation_results['best_params'])
 
     results = engine.run()
-    position_profits = engine.calculate_profit(1000)
+    final_quote_balance = engine.get_final_quote_balance(1000)
+    position_profits = engine.calculate_position_profits(1000)
 
+    print(f'Final Quote Balance: {final_quote_balance}')
     plot_sma_results(results, pair)
     plot_position_profits(position_profits)
 

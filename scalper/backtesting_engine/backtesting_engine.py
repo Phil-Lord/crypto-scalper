@@ -45,7 +45,7 @@ class BacktestingEngine:
         ''' Get price and indicator results from the backtesting run. '''
         return self.results
 
-    def calculate_profit(self, initial_quote_balance: float = 1000) -> float:
+    def calculate_position_profits(self, initial_quote_balance: float = 1000) -> float:
         if self.results is None:
             raise ValueError('Backtest yet to be ran, call run() first.')
         return calculate_position_profits(self.results, initial_quote_balance)

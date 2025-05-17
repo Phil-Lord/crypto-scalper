@@ -7,9 +7,9 @@ import pandas as pd
 from strategy_manager import StrategyManager
 
 
-def get_objective(engine, param_grid: dict[str, list[any]]):
+def get_objective(engine, param_grid: dict[str, list[any]]) -> callable:
     def objective(trial: optuna.Trial) -> float:
-        ''' Optimisation Objective: Maximise final quote balance.  '''
+        ''' Optimisation Objective: Maximise final quote balance. '''
         params = {}
         for param_name, param_range in param_grid.items():
             params[param_name] = trial.suggest_int(param_name, param_range[0], param_range[1])
