@@ -56,13 +56,11 @@ class TradeExecutor:
         try:
             order_result = self.add_order_connector.place(self.pair, signal, volume)
             logger.info(
-                f'Trade executed: id: {order_result['txid']}, volume: {order_result['desc']['order']}')
+                f'Trade executed: id: {order_result['txid']}, volume: {order_result['descr']['order']}')
+            # TODO: Log execution price, volume, and fee.
         except Exception as e:
             logger.error(f'Trade execution failed: {e}', exc_info=True)
 
     def log_interval_results(self, price: float, signal: str):
         ''' Log the results of the interval. '''
         logger.info(f'Interval result: price={price:.2f}, signal={signal}')
-
-        # Time, ticker price, signal
-        # If buy/sell: execution time, execution price, volume, fee, order Id
