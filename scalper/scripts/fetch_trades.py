@@ -2,18 +2,18 @@ import click
 
 from data_system import TradesRepository
 from exchange_connector import TradesConnector
-from utils import get_nano_timestamp, Pair, parse_datetime
+from utils import get_kraken_pair, get_nano_timestamp, parse_datetime
 
 
 @click.command()
-@click.option('--pair', required=True, help='Trading pair (e.g. BTC)')
+@click.option('--pair', required=True, help='Trading pair (e.g. BTCGBP)')
 @click.option('--start', required=True, help='Start timestamp (e.g. 2025-1-1-0-0-0)')
 @click.option('--end', required=True, help='End timestamp (e.g. 2025-1-1-23-59-59)')
 def fetch_trades(pair: str, start: str, end: str) -> None:
     connector = TradesConnector()
     repository = TradesRepository()
 
-    kraken_pair = Pair[pair].value
+    kraken_pair = get_kraken_pair(pair)
     start_timestamp = get_nano_timestamp(*parse_datetime(start))
     end_timestamp = get_nano_timestamp(*parse_datetime(end))
 

@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 class TradeExecutor:
     def __init__(self, pair: str, interval: int, strategy_name: str, **strategy_params):
         self.pair = pair
+        self.base = pair[:4]
+        self.quote = pair[4:]
         self.interval = interval
         self.ticker_connector = TickerConnector()
         self.balance_connector = BalanceConnector()
@@ -51,7 +53,7 @@ class TradeExecutor:
     def execute_trade(self, signal: str):
         ''' Call exchange connector to add order. '''
         balances = self.balance_connector.fetch()
-        volume = balances['ZGBP'] if signal == 'buy' else balances['XXBT']
+        volume = balances[self.quote] if signal == 'buy' else balances[self.base]
         logger.info(f'Placing {signal.upper()} order: volume={volume}')
         try:
             order_result = self.add_order_connector.place(self.pair, signal, volume)

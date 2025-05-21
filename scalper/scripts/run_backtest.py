@@ -3,7 +3,7 @@ import pandas as pd
 
 from backtesting_engine import BacktestingEngine
 from strategy_manager import StrategyManager
-from utils import get_second_timestamp, Pair, parse_datetime, plot_position_profits, plot_sma_results, SMA_GRID, SMA_50_200
+from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_sma_results, SMA_GRID
 
 
 @click.command()
@@ -31,8 +31,8 @@ def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = No
 
 def create_engine(pair: str, strategy_name: str, start: str, end: str, interval: int, vectorised: bool) -> BacktestingEngine:
     ''' Create a backtesting engine with the specified parameters. '''
-    kraken_pair = Pair[pair].value
-    params = SMA_50_200
+    kraken_pair = get_kraken_pair(pair)
+    params = {'short_window': 30, 'long_window': 293}
 
     if start is not None:
         start = get_second_timestamp(*parse_datetime(start))
