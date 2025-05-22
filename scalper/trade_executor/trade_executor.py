@@ -3,13 +3,14 @@ import logging
 
 from exchange_connector import AddOrderConnector, BalanceConnector, TickerConnector
 from strategy_manager import StrategyManager
+from utils import get_kraken_pair_symbols
 
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
     handlers=[
-        logging.FileHandler('trading.log'),
+        logging.FileHandler('test-trading.log'),
         logging.StreamHandler()
     ]
 )
@@ -19,8 +20,7 @@ logger = logging.getLogger(__name__)
 class TradeExecutor:
     def __init__(self, pair: str, interval: int, strategy_name: str, **strategy_params):
         self.pair = pair
-        self.base = pair[:4]
-        self.quote = pair[4:]
+        self.symbols = get_kraken_pair_symbols(pair)
         self.interval = interval
         self.ticker_connector = TickerConnector()
         self.balance_connector = BalanceConnector()
@@ -40,6 +40,7 @@ class TradeExecutor:
                     self.execute_trade(signal)
             except Exception as e:
                 logger.error(f'Error in TradeExecutor: {e}', exc_info=True)
+            # TODO: Add an except which kills the loop when error is minimum balance not met.
             time.sleep(self.interval * 60)
 
     def get_price(self) -> float:
@@ -53,7 +54,11 @@ class TradeExecutor:
     def execute_trade(self, signal: str):
         ''' Call exchange connector to add order. '''
         balances = self.balance_connector.fetch()
-        volume = balances[self.quote] if signal == 'buy' else balances[self.base]
+        if signal == 'buy':
+            volume = balances[self.symbols['quote']]
+        elif signal == 'sell':
+            volume = balances[self.symbols['base']]
+
         logger.info(f'Placing {signal.upper()} order: volume={volume}')
         try:
             order_result = self.add_order_connector.place(self.pair, signal, volume)
