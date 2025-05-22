@@ -1,7 +1,7 @@
 import requests
 
 from .exceptions import KrakenTooManyRequestsError
-from exchange_connector.utils import get_headers
+from exchange_connector.kraken_utils import get_headers
 
 
 class KrakenApiClient:

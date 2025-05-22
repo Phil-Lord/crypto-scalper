@@ -1,6 +1,6 @@
 import logging
 
-from exchange_connector.utils import get_nonce
+from exchange_connector.kraken_utils import get_nonce
 from .kraken_service import KrakenService
 
 
