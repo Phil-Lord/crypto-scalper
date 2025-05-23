@@ -1,11 +1,12 @@
 from .legacy import SmaStrategyLegacy, EmaStrategyLegacy
-from .strategies import Strategy, SmaStrategy
+from .strategies import PrecisionTrendStrategy, Strategy, SmaStrategy
 
 
 class StrategyManager:
     def __init__(self):
         self.strategies = {
             'SmaStrategy': SmaStrategy,
+            'PrecisionTrendStrategy': PrecisionTrendStrategy,
             'SmaStrategyLegacy': SmaStrategyLegacy,
             'EmaStrategyLegacy': EmaStrategyLegacy
         }

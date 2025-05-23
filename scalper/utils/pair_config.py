@@ -1,13 +1,15 @@
 raw_to_kraken_pairs = {
     'BTCGBP': 'XXBTZGBP',
     'DOGEGBP': 'XXDGZGBP',
-    'ETHGBP': 'XETHZGBP'
+    'ETHGBP': 'XETHZGBP',
+    'BTCUSD': 'XXBTZUSD'
 }
 
 kraken_pair_to_symbols = {
     'XXBTZGBP': {'base': 'XXBT', 'quote': 'ZGBP'},
     'XXDGZGBP': {'base': 'XXDG', 'quote': 'ZGBP'},
-    'XETHZGBP': {'base': 'XETH', 'quote': 'ZGBP'}
+    'XETHZGBP': {'base': 'XETH', 'quote': 'ZGBP'},
+    'XXBTZUSD': {'base': 'XXBT', 'quote': 'ZUSD'}
 }
 
 
