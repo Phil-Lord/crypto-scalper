@@ -3,7 +3,13 @@ import pandas as pd
 
 from backtesting_engine import BacktestingEngine
 from strategy_manager import StrategyManager
-from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_sma_results, SMA_GRID
+from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_sma_results, SMA_GRID, PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
+
+PARAMS = PRECISION_TREND_CONFIG
+GRID = PRECISION_TREND_GRID
+N_TRIALS = 1000
+INITIAL_QUOTE_BALANCE = 1000
+PLOT_RESULTS = False
 
 
 @click.command()
@@ -32,7 +38,6 @@ def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = No
 def create_engine(pair: str, strategy_name: str, start: str, end: str, interval: int, vectorised: bool) -> BacktestingEngine:
     ''' Create a backtesting engine with the specified parameters. '''
     kraken_pair = get_kraken_pair(pair)
-    params = {'short_window': 30, 'long_window': 293}
 
     if start is not None:
         start = get_second_timestamp(*parse_datetime(start))
@@ -40,15 +45,12 @@ def create_engine(pair: str, strategy_name: str, start: str, end: str, interval:
         end = get_second_timestamp(*parse_datetime(end))
 
     return BacktestingEngine(kraken_pair, strategy_name, start,
-                             end, interval, vectorised, **params)
+                             end, interval, vectorised, **PARAMS)
 
 
 def optimise_parameters(engine: BacktestingEngine, strategy_name: str) -> BacktestingEngine:
     ''' Optimise parameters for the specified strategy. '''
-    param_grid = SMA_GRID
-    n_trials = 100
-
-    optimisation_results = engine.optimise_parameters(param_grid, n_trials)
+    optimisation_results = engine.optimise_parameters(GRID, N_TRIALS)
     print(f'Best Parameters: {optimisation_results['best_params']}')
     print(f'Best Profit: {optimisation_results['best_profit']}')
 
@@ -60,10 +62,11 @@ def optimise_parameters(engine: BacktestingEngine, strategy_name: str) -> Backte
 
 def output_results(engine: BacktestingEngine, results: pd.DataFrame, pair: str) -> None:
     ''' Output the results of the backtest. '''
-    print(f'Final Quote Balance: {engine.get_final_quote_balance(1000)}')
-    position_profits = engine.calculate_position_profits(1000)
-    plot_sma_results(results, pair)
-    plot_position_profits(position_profits)
+    print(f'Final Quote Balance: {engine.get_final_quote_balance(INITIAL_QUOTE_BALANCE)}')
+    if (PLOT_RESULTS):
+        position_profits = engine.calculate_position_profits(INITIAL_QUOTE_BALANCE)
+        plot_sma_results(results, pair)
+        plot_position_profits(position_profits)
 
 
 if __name__ == '__main__':
