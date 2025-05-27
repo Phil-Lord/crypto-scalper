@@ -1,0 +1,101 @@
+2025-05-17 23:27:53,468 | INFO | TradeExecutor started for XXBTZGBP using SmaStrategy
+2025-05-17 23:27:53,469 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:27:53,716 | INFO | Interval result: price=77570.20, signal=hold
+2025-05-17 23:28:53,720 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:28:53,824 | INFO | Interval result: price=77570.20, signal=hold
+2025-05-17 23:29:53,826 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:29:53,948 | INFO | Interval result: price=77570.20, signal=hold
+2025-05-17 23:30:53,951 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:30:54,047 | INFO | Interval result: price=77570.20, signal=hold
+2025-05-17 23:31:54,047 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:31:54,150 | INFO | Interval result: price=77567.20, signal=hold
+2025-05-17 23:32:54,170 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:32:54,289 | INFO | Interval result: price=77570.20, signal=hold
+2025-05-17 23:33:54,290 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:33:54,400 | INFO | Interval result: price=77570.20, signal=hold
+2025-05-17 23:34:54,401 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:34:54,502 | INFO | Interval result: price=77570.20, signal=hold
+2025-05-17 23:35:54,503 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:35:54,596 | INFO | Interval result: price=77570.20, signal=hold
+2025-05-17 23:36:54,601 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:36:54,696 | INFO | Interval result: price=77570.20, signal=hold
+2025-05-17 23:37:54,697 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:37:54,806 | INFO | Interval result: price=77570.20, signal=hold
+2025-05-17 23:38:54,808 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:38:54,895 | INFO | Interval result: price=77570.20, signal=hold
+2025-05-17 23:39:54,895 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:39:55,005 | INFO | Interval result: price=77570.20, signal=hold
+2025-05-17 23:40:55,006 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:40:55,095 | INFO | Interval result: price=77570.20, signal=hold
+2025-05-17 23:41:55,096 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:41:55,251 | INFO | Interval result: price=77612.30, signal=hold
+2025-05-17 23:42:55,252 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:42:55,377 | INFO | Interval result: price=77610.00, signal=hold
+2025-05-17 23:43:55,379 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:43:55,482 | INFO | Interval result: price=77610.00, signal=hold
+2025-05-17 23:44:55,483 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:44:55,566 | INFO | Interval result: price=77610.00, signal=hold
+2025-05-17 23:45:55,568 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:45:55,708 | INFO | Interval result: price=77602.30, signal=hold
+2025-05-17 23:46:55,709 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:46:55,793 | INFO | Interval result: price=77622.60, signal=hold
+2025-05-17 23:47:55,794 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:47:55,906 | INFO | Interval result: price=77622.60, signal=hold
+2025-05-17 23:48:55,907 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:48:55,983 | INFO | Interval result: price=77622.60, signal=hold
+2025-05-17 23:49:55,983 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:49:56,089 | INFO | Interval result: price=77600.10, signal=hold
+2025-05-17 23:50:56,090 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:50:56,192 | INFO | Interval result: price=77600.10, signal=hold
+2025-05-17 23:51:56,193 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:51:56,302 | INFO | Interval result: price=77600.10, signal=hold
+2025-05-17 23:52:56,303 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:52:56,424 | INFO | Interval result: price=77600.10, signal=hold
+2025-05-17 23:53:56,425 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:53:56,517 | INFO | Interval result: price=77602.00, signal=hold
+2025-05-17 23:54:56,517 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:54:56,607 | INFO | Interval result: price=77624.10, signal=hold
+2025-05-17 23:55:56,609 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:55:56,696 | INFO | Interval result: price=77624.10, signal=hold
+2025-05-17 23:56:56,697 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:56:56,790 | INFO | Interval result: price=77622.10, signal=hold
+2025-05-17 23:57:56,791 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:57:56,908 | INFO | Interval result: price=77622.10, signal=hold
+2025-05-17 23:58:56,909 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:58:56,995 | INFO | Interval result: price=77624.80, signal=hold
+2025-05-17 23:59:56,997 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-17 23:59:57,093 | INFO | Interval result: price=77624.80, signal=hold
+2025-05-18 00:00:57,094 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:00:57,183 | INFO | Interval result: price=77624.80, signal=hold
+2025-05-18 00:01:57,183 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:01:57,287 | INFO | Interval result: price=77624.80, signal=hold
+2025-05-18 00:02:57,288 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:02:57,401 | INFO | Interval result: price=77624.80, signal=hold
+2025-05-18 00:03:57,402 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:03:57,497 | INFO | Interval result: price=77606.80, signal=hold
+2025-05-18 00:04:57,497 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:04:57,596 | INFO | Interval result: price=77606.80, signal=hold
+2025-05-18 00:05:57,598 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:05:57,687 | INFO | Interval result: price=77624.80, signal=hold
+2025-05-18 00:06:57,688 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:06:57,782 | INFO | Interval result: price=77606.80, signal=hold
+2025-05-18 00:07:57,783 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:07:57,898 | INFO | Interval result: price=77606.80, signal=hold
+2025-05-18 00:08:57,899 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:08:58,028 | INFO | Interval result: price=77606.70, signal=hold
+2025-05-18 00:09:58,031 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:09:58,142 | INFO | Interval result: price=77607.30, signal=hold
+2025-05-18 00:10:58,143 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:10:58,261 | INFO | Interval result: price=77705.90, signal=hold
+2025-05-18 00:11:58,264 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:11:58,386 | INFO | Interval result: price=77705.90, signal=hold
+2025-05-18 00:12:58,387 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:12:58,491 | INFO | Interval result: price=77705.90, signal=hold
+2025-05-18 00:13:58,492 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:13:58,575 | INFO | Interval result: price=77653.50, signal=hold
+2025-05-18 00:14:58,576 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:14:58,675 | INFO | Interval result: price=77688.20, signal=hold
+2025-05-18 00:15:58,677 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:15:58,753 | INFO | Interval result: price=77712.40, signal=hold
+2025-05-18 00:16:58,754 | INFO | Starting call to 'exchange_connector.services.kraken_service.KrakenService.make_request', this is the 1st time calling it.
+2025-05-18 00:16:58,836 | INFO | Interval result: price=77712.40, signal=hold

@@ -17,4 +17,4 @@ class EmaIndicator(Indicator):
         return self.ema
 
     def compute_vectorised(self, prices: pd.Series) -> pd.Series:
-        return prices.ewm(self.window, adjust=False).mean()
+        return prices.ewm(span=self.window, adjust=False).mean()

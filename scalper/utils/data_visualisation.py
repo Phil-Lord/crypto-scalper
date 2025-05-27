@@ -26,15 +26,15 @@ def plot_sma_results(results: pd.DataFrame, pair: str) -> None:
     # Plot SMAs.
     plt.plot(
         results.index,
-        results['short_sma'],
-        label='Short SMA',
+        results['short_ema'],
+        label='Short EMA',
         color='purple',
         linestyle='--'
     )
     plt.plot(
         results.index,
-        results['long_sma'],
-        label='Long SMA',
+        results['long_ema'],
+        label='Long EMA',
         color='green',
         linestyle='--'
     )
