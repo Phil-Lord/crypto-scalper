@@ -3,13 +3,13 @@ import pandas as pd
 
 from backtesting_engine import BacktestingEngine
 from strategy_manager import StrategyManager
-from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_sma_results, SMA_GRID, PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
+from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_sma_results, PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
 
 PARAMS = PRECISION_TREND_CONFIG
 GRID = PRECISION_TREND_GRID
 N_TRIALS = 100
 INITIAL_QUOTE_BALANCE = 1000
-PLOT_RESULTS = False
+PLOT_RESULTS = True
 
 
 @click.command()
