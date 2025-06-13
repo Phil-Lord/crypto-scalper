@@ -20,3 +20,7 @@ def initialise_database():
     Use table metadata and the engine to generate the database schema.
     '''
     Base.metadata.create_all(bind=engine)
+
+
+if __name__ == "__main__":
+    initialise_database()
