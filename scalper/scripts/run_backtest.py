@@ -3,8 +3,9 @@ import pandas as pd
 
 from backtesting_engine import BacktestingEngine
 from strategy_manager import StrategyManager
-from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_results, PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
+from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_results, SMA_CONFIG, SMA_GRID, PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
 
+USE_DEFAULT_STRATEGY_CONFIGS = True
 PARAMS = PRECISION_TREND_CONFIG
 GRID = PRECISION_TREND_GRID
 N_TRIALS = 100
@@ -23,19 +24,22 @@ PLOT_RESULTS = True
 def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = None,
                  interval: int = 1, vectorised: bool = None, optimise: bool = False) -> None:
     ''' Run a backtest on the specified trading pair and strategy. '''
+    # Set params and grid.
+    params, grid = get_params_for_strategy(strategy_name)
+
     # Create engine.
-    engine = create_engine(pair, strategy_name, start, end, interval, vectorised)
+    engine = create_engine(pair, strategy_name, start, end, interval, vectorised, **params)
 
     # Optimise parameters if requested.
     if optimise:
-        engine = optimise_parameters(engine, strategy_name)
+        engine = optimise_parameters(engine, strategy_name, grid)
 
     # Run backtest.
     results = engine.run()
     output_results(engine, results, pair)
 
 
-def create_engine(pair: str, strategy_name: str, start: str, end: str, interval: int, vectorised: bool) -> BacktestingEngine:
+def create_engine(pair: str, strategy_name: str, start: str, end: str, interval: int, vectorised: bool, **params) -> BacktestingEngine:
     ''' Create a backtesting engine with the specified parameters. '''
     kraken_pair = get_kraken_pair(pair)
 
@@ -44,13 +48,12 @@ def create_engine(pair: str, strategy_name: str, start: str, end: str, interval:
     if end is not None:
         end = get_second_timestamp(*parse_datetime(end))
 
-    return BacktestingEngine(kraken_pair, strategy_name, start,
-                             end, interval, vectorised, **PARAMS)
+    return BacktestingEngine(kraken_pair, strategy_name, start, end, interval, vectorised, **params)
 
 
-def optimise_parameters(engine: BacktestingEngine, strategy_name: str) -> BacktestingEngine:
+def optimise_parameters(engine: BacktestingEngine, strategy_name: str, grid: dict) -> BacktestingEngine:
     ''' Optimise parameters for the specified strategy. '''
-    optimisation_results = engine.optimise_parameters(GRID, N_TRIALS)
+    optimisation_results = engine.optimise_parameters(grid, N_TRIALS)
     print(f'Best Parameters: {optimisation_results['best_params']}')
     print(f'Best Profit: {optimisation_results['best_profit']}')
 
@@ -67,6 +70,16 @@ def output_results(engine: BacktestingEngine, results: pd.DataFrame, pair: str) 
         position_profits = engine.calculate_position_profits(INITIAL_QUOTE_BALANCE)
         plot_results(results, pair)
         plot_position_profits(position_profits)
+
+
+def get_params_for_strategy(strategy_name: str) -> tuple:
+    ''' Get the default parameters and grid for the specified strategy. '''
+    if (not USE_DEFAULT_STRATEGY_CONFIGS):
+        return PARAMS, GRID
+    if strategy_name == 'SmaStrategy':
+        return SMA_CONFIG, SMA_GRID
+    elif strategy_name == 'PrecisionTrendStrategy':
+        return PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
 
 
 if __name__ == '__main__':
