@@ -3,6 +3,10 @@ import pandas as pd
 
 
 def plot_position_profits(position_profits: pd.DataFrame) -> None:
+    if position_profits.empty:
+        print("No positions to plot.")
+        return
+
     plt.figure(figsize=(10, 5))
     plt.bar(position_profits.index, position_profits["profit"], color=[
             "green" if p >= 0 else "red" for p in position_profits["profit"]])
@@ -24,13 +28,13 @@ def plot_results(results: pd.DataFrame, pair: str) -> None:
     plt.plot(results.index, results["price"], label="Price", color="blue", alpha=0.4)
 
     # Plot SMAs.
-    if ('short_sma' in results.columns):
+    if 'short_sma' in results.columns:
         plot_line(results, 'short_sma', 'purple')
-    if ('long_sma' in results.columns):
+    if 'long_sma' in results.columns:
         plot_line(results, 'long_sma', 'green')
-    if ('short_ema' in results.columns):
+    if 'short_ema' in results.columns:
         plot_line(results, 'short_ema', 'orange')
-    if ('long_ema' in results.columns):
+    if 'long_ema' in results.columns:
         plot_line(results, 'long_ema', 'yellow')
 
     # Plot buys and sells.

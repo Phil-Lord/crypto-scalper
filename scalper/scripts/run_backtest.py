@@ -66,7 +66,7 @@ def optimise_parameters(engine: BacktestingEngine, strategy_name: str, grid: dic
 def output_results(engine: BacktestingEngine, results: pd.DataFrame, pair: str) -> None:
     ''' Output the results of the backtest. '''
     print(f'Final Quote Balance: {engine.get_final_quote_balance(INITIAL_QUOTE_BALANCE)}')
-    if (PLOT_RESULTS):
+    if PLOT_RESULTS:
         position_profits = engine.calculate_position_profits(INITIAL_QUOTE_BALANCE)
         plot_results(results, pair)
         plot_position_profits(position_profits)
@@ -74,7 +74,7 @@ def output_results(engine: BacktestingEngine, results: pd.DataFrame, pair: str) 
 
 def get_params_for_strategy(strategy_name: str) -> tuple:
     ''' Get the default parameters and grid for the specified strategy. '''
-    if (not USE_DEFAULT_STRATEGY_CONFIGS):
+    if not USE_DEFAULT_STRATEGY_CONFIGS:
         return PARAMS, GRID
     if strategy_name == 'SmaStrategy':
         return SMA_CONFIG, SMA_GRID
