@@ -13,10 +13,10 @@ def plot_position_profits(position_profits: pd.DataFrame) -> None:
     plt.show()
 
 
-def plot_sma_results(results: pd.DataFrame, pair: str) -> None:
+def plot_results(results: pd.DataFrame, pair: str) -> None:
     # Extract buys and sells.
-    buys = results[results["crossover"] == "buy"]
-    sells = results[results["crossover"] == "sell"]
+    buys = results[results["signal"] == "buy"]
+    sells = results[results["signal"] == "sell"]
 
     plt.figure(figsize=(12, 6))
 
@@ -24,21 +24,14 @@ def plot_sma_results(results: pd.DataFrame, pair: str) -> None:
     plt.plot(results.index, results["price"], label="Price", color="blue", alpha=0.4)
 
     # Plot SMAs.
-    # TODO: make this detect correct result params
-    plt.plot(
-        results.index,
-        results['short_ema'],
-        label='Short EMA',
-        color='purple',
-        linestyle='--'
-    )
-    plt.plot(
-        results.index,
-        results['long_ema'],
-        label='Long EMA',
-        color='green',
-        linestyle='--'
-    )
+    if ('short_sma' in results.columns):
+        plot_line(results, 'short_sma', 'purple')
+    if ('long_sma' in results.columns):
+        plot_line(results, 'long_sma', 'green')
+    if ('short_ema' in results.columns):
+        plot_line(results, 'short_ema', 'orange')
+    if ('long_ema' in results.columns):
+        plot_line(results, 'long_ema', 'yellow')
 
     # Plot buys and sells.
     plt.scatter(buys.index, buys["price"], color="green",
@@ -53,6 +46,10 @@ def plot_sma_results(results: pd.DataFrame, pair: str) -> None:
     plt.legend()
     plt.grid(alpha=0.3)
     plt.show()
+
+
+def plot_line(results: pd.DataFrame, column_name: str, colour: str) -> None:
+    plt.plot(results.index, results[column_name], label=column_name, color=colour, linestyle='--')
 
 
 def plot_trade_data_from_db(trades: pd.DataFrame) -> None:

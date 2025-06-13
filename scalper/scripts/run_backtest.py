@@ -3,7 +3,7 @@ import pandas as pd
 
 from backtesting_engine import BacktestingEngine
 from strategy_manager import StrategyManager
-from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_sma_results, PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
+from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_results, PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
 
 PARAMS = PRECISION_TREND_CONFIG
 GRID = PRECISION_TREND_GRID
@@ -65,7 +65,7 @@ def output_results(engine: BacktestingEngine, results: pd.DataFrame, pair: str) 
     print(f'Final Quote Balance: {engine.get_final_quote_balance(INITIAL_QUOTE_BALANCE)}')
     if (PLOT_RESULTS):
         position_profits = engine.calculate_position_profits(INITIAL_QUOTE_BALANCE)
-        plot_sma_results(results, pair)
+        plot_results(results, pair)
         plot_position_profits(position_profits)
 
 
