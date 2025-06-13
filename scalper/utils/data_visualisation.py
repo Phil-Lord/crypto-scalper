@@ -24,6 +24,7 @@ def plot_sma_results(results: pd.DataFrame, pair: str) -> None:
     plt.plot(results.index, results["price"], label="Price", color="blue", alpha=0.4)
 
     # Plot SMAs.
+    # TODO: make this detect correct result params
     plt.plot(
         results.index,
         results['short_ema'],
