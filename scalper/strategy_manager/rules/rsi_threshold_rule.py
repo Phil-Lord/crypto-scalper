@@ -15,8 +15,8 @@ class RsiThresholdRule(Rule):
         if rsi is None or prev_rsi is None:
             return 'hold'
 
-        cross_above_oversold = (rsi < self.oversold) and (prev_rsi >= self.oversold)
-        cross_below_overbought = (rsi > self.overbought) and (prev_rsi <= self.overbought)
+        cross_above_oversold = (rsi > self.oversold) and (prev_rsi <= self.oversold)
+        cross_below_overbought = (rsi < self.overbought) and (prev_rsi >= self.overbought)
 
         if cross_above_oversold and current_state['last_action'] != 'buy':
             return 'buy'

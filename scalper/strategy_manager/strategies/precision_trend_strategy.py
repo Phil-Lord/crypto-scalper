@@ -6,18 +6,20 @@ from strategy_manager.rules import MaCrossoverRule, RsiThresholdRule
 
 
 class PrecisionTrendStrategy(Strategy):
+    ''' EMA crossover, RSI, ADX, ATR '''
+
     def __init__(self, short_ema: int, long_ema: int, rsi_window: int, rsi_oversold: float, rsi_overbought: float, weight_crossover: float, weight_rsi: float):
         super().__init__()
         total_weight = weight_crossover + weight_rsi
-        self.weight_crossover = weight_crossover / total_weight
-        self.weight_rsi = weight_rsi / total_weight
 
         self.register_indicator('short_ema', EmaIndicator(short_ema))
         self.register_indicator('long_ema', EmaIndicator(long_ema))
         self.register_rule('crossover', MaCrossoverRule('short_ema', 'long_ema'))
+        self.weight_crossover = weight_crossover / total_weight
 
         self.register_indicator('rsi', RsiIndicator(rsi_window))
         self.register_rule('rsi_threshold', RsiThresholdRule('rsi', rsi_oversold, rsi_overbought))
+        self.weight_rsi = weight_rsi / total_weight
 
     def _generate_signal(self, rule_results: dict) -> str:
         crossover_signal = rule_results['crossover']
