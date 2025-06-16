@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 from .base_strategy import Strategy
 from strategy_manager.indicators import EmaIndicator, RsiIndicator
@@ -42,13 +43,12 @@ class PrecisionTrendStrategy(Strategy):
 
     def _generate_signals(self, results: pd.DataFrame) -> pd.DataFrame:
         signal_map = {'buy': 1, 'hold': 0, 'sell': -1}
-        crossover_scores = results['crossover'].map(signal_map)
-        rsi_scores = results['rsi_threshold'].map(signal_map)
+        indicators = {'crossover': self.weight_crossover, 'rsi_threshold': self.weight_rsi}
+        total_scores = sum(
+            results[indicator].map(signal_map) * weight
+            for indicator, weight in indicators.items()
+        )
 
-        total_scores = (self.weight_crossover * crossover_scores +
-                        self.weight_rsi * rsi_scores)
-
-        conditions = [total_scores > 0.5, total_scores < -0.5]
+        conditions = [total_scores > self.buy_threshold, total_scores < self.sell_threshold]
         choices = ['buy', 'sell']
-        return pd.Series(
-            pd.cut(total_scores, [-float('inf'), -0.5, 0.5, float('inf')], labels=['sell', 'hold', 'buy']))
+        return np.select(conditions, choices, default='hold')
