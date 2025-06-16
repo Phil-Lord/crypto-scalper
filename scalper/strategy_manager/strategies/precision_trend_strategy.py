@@ -8,9 +8,13 @@ from strategy_manager.rules import MaCrossoverRule, RsiThresholdRule
 class PrecisionTrendStrategy(Strategy):
     ''' EMA crossover, RSI, ADX, ATR '''
 
-    def __init__(self, short_ema: int, long_ema: int, rsi_window: int, rsi_oversold: float, rsi_overbought: float, weight_crossover: float, weight_rsi: float):
+    def __init__(self, short_ema: int, long_ema: int, rsi_window: int, rsi_oversold: float,
+                 rsi_overbought: float, weight_crossover: float, weight_rsi: float,
+                 buy_threshold: float, sell_threshold: float):
         super().__init__()
         total_weight = weight_crossover + weight_rsi
+        self.buy_threshold = buy_threshold
+        self.sell_threshold = sell_threshold
 
         self.register_indicator('short_ema', EmaIndicator(short_ema))
         self.register_indicator('long_ema', EmaIndicator(long_ema))
@@ -29,9 +33,9 @@ class PrecisionTrendStrategy(Strategy):
         score = (self.weight_crossover * signal_map[crossover_signal] +
                  self.weight_rsi * signal_map[rsi_threshold_signal])
 
-        if score > 0.5:
+        if score > self.buy_threshold:
             return 'buy'
-        elif score < -0.5:
+        elif score < self.sell_threshold:
             return 'sell'
         else:
             return 'hold'

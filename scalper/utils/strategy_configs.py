@@ -8,7 +8,9 @@ PRECISION_TREND_CONFIG = {
     'rsi_oversold': 50.0,
     'rsi_overbought': 50.0,
     'weight_crossover': 0.5,
-    'weight_rsi': 0.5
+    'weight_rsi': 0.5,
+    'buy_threshold': 0.5,
+    'sell_threshold': -0.5
 }
 PRECISION_TREND_GRID = {
     'short_ema': [5, 200],
@@ -17,5 +19,7 @@ PRECISION_TREND_GRID = {
     'rsi_oversold': [0.0, 50.0],
     'rsi_overbought': [50.0, 100.0],
     'weight_crossover': [0.0, 1.0],
-    'weight_rsi': [0.0, 1.0]
+    'weight_rsi': [0.0, 1.0],
+    'buy_threshold': [0.0, 1.0],
+    'sell_threshold': [-1.0, 0.0]
 }
