@@ -12,9 +12,12 @@ def delete_study(study: str):
         optuna.delete_study(study_name=study, storage=storage)
         print(f'Study {study} deleted.')
 
-    print('Remaining studies:')
-    for study in optuna.study.get_all_study_summaries(storage=storage):
-        print(study.study_name)
+    study_summaries = optuna.study.get_all_study_summaries(storage=storage)
+    if study_summaries:
+        for study in study_summaries:
+            print(study.study_name)
+    else:
+        print('No studies found.')
 
 
 if __name__ == '__main__':
