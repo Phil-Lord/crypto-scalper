@@ -42,30 +42,12 @@ class RsiIndicator(Indicator):
         return rsi
 
     def compute_vectorised(self, prices: pd.Series) -> pd.Series:
-        delta = prices.diff()
-        gain = delta.clip(lower=0)
-        loss = -delta.clip(upper=0)
+        self.prices = []
+        self.avg_gain, self.avg_loss, self.prev_price = None, None, None
 
-        avg_gain_wilder = pd.Series(index=prices.index, dtype=float)
-        avg_loss_wilder = pd.Series(index=prices.index, dtype=float)
+        rsi_values = []
+        for price in prices:
+            rsi = self.update(price)
+            rsi_values.append(rsi)
 
-        # Manually compute the initial average gain/loss over the first `window` deltas.
-        initial_gains = gain.iloc[1:self.window]  # skip NaN at index 0.
-        initial_losses = loss.iloc[1:self.window]
-
-        avg_gain = initial_gains.mean()
-        avg_loss = initial_losses.mean()
-
-        avg_gain_wilder.iloc[self.window] = avg_gain
-        avg_loss_wilder.iloc[self.window] = avg_loss
-
-        # Now apply Wilder smoothing from self.window + 1 onwards
-        for i in range(self.window + 1, len(prices)):
-            avg_gain = ((avg_gain * (self.window - 1)) + gain.iloc[i]) / self.window
-            avg_loss = ((avg_loss * (self.window - 1)) + loss.iloc[i]) / self.window
-            avg_gain_wilder.iloc[i] = avg_gain
-            avg_loss_wilder.iloc[i] = avg_loss
-
-        rs = avg_gain_wilder / avg_loss_wilder
-        rsi = 100 - (100 / (1 + rs))
-        return rsi
+        return pd.Series(rsi_values, index=prices.index, dtype=float)
