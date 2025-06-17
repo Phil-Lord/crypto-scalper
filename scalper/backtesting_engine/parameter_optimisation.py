@@ -12,10 +12,14 @@ def get_objective(engine, param_grid: dict[str, list[any]]) -> callable:
         ''' Optimisation Objective: Maximise final quote balance. '''
         params = {}
         for param_name, param_range in param_grid.items():
-            params[param_name] = trial.suggest_int(param_name, param_range[0], param_range[1])
+            if isinstance(param_range[0], int):
+                params[param_name] = trial.suggest_int(param_name, param_range[0], param_range[1])
+            elif isinstance(param_range[0], float):
+                params[param_name] = trial.suggest_float(param_name, param_range[0], param_range[1])
+            else:
+                raise ValueError(f'Unsupported parameter type for {param_name}')
 
-        strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
-        engine.strategy = strategy
+        engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
         engine.run()
         final_quote_balance = engine.get_final_quote_balance()
 
