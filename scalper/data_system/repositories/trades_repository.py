@@ -18,7 +18,7 @@ class TradesRepository(Repository):
         '''
         Fetch trades for a certain pair between a start and end date.
         '''
-        print(f'Fetching {pair} trades from {start} to {end}.')
+        print(f'Fetching {pair} trades from {start if start else 'start'} to {end if end else 'end'}.')
         with SessionLocal() as session:
             crud = TradeCRUD(session)
             return crud.get_trades(pair, start, end)
