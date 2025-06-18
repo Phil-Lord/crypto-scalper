@@ -23,6 +23,8 @@ class RsiIndicator(Indicator):
         if len(self.prices) < self.window + 1:
             self.prices.append(price)
             return None
+        else:
+            self.prices = self.prices[-(self.window + 1):]
 
         if self.avg_gain is None:
             # Calculate initial average gain and loss.
