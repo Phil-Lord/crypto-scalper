@@ -41,10 +41,6 @@ class BacktestingEngine:
             self.__load_resampled_prices()
         return optimise_parameters_postgres(self, param_grid, n_trials)
 
-    def get_results(self) -> pd.DataFrame:
-        ''' Get price and indicator results from the backtesting run. '''
-        return self.results
-
     def calculate_position_profits(self, initial_quote_balance: float = 1000) -> float:
         if self.results is None:
             raise ValueError('Backtest yet to be ran, call run() first.')
