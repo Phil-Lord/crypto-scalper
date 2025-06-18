@@ -1,7 +1,9 @@
 import os
 import sqlite3
+import warnings
 
 import optuna
+from optuna.exceptions import ExperimentalWarning
 import pandas as pd
 from tqdm import tqdm
 
@@ -55,6 +57,8 @@ def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int 
 
 
 def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
+    warnings.filterwarnings("ignore", category=ExperimentalWarning)
+
     # Create study name using backtest params.
     study_name = (
         f'{engine.strategy.__class__.__name__}_'
