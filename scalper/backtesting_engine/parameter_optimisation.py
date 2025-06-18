@@ -120,7 +120,7 @@ def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_tri
 
 class TqdmProgressCallback:
     def __init__(self, total_trials: int):
-        self.pbar = tqdm(total=total_trials, desc="Optimising", ncols=80)
+        self.pbar = tqdm(total=total_trials, desc="Optimising", dynamic_ncols=True)
 
     def __call__(self, study: optuna.study.Study, trial: optuna.trial.FrozenTrial) -> None:
         self.pbar.update(1)
