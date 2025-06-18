@@ -1,5 +1,4 @@
 import pandas as pd
-from tqdm import tqdm
 
 from data_system import TradesRepository
 from .profit_calculation import calculate_position_profits, get_final_quote_balance
@@ -28,7 +27,7 @@ class BacktestingEngine:
             self.results = self.strategy.vectorised_compute(self.resampled_prices['price'])
         else:
             results = [None] * len(self.resampled_prices)
-            for i, (timestamp, price) in enumerate(tqdm(self.resampled_prices['price'].items())):
+            for i, (timestamp, price) in enumerate(self.resampled_prices['price'].items()):
                 result = self.strategy.generate_signal(price)
                 result.update({'price': price, 'timestamp': timestamp})
                 results[i] = result

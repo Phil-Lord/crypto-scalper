@@ -3,6 +3,7 @@ import sqlite3
 
 import optuna
 import pandas as pd
+from tqdm import tqdm
 
 from strategy_manager import StrategyManager
 
@@ -21,10 +22,7 @@ def get_objective(engine, param_grid: dict[str, list[any]]) -> callable:
 
         engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
         engine.run()
-        final_quote_balance = engine.get_final_quote_balance()
-
-        print(f'{trial.number}: {final_quote_balance} {params}')
-        return final_quote_balance
+        return engine.get_final_quote_balance()
     return objective
 
 
@@ -53,12 +51,7 @@ def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int 
     conn.close()
 
     study.optimize(get_objective(engine, param_grid), n_trials=n_trials, n_jobs=-1)
-
-    return {
-        'best_params': study.best_params,
-        'best_profit': study.best_value,
-        'study': study
-    }
+    return {'best_params': study.best_params, 'best_profit': study.best_value, 'study': study}
 
 
 def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
@@ -108,9 +101,25 @@ def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_tri
 
     # Run optimisation.
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    study.optimize(get_objective(engine, param_grid), n_trials=n_trials, n_jobs=-1)
-    return {
-        'best_params': study.best_params,
-        'best_profit': study.best_value,
-        'study': study
-    }
+    progress_callback = TqdmProgressCallback(n_trials)
+    try:
+        study.optimize(
+            get_objective(engine, param_grid),
+            n_trials=n_trials,
+            n_jobs=-1,
+            callbacks=[progress_callback]
+        )
+    finally:
+        progress_callback.close()
+    return {'best_params': study.best_params, 'best_profit': study.best_value, 'study': study}
+
+
+class TqdmProgressCallback:
+    def __init__(self, total_trials: int):
+        self.pbar = tqdm(total=total_trials, desc="Optimising", ncols=80)
+
+    def __call__(self, study: optuna.study.Study, trial: optuna.trial.FrozenTrial) -> None:
+        self.pbar.update(1)
+
+    def close(self) -> None:
+        self.pbar.close()
