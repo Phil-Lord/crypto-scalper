@@ -20,16 +20,17 @@ class RsiIndicator(Indicator):
         gain = max(delta, 0)
         loss = max(-delta, 0)
 
-        if len(self.prices) < self.window:
+        if len(self.prices) < self.window + 1:
             self.prices.append(price)
             return None
 
         if self.avg_gain is None:
             # Calculate initial average gain and loss.
-            self.avg_gain = np.mean([max(self.prices[i+1] - self.prices[i], 0)
-                                    for i in range(self.window - 1)])
-            self.avg_loss = np.mean([max(self.prices[i] - self.prices[i+1], 0)
-                                    for i in range(self.window - 1)])
+            deltas = np.diff(self.prices[-(self.window + 1):])
+            gains = np.maximum(deltas, 0)
+            losses = np.maximum(-deltas, 0)
+            self.avg_gain = np.mean(gains)
+            self.avg_loss = np.mean(losses)
         else:
             self.avg_gain = (self.avg_gain * (self.window - 1) + gain) / self.window
             self.avg_loss = (self.avg_loss * (self.window - 1) + loss) / self.window
