@@ -1,3 +1,5 @@
+import json
+
 import click
 import pandas as pd
 
@@ -54,7 +56,7 @@ def create_engine(pair: str, strategy_name: str, start: str, end: str, interval:
 def optimise_parameters(engine: BacktestingEngine, strategy_name: str, grid: dict) -> BacktestingEngine:
     ''' Optimise parameters for the specified strategy. '''
     optimisation_results = engine.optimise_parameters(grid, N_TRIALS)
-    print(f'Best Parameters: {optimisation_results['best_params']}')
+    print(f'Best Parameters: {json.dumps(optimisation_results['best_params'], indent=2)}')
     print(f'Best Profit: {optimisation_results['best_profit']}')
 
     engine.strategy = StrategyManager().get_strategy(
