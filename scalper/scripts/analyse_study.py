@@ -1,7 +1,9 @@
+import subprocess
+
 import questionary
 
 from study_analyser import StudyAnalyser
-from utils import get_study_names
+from utils import get_study_names, OPTUNA_DB_URL
 
 
 def analyse_study() -> None:
@@ -24,6 +26,7 @@ def run_analysis_dashboard(analyser: StudyAnalyser) -> None:
                 '📈 Plot Optimisation History',
                 '🧮 Plot Parameter Importances',
                 '📊 Plot Params vs Objective',
+                '📺 Launch Optuna HTML Dashboard',
                 '❌ Quit'
             ]
         ).ask()
@@ -46,6 +49,11 @@ def run_analysis_dashboard(analyser: StudyAnalyser) -> None:
 
         elif action == '📊 Plot Params vs Objective':
             analyser.plot_params_vs_objective()
+
+        elif action == '📺 Launch Optuna HTML Dashboard':
+            url = OPTUNA_DB_URL.replace('postgresql://', 'postgresql+psycopg2://')
+            print('Launching Optuna dashboard at http://localhost:8080 ...')
+            subprocess.run(['optuna-dashboard', url])
 
         elif action == '❌ Quit':
             break
