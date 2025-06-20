@@ -10,18 +10,18 @@ class RsiIndicator(Indicator):
         self.prices = []
         self.avg_gain, self.avg_loss, self.prev_price = None, None, None
 
-    def update(self, price: float) -> float:
+    def update(self, ohlc: pd.Series) -> float:
         if self.prev_price is None:
-            self.prev_price = price
+            self.prev_price = ohlc['price']
             return None
 
-        delta = price - self.prev_price
-        self.prev_price = price
+        delta = ohlc['price'] - self.prev_price
+        self.prev_price = ohlc['price']
         gain = max(delta, 0)
         loss = max(-delta, 0)
 
         if len(self.prices) < self.window + 1:
-            self.prices.append(price)
+            self.prices.append(ohlc['price'])
             return None
         else:
             self.prices = self.prices[-(self.window + 1):]
@@ -49,8 +49,8 @@ class RsiIndicator(Indicator):
         self.avg_gain, self.avg_loss, self.prev_price = None, None, None
 
         rsi_values = []
-        for price in ohlc['price']:
-            rsi = self.update(price)
+        for _, row in ohlc.iterrows():
+            rsi = self.update(row)
             rsi_values.append(rsi)
 
         return pd.Series(rsi_values, index=ohlc['price'].index, dtype=float)

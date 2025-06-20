@@ -27,9 +27,9 @@ class BacktestingEngine:
             self.results = self.strategy.vectorised_compute(self.resampled_ohlc)
         else:
             results = [None] * len(self.resampled_ohlc)
-            for i, (timestamp, price) in enumerate(self.resampled_ohlc['price'].items()):
-                result = self.strategy.generate_signal(price)
-                result.update({'price': price, 'timestamp': timestamp})
+            for i, (timestamp, row) in enumerate(self.resampled_ohlc.iterrows()):
+                result = self.strategy.generate_signal(row)
+                result.update({'timestamp': timestamp})
                 results[i] = result
             self.results = pd.DataFrame(results).set_index('timestamp')
 

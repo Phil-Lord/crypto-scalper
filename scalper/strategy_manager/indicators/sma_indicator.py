@@ -8,8 +8,8 @@ class SmaIndicator(Indicator):
         self.window = window
         self.prices = []
 
-    def update(self, price: float) -> float:
-        self.prices.append(price)
+    def update(self, ohlc: pd.Series) -> float:
+        self.prices.append(ohlc['price'])
         if len(self.prices) < self.window:
             return None
         return sum(self.prices[-self.window:]) / self.window

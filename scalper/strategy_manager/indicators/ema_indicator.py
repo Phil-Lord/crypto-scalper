@@ -9,11 +9,11 @@ class EmaIndicator(Indicator):
         self.ema = None
         self.alpha = 2 / (window + 1)
 
-    def update(self, price: float) -> float:
+    def update(self, ohlc: pd.Series) -> float:
         if self.ema is None:
-            self.ema = price  # Initialize EMA with the first price.
+            self.ema = ohlc['price']  # Initialise EMA with the first price.
         else:
-            self.ema = (price - self.ema) * self.alpha + self.ema
+            self.ema = (ohlc['price'] - self.ema) * self.alpha + self.ema
         return self.ema
 
     def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:

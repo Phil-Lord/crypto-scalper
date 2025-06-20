@@ -17,10 +17,10 @@ class Strategy:
     def register_rule(self, name: str, rule: Rule):
         self.rules[name] = rule
 
-    def generate_signal(self, price: float) -> dict:
-        ''' Compute indicators and rules given a new price, then generate signal. '''
+    def generate_signal(self, ohlc: pd.Series) -> dict:
+        ''' Compute indicators and rules given a new ohlc, then generate signal. '''
         indicator_results = {
-            name: indicator.update(price)
+            name: indicator.update(ohlc)
             for name, indicator in self.indicators.items()
         }
 
@@ -37,7 +37,7 @@ class Strategy:
         signal = self._generate_signal(rule_results)
         if signal in ['buy', 'sell']:
             self.last_action = signal
-        return {'price': price, **indicator_results, **rule_results, 'signal': signal}
+        return {'price': ohlc['price'], **indicator_results, **rule_results, 'signal': signal}
 
     def vectorised_compute(self, ohlc: pd.DataFrame) -> pd.DataFrame:
         ''' Compute indicators and rules for a series of ohlc data, then generate signals. '''

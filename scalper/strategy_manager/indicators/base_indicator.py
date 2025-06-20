@@ -5,8 +5,8 @@ import pandas as pd
 
 class Indicator(ABC):
     @abstractmethod
-    def update(self, price: float) -> any:
-        ''' Update indicator with new price for live trading. '''
+    def update(self, ohlc: pd.Series) -> any:
+        ''' Update indicator with new ohlc for live trading. '''
         pass
 
     @abstractmethod
