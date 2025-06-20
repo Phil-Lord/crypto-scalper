@@ -1,12 +1,13 @@
 import click
 import optuna
 
+from utils import OPTUNA_DB_URL
+
 
 @click.command()
 @click.option('--study', required=True, help='Study name (e.g. SmaStrategy_XXBTZGBP_20240101-20241231)')
 def delete_study(study: str):
-    db_url = ('postgresql://optuna_user:password@localhost:5432/optuna_db')
-    storage = optuna.storages.RDBStorage(url=db_url)
+    storage = optuna.storages.RDBStorage(url=OPTUNA_DB_URL)
 
     if study != 'l':
         optuna.delete_study(study_name=study, storage=storage)

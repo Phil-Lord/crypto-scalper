@@ -7,6 +7,7 @@ from optuna.exceptions import ExperimentalWarning
 import pandas as pd
 from tqdm import tqdm
 
+from utils import OPTUNA_DB_URL
 from strategy_manager import StrategyManager
 
 
@@ -68,12 +69,8 @@ def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_tri
     )
 
     # Create postgres Optuna storage instance.
-    db_url = (
-        'postgresql://optuna_user:password@localhost:5432/optuna_db'
-        '?application_name=optuna_worker'
-    )
     storage = optuna.storages.RDBStorage(
-        url=db_url,
+        url=OPTUNA_DB_URL,
         engine_kwargs={
             'pool_size': 10,
             'max_overflow': 10,

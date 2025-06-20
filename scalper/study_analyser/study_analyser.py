@@ -1,22 +1,21 @@
+import json
+
 import optuna
 from optuna.storages import RDBStorage
 import pandas as pd
 
+from utils import OPTUNA_DB_URL
 from .study_plotter import StudyPlotter
 
 
 class StudyAnalyser:
     def __init__(self, study_name: str):
         self.study_name = study_name
-        self.db_url = (
-            'postgresql://optuna_user:password@localhost:5432/optuna_db'
-            '?application_name=optuna_analysis'
-        )
         self.study = self._load_study()
 
     def _load_study(self) -> None:
         storage = RDBStorage(
-            url=self.db_url,
+            url=OPTUNA_DB_URL,
             engine_kwargs={
                 'pool_pre_ping': True,
                 'connect_args': {
@@ -31,7 +30,7 @@ class StudyAnalyser:
         print(f'Study name: {self.study.study_name}')
         print(f'Number of trials: {len(self.study.trials)}')
         print(f'Best value: {self.study.best_value}')
-        print(f'Best params: {self.study.best_params}')
+        print(f'Best params: {json.dumps(self.study.best_params, indent=2)}')
 
     def plot_optimisation_history(self) -> None:
         StudyPlotter.plot_optimisation_history(self.study)

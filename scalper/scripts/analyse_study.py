@@ -1,6 +1,7 @@
 import optuna
 import questionary
 
+from utils import OPTUNA_DB_URL
 from study_analyser import StudyAnalyser
 
 
@@ -20,8 +21,7 @@ def analyse_study() -> None:
 
 
 def get_study_names() -> list[str]:
-    db_url = ('postgresql://optuna_user:password@localhost:5432/optuna_db')
-    storage = optuna.storages.RDBStorage(url=db_url)
+    storage = optuna.storages.RDBStorage(url=OPTUNA_DB_URL)
     study_summaries = optuna.study.get_all_study_summaries(storage=storage)
     return [study.study_name for study in study_summaries]
 

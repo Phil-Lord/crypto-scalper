@@ -1,4 +1,4 @@
-from .constants import ROOT_DIR
+from .constants import OPTUNA_DB_URL, ROOT_DIR
 from .data_visualisation import plot_position_profits, plot_results, plot_trade_data_from_db
 from .env_vars import get_env_var
 from .pair_config import get_kraken_pair, get_kraken_pair_symbols
