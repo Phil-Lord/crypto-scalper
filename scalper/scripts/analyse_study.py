@@ -7,16 +7,48 @@ from utils import get_study_names
 def analyse_study() -> None:
     study_names = get_study_names()
     if not study_names:
-        print("No studies found.")
+        print('No studies found.')
         return
-    study_name = questionary.select("Select a study:", choices=study_names).ask()
-
+    study_name = questionary.select('Select a study:', choices=study_names).ask()
     analyser = StudyAnalyser(study_name)
-    analyser.describe()
-    analyser.plot_optimisation_history()
-    analyser.plot_param_importances()
-    analyser.plot_params_vs_objective()
-    print(analyser.export_trials_dataframe())
+    run_analysis_dashboard(analyser)
+
+
+def run_analysis_dashboard(analyser: StudyAnalyser) -> None:
+    while True:
+        action = questionary.select(
+            'Select an action:',
+            choices=[
+                '📄 Describe Study',
+                '📤 Export Trials DataFrame',
+                '📈 Plot Optimisation History',
+                '🧮 Plot Parameter Importances',
+                '📊 Plot Params vs Objective',
+                '❌ Quit'
+            ]
+        ).ask()
+
+        if action == '📄 Describe Study':
+            analyser.describe()
+
+        elif action == '📤 Export Trials DataFrame':
+            df = analyser.export_trials_dataframe()
+            filename = questionary.text('Enter filename to save as (e.g. trials.csv):').ask()
+            if filename:
+                df.to_csv(filename, index=False)
+                print(f'Exported to {filename}')
+
+        elif action == '📈 Plot Optimisation History':
+            analyser.plot_optimisation_history()
+
+        elif action == '🧮 Plot Parameter Importances':
+            analyser.plot_param_importances()
+
+        elif action == '📊 Plot Params vs Objective':
+            analyser.plot_params_vs_objective()
+
+        elif action == '❌ Quit':
+            break
 
 
 if __name__ == '__main__':
