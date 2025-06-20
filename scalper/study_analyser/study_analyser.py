@@ -4,7 +4,6 @@ import optuna
 from optuna.storages import RDBStorage
 import pandas as pd
 
-from .study_plotter import StudyPlotter
 from utils import OPTUNA_DB_URL
 
 
@@ -31,15 +30,6 @@ class StudyAnalyser:
         print(f'Number of trials: {len(self.study.trials)}')
         print(f'Best value: {self.study.best_value}')
         print(f'Best params: {json.dumps(self.study.best_params, indent=2)}')
-
-    def plot_optimisation_history(self) -> None:
-        StudyPlotter.plot_optimisation_history(self.study)
-
-    def plot_param_importances(self) -> None:
-        StudyPlotter.plot_param_importances(self.study)
-
-    def plot_params_vs_objective(self) -> None:
-        StudyPlotter.plot_params_vs_objective(self.study)
 
     def export_trials_dataframe(self) -> pd.DataFrame:
         return self.study.trials_dataframe(attrs=('number', 'value', 'params'))
