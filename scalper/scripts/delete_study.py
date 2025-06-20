@@ -1,7 +1,7 @@
 import click
 import optuna
 
-from utils import OPTUNA_DB_URL
+from utils import get_study_names, OPTUNA_DB_URL
 
 
 @click.command()
@@ -13,12 +13,12 @@ def delete_study(study: str):
         optuna.delete_study(study_name=study, storage=storage)
         print(f'Study {study} deleted.')
 
-    study_summaries = optuna.study.get_all_study_summaries(storage=storage)
-    if study_summaries:
-        for study in study_summaries:
-            print(study.study_name)
+    study_names = get_study_names()
+    if study_names:
+        for name in study_names:
+            print(name)
     else:
-        print('No studies found.')
+        print("No studies found.")
 
 
 if __name__ == '__main__':

@@ -4,8 +4,8 @@ import optuna
 from optuna.storages import RDBStorage
 import pandas as pd
 
-from utils import OPTUNA_DB_URL
 from .study_plotter import StudyPlotter
+from utils import OPTUNA_DB_URL
 
 
 class StudyAnalyser:

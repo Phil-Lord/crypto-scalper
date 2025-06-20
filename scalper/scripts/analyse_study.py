@@ -1,8 +1,7 @@
-import optuna
 import questionary
 
-from utils import OPTUNA_DB_URL
 from study_analyser import StudyAnalyser
+from utils import get_study_names
 
 
 def analyse_study() -> None:
@@ -18,12 +17,6 @@ def analyse_study() -> None:
     analyser.plot_param_importances()
     analyser.plot_params_vs_objective()
     print(analyser.export_trials_dataframe())
-
-
-def get_study_names() -> list[str]:
-    storage = optuna.storages.RDBStorage(url=OPTUNA_DB_URL)
-    study_summaries = optuna.study.get_all_study_summaries(storage=storage)
-    return [study.study_name for study in study_summaries]
 
 
 if __name__ == '__main__':
