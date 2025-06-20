@@ -4,6 +4,7 @@ import subprocess
 import optuna
 import pandas as pd
 
+from .study_plotter import StudyPlotter
 from utils import OPTUNA_DB_URL
 
 
@@ -33,6 +34,12 @@ class StudyAnalyser:
 
     def export_trials_dataframe(self) -> pd.DataFrame:
         return self.study.trials_dataframe(attrs=('number', 'value', 'params'))
+
+    def plot_hyperparameter_correlation_matrix(self):
+        StudyPlotter.plot_hyperparameter_correlation_matrix(self.study)
+
+    def plot_parameter_stability(self):
+        StudyPlotter.plot_parameter_stability(self.study)
 
     def launch_dashboard(self) -> None:
         url = OPTUNA_DB_URL.replace('postgresql://', 'postgresql+psycopg2://')

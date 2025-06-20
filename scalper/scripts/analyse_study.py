@@ -21,6 +21,8 @@ def run_analysis_dashboard(analyser: StudyAnalyser) -> None:
             choices=[
                 '📄 Describe Study',
                 '📤 Export Trials DataFrame',
+                '🧮 Plot Hyperparameter Correlation Matrix',
+                '📊 Plot Parameter Stability',
                 '📺 Launch Optuna HTML Dashboard',
                 '❌ Quit'
             ]
@@ -34,6 +36,10 @@ def run_analysis_dashboard(analyser: StudyAnalyser) -> None:
             if filename:
                 df.to_csv(filename, index=False)
                 print(f'Exported to {filename}')
+        elif action == '🧮 Plot Hyperparameter Correlation Matrix':
+            analyser.plot_hyperparameter_correlation_matrix()
+        elif action == '📊 Plot Parameter Stability':
+            analyser.plot_parameter_stability()
         elif action == '📺 Launch Optuna HTML Dashboard':
             analyser.launch_dashboard()
         elif action == '❌ Quit':
