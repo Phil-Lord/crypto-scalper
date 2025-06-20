@@ -60,6 +60,6 @@ class BacktestingEngine:
         trades.set_index("timestamp", inplace=True)
 
         ohlc = trades['price'].resample(f'{self.interval}min').ohlc()
-        ohlc = ohlc.ffill()
+        ohlc = ohlc.bfill()
         ohlc.rename(columns={'close': 'price'}, inplace=True)
         self.resampled_ohlc = ohlc
