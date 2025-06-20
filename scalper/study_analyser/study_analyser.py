@@ -2,7 +2,6 @@ import json
 import subprocess
 
 import optuna
-from optuna.storages import RDBStorage
 import pandas as pd
 
 from utils import OPTUNA_DB_URL
@@ -14,7 +13,7 @@ class StudyAnalyser:
         self.study = self._load_study()
 
     def _load_study(self) -> None:
-        storage = RDBStorage(
+        storage = optuna.storages.RDBStorage(
             url=OPTUNA_DB_URL,
             engine_kwargs={
                 'pool_pre_ping': True,
