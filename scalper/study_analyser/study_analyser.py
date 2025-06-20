@@ -1,4 +1,5 @@
 import json
+import subprocess
 
 import optuna
 from optuna.storages import RDBStorage
@@ -33,3 +34,8 @@ class StudyAnalyser:
 
     def export_trials_dataframe(self) -> pd.DataFrame:
         return self.study.trials_dataframe(attrs=('number', 'value', 'params'))
+
+    def launch_dashboard(self) -> None:
+        url = OPTUNA_DB_URL.replace('postgresql://', 'postgresql+psycopg2://')
+        print('Launching Optuna dashboard at http://localhost:8080 ...')
+        subprocess.run(['optuna-dashboard', url])
