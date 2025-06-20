@@ -44,13 +44,13 @@ class RsiIndicator(Indicator):
         rsi = 100 - (100 / (1 + rs))
         return rsi
 
-    def compute_vectorised(self, prices: pd.Series) -> pd.Series:
+    def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
         self.prices = []
         self.avg_gain, self.avg_loss, self.prev_price = None, None, None
 
         rsi_values = []
-        for price in prices:
+        for price in ohlc['price']:
             rsi = self.update(price)
             rsi_values.append(rsi)
 
-        return pd.Series(rsi_values, index=prices.index, dtype=float)
+        return pd.Series(rsi_values, index=ohlc['price'].index, dtype=float)

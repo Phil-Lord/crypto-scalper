@@ -39,13 +39,13 @@ class Strategy:
             self.last_action = signal
         return {'price': price, **indicator_results, **rule_results, 'signal': signal}
 
-    def vectorised_compute(self, prices: pd.Series) -> pd.DataFrame:
-        ''' Compute indicators and rules for a series of prices, then generate signals. '''
+    def vectorised_compute(self, ohlc: pd.DataFrame) -> pd.DataFrame:
+        ''' Compute indicators and rules for a series of ohlc data, then generate signals. '''
         indicator_results = {
-            name: indicator.compute_vectorised(prices)
+            name: indicator.compute_vectorised(ohlc)
             for name, indicator in self.indicators.items()
         }
-        results = pd.DataFrame({'price': prices, **indicator_results})
+        results = pd.DataFrame({'price': ohlc['price'], **indicator_results})
 
         for rule_name, rule in self.rules.items():
             results[rule_name] = rule.compute_vectorised(results)

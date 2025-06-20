@@ -16,5 +16,5 @@ class EmaIndicator(Indicator):
             self.ema = (price - self.ema) * self.alpha + self.ema
         return self.ema
 
-    def compute_vectorised(self, prices: pd.Series) -> pd.Series:
-        return prices.ewm(span=self.window, adjust=False).mean()
+    def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
+        return ohlc['price'].ewm(span=self.window, adjust=False).mean()

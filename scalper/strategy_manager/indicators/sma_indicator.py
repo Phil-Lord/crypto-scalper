@@ -14,5 +14,5 @@ class SmaIndicator(Indicator):
             return None
         return sum(self.prices[-self.window:]) / self.window
 
-    def compute_vectorised(self, prices: pd.Series) -> pd.Series:
-        return prices.rolling(self.window).mean()
+    def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
+        return ohlc['price'].rolling(self.window).mean()

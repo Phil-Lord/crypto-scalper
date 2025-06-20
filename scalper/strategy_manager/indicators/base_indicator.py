@@ -10,6 +10,6 @@ class Indicator(ABC):
         pass
 
     @abstractmethod
-    def compute_vectorised(self, prices: pd.Series) -> pd.Series:
+    def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
         ''' Compute indicator for entire series during backtesting. '''
         pass
