@@ -45,12 +45,16 @@ class RsiIndicator(Indicator):
         return rsi
 
     def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
-        self.prices = []
-        self.avg_gain, self.avg_loss, self.prev_price = None, None, None
+        prices = ohlc['price']
+        delta = prices.diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
 
-        rsi_values = []
-        for _, row in ohlc.iterrows():
-            rsi = self.update(row)
-            rsi_values.append(rsi)
+        # Wilder's smoothing for the entire series (no rolling mean).
+        avg_gain = gain.ewm(alpha=1/self.window, min_periods=self.window, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1/self.window, min_periods=self.window, adjust=False).mean()
 
-        return pd.Series(rsi_values, index=ohlc['price'].index, dtype=float)
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        rsi[avg_loss == 0] = 100  # Handle division by zero
+        return rsi
