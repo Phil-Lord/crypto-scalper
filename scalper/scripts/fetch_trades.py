@@ -6,9 +6,9 @@ from utils import get_kraken_pair, get_nano_timestamp, parse_datetime
 
 
 @click.command()
-@click.option('--pair', required=True, help='Trading pair (e.g. BTCGBP)')
-@click.option('--start', required=True, help='Start timestamp (e.g. 2025-1-1-0-0-0)')
-@click.option('--end', required=True, help='End timestamp (e.g. 2025-1-1-23-59-59)')
+@click.option('--pair', '-p', required=True, help='Trading pair (e.g. BTCGBP)')
+@click.option('--start', '-s', required=True, help='Start timestamp (e.g. 2025-1-1-0-0-0)')
+@click.option('--end', '-e', required=True, help='End timestamp (e.g. 2025-1-1-23-59-59)')
 def fetch_trades(pair: str, start: str, end: str) -> None:
     connector = TradesConnector()
     repository = TradesRepository()
