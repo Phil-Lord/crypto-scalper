@@ -16,15 +16,15 @@ PLOT_RESULTS = True
 
 
 @click.command()
-@click.option('--pair', required=True, help='Trading pair (e.g. BTC)')
-@click.option('--strategy_name', required=True, help='Strategy name (e.g. sma)')
-@click.option('--start', required=False, help='Start timestamp (e.g. 2025-1-1-0-0-0)')
-@click.option('--end', required=False, help='End timestamp (e.g. 2025-1-1-23-59-59)')
-@click.option('--interval', required=False, help='Interval (e.g. 1, 3, 5, 15, etc.)')
-@click.option('--vectorised', required=False, type=bool, help='Run in vectorised mode.')
-@click.option('--optimise', is_flag=True, help='Enable parameter optimisation.')
+@click.option('--pair', '-p', required=True, help='Trading pair (e.g. BTC)')
+@click.option('--strategy_name', '-sn', required=True, help='Strategy name (e.g. sma)')
+@click.option('--start', '-s', required=False, help='Start timestamp (e.g. 2025-1-1-0-0-0)')
+@click.option('--end', '-e', required=False, help='End timestamp (e.g. 2025-1-1-23-59-59)')
+@click.option('--interval', '-i', required=False, help='Interval (e.g. 1, 3, 5, 15, etc.)')
+@click.option('--vectorised', '-v', is_flag=True, help='Run in vectorised mode.')
+@click.option('--optimise', '-o', is_flag=True, help='Enable parameter optimisation.')
 def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = None,
-                 interval: int = 1, vectorised: bool = None, optimise: bool = False) -> None:
+                 interval: int = 1, vectorised: bool = False, optimise: bool = False) -> None:
     ''' Run a backtest on the specified trading pair and strategy. '''
     # Set params and grid.
     params, grid = get_params_for_strategy(strategy_name)
