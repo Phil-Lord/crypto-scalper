@@ -11,7 +11,7 @@ def parse_datetime(datetime: str):
     return [int(i) for i in datetime.split('-')]
 
 
-def get_nano_timestamp(year: int, month: int, day: int, hour: int, minute: int, second: int) -> int:
+def get_nano_timestamp(year: int, month: int = 1, day: int = 1, hour: int = 0, minute: int = 0, second: int = 0) -> int:
     '''
     The Kraken API Trades endpoint takes nanosecond timestamps, e.g. 1738022400000000000.
     '''
@@ -19,7 +19,7 @@ def get_nano_timestamp(year: int, month: int, day: int, hour: int, minute: int, 
     return int(time.mktime(date.timetuple()) * 1000000000)
 
 
-def get_second_timestamp(year: int, month: int, day: int, hour: int, minute: int, second: int) -> float:
+def get_second_timestamp(year: int, month: int = 1, day: int = 1, hour: int = 0, minute: int = 0, second: int = 0) -> float:
     '''
     The Kraken API Trades endpoint returns timestamps in seconds (with the fractional part in
     microseconds), e.g. 1738022410.0468764.
