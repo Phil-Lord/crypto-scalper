@@ -62,24 +62,23 @@ class AdxIndicator(Indicator):
         lows = ohlc['low']
         closes = ohlc['price']
 
-        # Directional Movement
-        up_move = highs.diff()
-        down_move = lows.diff()
+        # Directional movement
+        up_move = highs - highs.shift()
+        down_move = lows.shift() - lows
 
-        plus_dm = pd.Series(np.where((up_move > down_move) & (
-            up_move > 0), up_move, 0.0), index=ohlc.index)
-        minus_dm = pd.Series(np.where((down_move > up_move) & (
-            down_move > 0), down_move, 0.0), index=ohlc.index)
+        plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+        minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
 
-        # True Range
+        plus_dm = pd.Series(plus_dm, index=ohlc.index)
+        minus_dm = pd.Series(minus_dm, index=ohlc.index)
+
         tr1 = highs - lows
-        tr2 = abs(highs - closes.shift())
-        tr3 = abs(lows - closes.shift())
+        tr2 = (highs - closes.shift()).abs()
+        tr3 = (lows - closes.shift()).abs()
         tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
 
         alpha = 1 / self.window
 
-        # Do NOT set first value to np.nan; let ewm use the first valid value as seed
         smoothed_tr = tr.ewm(alpha=alpha, adjust=False).mean()
         smoothed_plus_dm = plus_dm.ewm(alpha=alpha, adjust=False).mean()
         smoothed_minus_dm = minus_dm.ewm(alpha=alpha, adjust=False).mean()
@@ -87,9 +86,12 @@ class AdxIndicator(Indicator):
         plus_di = 100 * smoothed_plus_dm / smoothed_tr
         minus_di = 100 * smoothed_minus_dm / smoothed_tr
 
-        dx = (abs(plus_di - minus_di) / (plus_di + minus_di)
+        dx = ((plus_di - minus_di).abs() / (plus_di + minus_di)
               ).replace([np.inf, -np.inf], 0).fillna(0) * 100
 
         adx = dx.ewm(alpha=alpha, adjust=False).mean()
+
+        # Ensure first row matches non-vectorised behavior
+        adx.iloc[0] = np.nan
 
         return adx.rename('adx')
