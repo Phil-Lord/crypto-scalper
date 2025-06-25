@@ -91,7 +91,8 @@ class AdxIndicator(Indicator):
 
         adx = dx.ewm(alpha=alpha, adjust=False).mean()
 
-        # Ensure first row matches non-vectorised behavior
+        # Match non-vectorised: first valid ADX is raw dx, not smoothed yet.
         adx.iloc[0] = np.nan
+        adx.iloc[1] = dx.iloc[1]
 
         return adx.rename('adx')
