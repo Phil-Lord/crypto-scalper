@@ -16,4 +16,4 @@ class AdxThresholdRule(Rule):
         return 'buy' if adx >= self.threshold else 'hold'
 
     def compute_vectorised(self, results: pd.DataFrame) -> pd.Series:
-        return np.where(results[self.adx_name] > self.threshold, 'buy', 'hold')
+        return np.where(results[self.adx_name] >= self.threshold, 'buy', 'hold')
