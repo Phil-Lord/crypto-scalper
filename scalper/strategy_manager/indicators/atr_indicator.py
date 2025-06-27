@@ -25,7 +25,9 @@ class AtrIndicator(Indicator):
             1 - alpha) * self.smoothed_tr + alpha * tr
 
         self.prev_close = close
-        return self.smoothed_tr
+
+        # Return the ATR as a ratio of the smoothed TR to the current close price.
+        return self.smoothed_tr / close if close != 0 else None
 
     def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
         highs = ohlc['high']
@@ -39,6 +41,7 @@ class AtrIndicator(Indicator):
 
         alpha = 1 / self.window
         atr = tr.ewm(alpha=alpha, adjust=False).mean()
-        atr.name = 'atr'
 
-        return atr
+        # Return ratio of ATRs to current close prices.
+        atr_ratio = (atr / closes).rename('atr')
+        return atr_ratio

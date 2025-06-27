@@ -10,10 +10,10 @@ class AtrThresholdRule(Rule):
         self.threshold = threshold
 
     def check(self, current_state: dict) -> str:
-        atr = current_state.get(self.atr_name)
-        if atr is None:
+        atr_ratio = current_state.get(self.atr_name)
+        if atr_ratio is None:
             return 'hold'
-        return 'buy' if atr >= self.threshold else 'hold'
+        return 'buy' if atr_ratio >= self.threshold else 'hold'
 
     def compute_vectorised(self, results: pd.DataFrame) -> pd.Series:
         return np.where(results[self.atr_name] >= self.threshold, 'buy', 'hold')
