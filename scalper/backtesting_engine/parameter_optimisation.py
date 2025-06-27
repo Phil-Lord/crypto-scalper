@@ -15,13 +15,13 @@ def get_objective(engine, param_grid: dict[str, list[any]]) -> callable:
     def objective(trial: optuna.Trial) -> float:
         ''' Optimisation Objective: Maximise final quote balance. '''
         params = {}
-        for param_name, param_range in param_grid.items():
-            if isinstance(param_range[0], int):
-                params[param_name] = trial.suggest_int(param_name, param_range[0], param_range[1])
-            elif isinstance(param_range[0], float):
-                params[param_name] = trial.suggest_float(param_name, param_range[0], param_range[1])
+        for name, (low, high) in param_grid.items():
+            if isinstance(low, int):
+                params[name] = trial.suggest_int(name, low, high)
+            elif isinstance(low, float):
+                params[name] = trial.suggest_float(name, low, high)
             else:
-                raise ValueError(f'Unsupported parameter type for {param_name}')
+                raise ValueError(f'Unsupported parameter type for {name}')
 
         engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
         engine.run()
