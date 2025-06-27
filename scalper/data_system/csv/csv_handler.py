@@ -21,7 +21,12 @@ class CsvHandler:
         # Filter out any new trades found in the existing stored data, then concatenate.
         existing_trades = self.load_trades(True)
         trades = trades[~trades.index.isin(existing_trades.index)]
-        trades_df = pd.concat([existing_trades, trades])
+        dfs = [df for df in [existing_trades, trades] if not df.empty]
+        if dfs:
+            trades_df = pd.concat(dfs)
+        else:
+            # If both are empty, create an empty DataFrame with the correct columns
+            trades_df = pd.DataFrame(columns=trades.columns)
 
         # Sort by trade id and save.
         trades_df.sort_index(inplace=True)
