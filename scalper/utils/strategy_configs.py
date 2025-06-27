@@ -9,9 +9,12 @@ PRECISION_TREND_CONFIG = {
     'rsi_overbought': 91.68,
     'adx_window': 14,
     'adx_threshold': 25,
+    'atr_window': 14,
+    'atr_threshold': 50,
     'weight_crossover': 0.04,
     'weight_rsi': 0.87,
     'weight_adx': 0.3,
+    'weight_atr': 0.3,
     'buy_threshold': 0.38,
     'sell_threshold': -0.86
 }
@@ -23,9 +26,12 @@ PRECISION_TREND_GRID = {
     'rsi_overbought': [50.0, 100.0],
     'adx_window': [0, 50],
     'adx_threshold': [0, 50],
+    'atr_window': [0, 50],
+    'atr_threshold': [0, 100],
     'weight_crossover': [0.0, 1.0],
     'weight_rsi': [0.0, 1.0],
     'weight_adx': [0.0, 1.0],
+    'weight_atr': [0.0, 1.0],
     'buy_threshold': [0.0, 1.0],
     'sell_threshold': [-1.0, 0.0]
 }
