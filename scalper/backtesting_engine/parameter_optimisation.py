@@ -11,7 +11,7 @@ from utils import OPTUNA_DB_URL
 from strategy_manager import StrategyManager
 
 
-def get_objective(engine, param_grid: dict[str, list[any]]) -> callable:
+def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[callable] = None) -> callable:
     def objective(trial: optuna.Trial) -> float:
         ''' Optimisation Objective: Maximise final quote balance. '''
         params = {}
@@ -22,6 +22,11 @@ def get_objective(engine, param_grid: dict[str, list[any]]) -> callable:
                 params[name] = trial.suggest_float(name, low, high)
             else:
                 raise ValueError(f'Unsupported parameter type for {name}')
+
+        if constraints:
+            for constraint in constraints:
+                if not constraint(params):
+                    raise optuna.TrialPruned()
 
         engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
         engine.run()
@@ -57,7 +62,8 @@ def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int 
     return {'best_params': study.best_params, 'best_profit': study.best_value, 'study': study}
 
 
-def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
+def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_trials: int = 100,
+                                 constraints: list[callable] = None) -> dict[str, any]:
     warnings.filterwarnings("ignore", category=ExperimentalWarning)
 
     # Create study name using backtest params.
@@ -105,7 +111,7 @@ def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_tri
     progress_callback = TqdmProgressCallback(n_trials)
     try:
         study.optimize(
-            get_objective(engine, param_grid),
+            get_objective(engine, param_grid, constraints),
             n_trials=n_trials,
             n_jobs=-1,
             callbacks=[progress_callback]

@@ -38,7 +38,8 @@ class BacktestingEngine:
     def optimise_parameters(self, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
         if self.resampled_ohlc is None:
             self.__load_resampled_ohlc()
-        return optimise_parameters_postgres(self, param_grid, n_trials)
+        strategy_constraints = getattr(self.strategy.__class__, 'constraints', lambda: [])()
+        return optimise_parameters_postgres(self, param_grid, n_trials, strategy_constraints)
 
     def calculate_position_profits(self, initial_quote_balance: float = 1000) -> float:
         if self.results is None:
