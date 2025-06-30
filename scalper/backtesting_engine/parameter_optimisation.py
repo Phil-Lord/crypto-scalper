@@ -1,5 +1,4 @@
 import os
-import sqlite3
 import warnings
 
 import optuna
@@ -32,34 +31,6 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
         engine.run()
         return engine.get_final_quote_balance()
     return objective
-
-
-def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
-    db_dir = os.path.join(os.path.dirname(__file__))
-    os.makedirs(db_dir, exist_ok=True)
-    db_url = f'sqlite:///{db_dir}/optimisation_shared/optimisation.db'
-
-    optuna.logging.set_verbosity(optuna.logging.WARNING)
-    study = optuna.create_study(
-        direction='maximize',
-        sampler=optuna.samplers.TPESampler(
-            n_startup_trials=10,
-            multivariate=True,
-            group=True,
-            constant_liar=True
-        ),
-        storage=db_url,
-        load_if_exists=True
-    )
-
-    # Enable Write-Ahead Logging (WAL) mode
-    conn = sqlite3.connect(f'{db_dir}/optimisation_shared/optimisation.db')
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=NORMAL")  # Better performance than FULL
-    conn.close()
-
-    study.optimize(get_objective(engine, param_grid), n_trials=n_trials, n_jobs=-1)
-    return {'best_params': study.best_params, 'best_profit': study.best_value, 'study': study}
 
 
 def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_trials: int = 100,
