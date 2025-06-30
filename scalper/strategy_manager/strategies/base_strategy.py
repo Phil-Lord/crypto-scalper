@@ -71,7 +71,7 @@ class Strategy:
         ''' Replace consecutive buy or sell signals with hold. '''
         signals_arr = signals.to_numpy()
         suppressed = np.empty_like(signals_arr, dtype=object)
-        last_action = None
+        last_action = 'sell'
 
         for i, signal in enumerate(signals_arr):
             if signal == 'hold':
