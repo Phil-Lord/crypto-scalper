@@ -33,20 +33,27 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
     return objective
 
 
-def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_trials: int = 100,
-                                 constraints: list[callable] = None) -> dict[str, any]:
+def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int = 100,
+                        constraints: list[callable] = None) -> dict[str, any]:
     warnings.filterwarnings("ignore", category=ExperimentalWarning)
+    study_name = create_study_name(engine)
+    storage = create_storage()
+    study = create_study(storage, study_name, n_trials)
+    optimise(n_trials, study, engine, param_grid, constraints)
+    return {'best_params': study.best_params, 'best_profit': study.best_value, 'study': study}
 
-    # Create study name using backtest params.
-    study_name = (
+
+def create_study_name(engine) -> str:
+    return (
         f'{engine.strategy.__class__.__name__}_'
         f'{engine.pair}_'
         f'{pd.to_datetime(engine.start, unit='s').strftime('%Y%m%d')}-'
         f'{pd.to_datetime(engine.end, unit='s').strftime('%Y%m%d')}'
     )
 
-    # Create postgres Optuna storage instance.
-    storage = optuna.storages.RDBStorage(
+
+def create_storage() -> optuna.storages.RDBStorage:
+    return optuna.storages.RDBStorage(
         url=OPTUNA_DB_URL,
         engine_kwargs={
             'pool_size': 10,
@@ -59,9 +66,10 @@ def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_tri
         }
     )
 
-    # Create study.
+
+def create_study(storage, study_name: str, n_trials: int) -> optuna.study.Study:
     try:
-        study = optuna.create_study(
+        return optuna.create_study(
             study_name=study_name,
             storage=storage,
             load_if_exists=True,
@@ -75,9 +83,11 @@ def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_tri
         )
     except optuna.exceptions.DuplicatedStudyError:
         # Handle concurrent study creation.
-        study = optuna.load_study(study_name=study_name, storage=storage)
+        return optuna.load_study(study_name=study_name, storage=storage)
 
-    # Run optimisation.
+
+def optimise(n_trials: int, study: optuna.study.Study, engine, param_grid: dict[str, list[any]],
+             constraints: list[callable] = None) -> None:
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     progress_callback = TqdmProgressCallback(n_trials)
     try:
@@ -89,7 +99,6 @@ def optimise_parameters_postgres(engine, param_grid: dict[str, list[any]], n_tri
         )
     finally:
         progress_callback.close()
-    return {'best_params': study.best_params, 'best_profit': study.best_value, 'study': study}
 
 
 class TqdmProgressCallback:

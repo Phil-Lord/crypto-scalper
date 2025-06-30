@@ -2,7 +2,7 @@ import pandas as pd
 
 from data_system import TradesRepository
 from .profit_calculation import calculate_position_profits, get_final_quote_balance
-from .parameter_optimisation import optimise_parameters_postgres
+from .parameter_optimisation import optimise_parameters
 from strategy_manager import StrategyManager
 
 
@@ -39,7 +39,7 @@ class BacktestingEngine:
         if self.resampled_ohlc is None:
             self.__load_resampled_ohlc()
         strategy_constraints = getattr(self.strategy.__class__, 'constraints', lambda: [])()
-        return optimise_parameters_postgres(self, param_grid, n_trials, strategy_constraints)
+        return optimise_parameters(self, param_grid, n_trials, strategy_constraints)
 
     def calculate_position_profits(self, initial_quote_balance: float = 1000) -> float:
         if self.results is None:
