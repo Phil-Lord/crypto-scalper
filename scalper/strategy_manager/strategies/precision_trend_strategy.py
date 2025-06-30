@@ -61,7 +61,7 @@ class PrecisionTrendStrategy(Strategy):
         else:
             return 'hold'
 
-    def _generate_signals(self, results: pd.DataFrame) -> pd.DataFrame:
+    def _generate_signals(self, results: pd.DataFrame) -> pd.Series:
         signal_map = {'buy': 1, 'hold': 0, 'sell': -1}
         indicators = {
             'crossover': self.weight_crossover,
@@ -76,4 +76,5 @@ class PrecisionTrendStrategy(Strategy):
 
         conditions = [total_scores > self.buy_threshold, total_scores < self.sell_threshold]
         choices = ['buy', 'sell']
-        return np.select(conditions, choices, default='hold')
+        result = np.select(conditions, choices, default='hold')
+        return pd.Series(result, index=results.index)

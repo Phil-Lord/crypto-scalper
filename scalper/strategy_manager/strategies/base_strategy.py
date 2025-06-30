@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 from strategy_manager.indicators import Indicator
@@ -35,8 +36,12 @@ class Strategy:
         }
 
         signal = self._generate_signal(rule_results)
-        if signal in ['buy', 'sell']:
-            self.last_action = signal
+        if signal == self.last_action and signal != 'hold':
+            signal = 'hold'
+        else:
+            if signal in ['buy', 'sell']:
+                self.last_action = signal
+
         return {'price': ohlc['price'], **indicator_results, **rule_results, 'signal': signal}
 
     def vectorised_compute(self, ohlc: pd.DataFrame) -> pd.DataFrame:
@@ -50,13 +55,31 @@ class Strategy:
         for rule_name, rule in self.rules.items():
             results[rule_name] = rule.compute_vectorised(results)
 
-        results['signal'] = self._generate_signals(results)
+        signals = self._generate_signals(results)
+        results['signal'] = self._suppress_consecutive_signals(signals)
         return results
 
     def _generate_signal(self, rule_results: dict) -> str:
         ''' Generate a signal based on the rule results of a training run interval. '''
         pass
 
-    def _generate_signals(self, results: pd.DataFrame) -> pd.DataFrame:
+    def _generate_signals(self, results: pd.DataFrame) -> pd.Series:
         ''' Generate signals based on the results of a vectorised trading run. '''
         pass
+
+    def _suppress_consecutive_signals(self, signals: pd.Series) -> pd.Series:
+        ''' Replace consecutive buy or sell signals with hold. '''
+        signals_arr = signals.to_numpy()
+        suppressed = np.empty_like(signals_arr, dtype=object)
+        last_action = None
+
+        for i, signal in enumerate(signals_arr):
+            if signal == 'hold':
+                suppressed[i] = 'hold'
+            elif signal == last_action:
+                suppressed[i] = 'hold'
+            else:
+                suppressed[i] = signal
+                last_action = signal
+
+        return pd.Series(suppressed, index=signals.index)

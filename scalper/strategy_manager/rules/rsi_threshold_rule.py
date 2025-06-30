@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 from .base_rule import Rule
@@ -15,12 +16,9 @@ class RsiThresholdRule(Rule):
         if rsi is None or prev_rsi is None:
             return 'hold'
 
-        cross_above_oversold = (rsi > self.oversold) and (prev_rsi <= self.oversold)
-        cross_below_overbought = (rsi < self.overbought) and (prev_rsi >= self.overbought)
-
-        if cross_above_oversold and current_state['last_action'] != 'buy':
+        if rsi > self.oversold and prev_rsi <= self.oversold:
             return 'buy'
-        elif cross_below_overbought and current_state['last_action'] == 'buy':
+        elif rsi < self.overbought and prev_rsi >= self.overbought:
             return 'sell'
         return 'hold'
 
@@ -29,14 +27,7 @@ class RsiThresholdRule(Rule):
         cross_above_oversold = (rsi > self.oversold) & (rsi.shift(1) <= self.oversold)
         cross_below_overbought = (rsi < self.overbought) & (rsi.shift(1) >= self.overbought)
 
-        signals = pd.Series('hold', index=results.index)
-        last_action = 'sell'
-
-        for i in range(len(results)):
-            if cross_above_oversold.iloc[i] and last_action != 'buy':
-                signals.iloc[i] = 'buy'
-                last_action = 'buy'
-            elif cross_below_overbought.iloc[i] and last_action == 'buy':
-                signals.iloc[i] = 'sell'
-                last_action = 'sell'
-        return signals
+        signals = np.full(len(results), 'hold', dtype=object)
+        signals[cross_above_oversold] = 'buy'
+        signals[cross_below_overbought] = 'sell'
+        return pd.Series(signals, index=results.index)

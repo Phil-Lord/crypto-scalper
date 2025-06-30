@@ -15,8 +15,8 @@ PRECISION_TREND_CONFIG = {
     'weight_rsi': 0.25,
     'weight_adx': 0.25,
     'weight_atr': 0.25,
-    'buy_threshold': 0.38,
-    'sell_threshold': -0.86
+    'buy_threshold': 0.1,
+    'sell_threshold': -0.1
 }
 PRECISION_TREND_GRID = {
     'short_ema': [5, 50],
