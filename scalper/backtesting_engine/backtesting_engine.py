@@ -21,7 +21,7 @@ class BacktestingEngine:
     def run(self) -> pd.DataFrame:
         ''' Load trades from the database and generate a strategy signal for each interval. '''
         if self.resampled_ohlc is None:
-            self.__load_resampled_ohlc()
+            self._load_resampled_ohlc()
 
         if self.vectorised:
             self.results = self.strategy.vectorised_compute(self.resampled_ohlc)
@@ -37,7 +37,7 @@ class BacktestingEngine:
 
     def optimise_parameters(self, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
         if self.resampled_ohlc is None:
-            self.__load_resampled_ohlc()
+            self._load_resampled_ohlc()
         strategy_constraints = getattr(self.strategy.__class__, 'constraints', lambda: [])()
         return optimise_parameters(self, param_grid, n_trials, strategy_constraints)
 
@@ -51,7 +51,7 @@ class BacktestingEngine:
             raise ValueError('Backtest yet to be ran, call run() first.')
         return get_final_quote_balance(self.results, initial_quote_balance)
 
-    def __load_resampled_ohlc(self) -> None:
+    def _load_resampled_ohlc(self) -> None:
         '''
         Load trade data from the database, indexed by timestamp (as millisecond-precise datetimes).
         Then resample into forward-filled ohlc data for each interval.
