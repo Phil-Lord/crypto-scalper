@@ -1,15 +1,15 @@
 import questionary
 
 from study_analyser import StudyAnalyser
-from utils import get_study_names
+from utils import get_study_choices
 
 
 def analyse_study() -> None:
-    study_names = get_study_names()
-    if not study_names:
+    study_choices = get_study_choices()
+    if not study_choices:
         print('No studies found.')
         return
-    study_name = questionary.select('Select a study:', choices=study_names).ask()
+    study_name = questionary.select('Select a study:', choices=study_choices).ask()
     analyser = StudyAnalyser(study_name)
     run_analysis_dashboard(analyser)
 
