@@ -10,7 +10,8 @@ from utils import OPTUNA_DB_URL
 from strategy_manager import StrategyManager
 
 
-def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[callable] = None) -> callable:
+def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[callable] = None,
+                  windows: list[tuple[pd.Timestamp, pd.Timestamp]] = None) -> callable:
     def objective(trial: optuna.Trial) -> float:
         ''' Optimisation Objective: Maximise final quote balance. '''
         params = {}
@@ -28,8 +29,14 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
                     raise optuna.TrialPruned()
 
         engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
-        engine.run()
-        return engine.get_final_quote_balance()
+
+        val_results = []
+        for eval_start, eval_end in windows:
+            engine.set_ohlc_window(eval_start, eval_end)
+            engine.run()
+            val_results.append(engine.get_final_quote_balance())
+
+        return sum(val_results) / len(val_results)
     return objective
 
 
@@ -39,7 +46,8 @@ def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int 
     study_name = create_study_name(engine)
     storage = create_storage()
     study = create_study(storage, study_name, n_trials)
-    optimise(n_trials, study, engine, param_grid, constraints)
+    windows = create_evaluation_windows(engine.start, engine.end)
+    optimise(n_trials, study, engine, windows, param_grid, constraints)
     return {'best_params': study.best_params, 'best_profit': study.best_value, 'study': study}
 
 
@@ -86,13 +94,30 @@ def create_study(storage, study_name: str, n_trials: int) -> optuna.study.Study:
         return optuna.load_study(study_name=study_name, storage=storage)
 
 
-def optimise(n_trials: int, study: optuna.study.Study, engine, param_grid: dict[str, list[any]],
+def create_evaluation_windows(start: float, end: float) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
+    ''' Generate a list of non-overlapping evaluation windows between two timestamps. '''
+    start = pd.Timestamp(start, unit='s')
+    end = pd.Timestamp(end, unit='s')
+    window_months = 1
+
+    windows = []
+    current = start
+    while current + pd.DateOffset(months=window_months) <= end:
+        eval_start = current
+        eval_end = current + pd.DateOffset(months=window_months) - pd.DateOffset(days=1)
+        windows.append((eval_start, eval_end))
+        current += pd.DateOffset(months=1)
+    return windows
+
+
+def optimise(n_trials: int, study: optuna.study.Study, engine,
+             windows: list[tuple[pd.Timestamp, pd.Timestamp]], param_grid: dict[str, list[any]],
              constraints: list[callable] = None) -> None:
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     progress_callback = TqdmProgressCallback(n_trials)
     try:
         study.optimize(
-            get_objective(engine, param_grid, constraints),
+            get_objective(engine, param_grid, constraints, windows),
             n_trials=n_trials,
             n_jobs=-1,
             callbacks=[progress_callback]
