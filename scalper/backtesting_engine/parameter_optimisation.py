@@ -13,7 +13,7 @@ from strategy_manager import StrategyManager
 def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[callable] = None,
                   windows: list[tuple[pd.Timestamp, pd.Timestamp]] = None) -> callable:
     def objective(trial: optuna.Trial) -> float:
-        ''' Optimisation Objective: Maximise geometric mean of returns. '''
+        ''' Optimisation Objective: Maximise geometric mean of per-window return ratios. '''
         params = {}
         for name, (low, high) in param_grid.items():
             if isinstance(low, int):
@@ -30,17 +30,17 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
 
         engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
 
-        start_balance = 1000
-        returns = []
-        for eval_start, eval_end in windows:
-            engine.set_ohlc_window(eval_start, eval_end)
+        initial_balance = 1000
+        window_return_ratios = []
+        for window_start, window_end in windows:
+            engine.set_ohlc_window(window_start, window_end)
             engine.run()
-            final_balance = (engine.get_final_quote_balance(start_balance))
-            ret = final_balance / start_balance
-            returns.append(ret)
+            final_balance = (engine.get_final_quote_balance(initial_balance))
+            return_ratio = final_balance / initial_balance  # e.g. 1.05 = +5%
+            window_return_ratios.append(return_ratio)
 
-        # Calculate geometric mean of returns to account for compounding.
-        return pd.Series(returns).prod() ** (1 / len(returns))
+        # Use geometric mean to account for compounding across windows.
+        return pd.Series(window_return_ratios).prod() ** (1 / len(window_return_ratios))
     return objective
 
 
