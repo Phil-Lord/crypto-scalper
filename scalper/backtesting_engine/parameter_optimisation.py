@@ -13,7 +13,7 @@ from strategy_manager import StrategyManager
 def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[callable] = None,
                   windows: list[tuple[pd.Timestamp, pd.Timestamp]] = None) -> callable:
     def objective(trial: optuna.Trial) -> float:
-        ''' Optimisation Objective: Maximise final quote balance. '''
+        ''' Optimisation Objective: Maximise geometric mean of returns. '''
         params = {}
         for name, (low, high) in param_grid.items():
             if isinstance(low, int):
@@ -30,13 +30,17 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
 
         engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
 
-        val_results = []
+        start_balance = 1000
+        returns = []
         for eval_start, eval_end in windows:
             engine.set_ohlc_window(eval_start, eval_end)
             engine.run()
-            val_results.append(engine.get_final_quote_balance())
+            final_balance = (engine.get_final_quote_balance(start_balance))
+            ret = final_balance / start_balance
+            returns.append(ret)
 
-        return sum(val_results) / len(val_results)
+        # Calculate geometric mean of returns to account for compounding.
+        return pd.Series(returns).prod() ** (1 / len(returns))
     return objective
 
 
