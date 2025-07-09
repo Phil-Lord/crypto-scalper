@@ -30,7 +30,7 @@ class StudyAnalyser:
         print(f'Study name: {self.study.study_name}')
         print(f'Number of trials: {len(self.study.trials)}')
         print(f'Best value: {self.study.best_value}')
-        print(f'Best params: {json.dumps(self.study.best_params, indent=2)}')
+        print(f'Best params: {json.dumps(self.study.best_params, indent=4).replace('"', "'")}')
 
     def export_trials_dataframe(self) -> pd.DataFrame:
         return self.study.trials_dataframe(attrs=('number', 'value', 'params'))
