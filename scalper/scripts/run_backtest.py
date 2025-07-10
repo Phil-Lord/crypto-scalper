@@ -31,6 +31,7 @@ def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = No
 
     if optimise:
         engine = optimise_parameters(engine, strategy_name, grid)
+        engine.set_ohlc_window(start, end)
 
     results = engine.run()
     output_results(engine, results, pair)
