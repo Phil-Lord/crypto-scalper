@@ -20,6 +20,7 @@ def run_analysis_dashboard(analyser: StudyAnalyser) -> None:
             'Select an action:',
             choices=[
                 '📄 Describe Study',
+                '🔢 Describe Trial by Number',
                 '📤 Export Trials DataFrame',
                 '🧮 Plot Hyperparameter Correlation Matrix',
                 '📊 Plot Parameter Stability',
@@ -30,6 +31,9 @@ def run_analysis_dashboard(analyser: StudyAnalyser) -> None:
 
         if action == '📄 Describe Study':
             analyser.describe()
+        elif action == '🔢 Describe Trial by Number':
+            trial_number = questionary.text('Enter trial number:').ask()
+            analyser.describe_trial_by_number(int(trial_number))
         elif action == '📤 Export Trials DataFrame':
             df = analyser.export_trials_dataframe()
             filename = questionary.text('Enter filename to save as (e.g. trials.csv):').ask()

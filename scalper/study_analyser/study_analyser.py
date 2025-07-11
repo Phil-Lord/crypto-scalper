@@ -32,6 +32,12 @@ class StudyAnalyser:
         print(f'Best value: {self.study.best_value}')
         print(f'Best params: {json.dumps(self.study.best_params, indent=4).replace('"', "'")}')
 
+    def describe_trial_by_number(self, trial_number: int) -> None:
+        trial = self.study.trials[trial_number]
+        print(f'Number: {trial.number}/{len(self.study.trials)}')
+        print(f'Value: {trial.value}')
+        print(f'Params: {json.dumps(trial.params, indent=4).replace('"', "'")}')
+
     def export_trials_dataframe(self) -> pd.DataFrame:
         return self.study.trials_dataframe(attrs=('number', 'value', 'params'))
 
