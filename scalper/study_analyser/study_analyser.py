@@ -27,8 +27,10 @@ class StudyAnalyser:
         return optuna.load_study(study_name=self.study_name, storage=storage)
 
     def describe(self) -> None:
+        pruned_count = len([trial for trial in self.study.trials if trial.state ==
+                            optuna.trial.TrialState.PRUNED])
         print(f'Study name: {self.study.study_name}')
-        print(f'Number of trials: {len(self.study.trials)}')
+        print(f'Number of trials: {len(self.study.trials)} ({pruned_count} pruned)')
         print(f'Best value: {self.study.best_value} (trial {self.study.best_trial.number})')
         print(f'Best params: {json.dumps(self.study.best_params, indent=4).replace('"', "'")}')
 
