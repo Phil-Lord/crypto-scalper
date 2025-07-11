@@ -29,7 +29,7 @@ class StudyAnalyser:
     def describe(self) -> None:
         print(f'Study name: {self.study.study_name}')
         print(f'Number of trials: {len(self.study.trials)}')
-        print(f'Best value: {self.study.best_value}')
+        print(f'Best value: {self.study.best_value} (trial {self.study.best_trial.number})')
         print(f'Best params: {json.dumps(self.study.best_params, indent=4).replace('"', "'")}')
 
     def describe_trial_by_number(self, trial_number: int) -> None:
