@@ -32,6 +32,10 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
 
         initial_balance = 1000
         window_return_ratios = []
+        total_signal_count = 0
+        total_trade_count = 0
+        min_trades_per_window = 5
+
         for window_start, window_end in windows:
             engine.set_ohlc_window(window_start, window_end)
             engine.run()
@@ -39,8 +43,22 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
             return_ratio = final_balance / initial_balance  # e.g. 1.05 = +5%
             window_return_ratios.append(return_ratio)
 
+            # Prune trials with too few trades in a window.
+            trade_count = engine.results['signal'].ne('hold').sum()
+            if trade_count < min_trades_per_window:
+                raise optuna.TrialPruned()
+
+            total_signal_count += len(engine.results)
+            total_trade_count += trade_count
+
+        # Reward activity and prune trials with too few trades.
+        min_trade_ratio = 0.0001  # Require at least ~525 trades/year (~1.4/day).
+        if total_trade_count / total_signal_count < min_trade_ratio:
+            raise optuna.TrialPruned()
+        activity_bonus = min(total_trade_count / 200, 0.2)  # Cap bonus at 20%.
+
         # Use geometric mean to account for compounding across windows.
-        return pd.Series(window_return_ratios).prod() ** (1 / len(window_return_ratios))
+        return (pd.Series(window_return_ratios).prod() ** (1 / len(window_return_ratios))) + activity_bonus
     return objective
 
 
