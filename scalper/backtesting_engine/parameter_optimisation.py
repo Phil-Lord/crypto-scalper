@@ -51,6 +51,8 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
             total_signal_count += len(engine.results)
             total_trade_count += trade_count
 
+        trial.set_user_attr("trade_count", total_trade_count)
+
         # Reward activity and prune trials with too few trades.
         min_trade_ratio = 0.0001  # Require at least ~525 trades/year (~1.4/day).
         if total_trade_count / total_signal_count < min_trade_ratio:
