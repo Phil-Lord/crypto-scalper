@@ -46,14 +46,6 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
             final_balance = engine.get_final_quote_balance(initial_balance)
             return_ratio = final_balance / initial_balance  # e.g. 1.05 = +5%
             window_return_ratios.append(return_ratio)
-
-            # Prune trials with too few trades in a window.
-            days_in_window = (window_end - window_start).days or 1
-            min_trades = int(days_in_window * 0.2)  # Minimum 0.2 trades/day.
-            trade_count = engine.results['signal'].ne('hold').sum()
-            if trade_count < min_trades:
-                raise optuna.TrialPruned()
-
             all_window_results.append(engine.results.copy())
 
         # --- Calculate activity penalty --- #
@@ -61,7 +53,7 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
         results = pd.concat(all_window_results).sort_index()
         results = results[~results.index.duplicated(keep='first')]
         trade_count = results['signal'].ne('hold').sum()
-        trial.set_user_attr("trade_count", trade_count)
+        trial.set_user_attr('trade_count', int(trade_count))
 
         # Calculate penalty adaptively based on trade frequency.
         duration_days = (results.index[-1] - results.index[0]).days or 1
@@ -80,7 +72,7 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
 
 def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int = 100,
                         constraints: list[callable] = None) -> dict[str, any]:
-    warnings.filterwarnings("ignore", category=ExperimentalWarning)
+    warnings.filterwarnings('ignore', category=ExperimentalWarning)
     study_name = create_study_name(engine)
     storage = create_storage()
     study = create_study(storage, study_name, n_trials)
@@ -166,7 +158,7 @@ def optimise(n_trials: int, study: optuna.study.Study, engine,
 
 class TqdmProgressCallback:
     def __init__(self, total_trials: int):
-        self.pbar = tqdm(total=total_trials, desc="Optimising", dynamic_ncols=True)
+        self.pbar = tqdm(total=total_trials, desc='Optimising', dynamic_ncols=True)
 
     def __call__(self, study: optuna.study.Study, trial: optuna.trial.FrozenTrial) -> None:
         self.pbar.update(1)

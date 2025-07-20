@@ -10,7 +10,7 @@ from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_po
 USE_DEFAULT_STRATEGY_CONFIGS = True
 PARAMS = PRECISION_TREND_CONFIG
 GRID = PRECISION_TREND_GRID
-N_TRIALS = 100
+N_TRIALS = 1000
 INITIAL_QUOTE_BALANCE = 1000
 PLOT_RESULTS = True
 
