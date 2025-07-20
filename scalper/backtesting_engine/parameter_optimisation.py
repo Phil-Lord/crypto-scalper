@@ -14,6 +14,7 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
                   windows: list[tuple[pd.Timestamp, pd.Timestamp]] = None) -> callable:
     def objective(trial: optuna.Trial) -> float:
         ''' Optimisation Objective: Maximise geometric mean of per-window return ratios. '''
+        # --- Parameter suggestion --- #
         params = {}
         for name, (low, high) in param_grid.items():
             if isinstance(low, int):
@@ -23,44 +24,57 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
             else:
                 raise ValueError(f'Unsupported parameter type for {name}')
 
+        # --- Constraint pruning --- #
         if constraints:
             for constraint in constraints:
                 if not constraint(params):
                     raise optuna.TrialPruned()
 
+        # --- Strategy definition --- #
         engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
 
+        # --- Optimisation setup --- #
         initial_balance = 1000
         window_return_ratios = []
-        total_signal_count = 0
-        total_trade_count = 0
-        min_trades_per_window = 5
+        all_window_results = []
 
+        # --- Window-based optimisation --- #
         for window_start, window_end in windows:
+            # Run strategy on window and calculate return ratio.
             engine.set_ohlc_window(window_start, window_end)
             engine.run()
-            final_balance = (engine.get_final_quote_balance(initial_balance))
+            final_balance = engine.get_final_quote_balance(initial_balance)
             return_ratio = final_balance / initial_balance  # e.g. 1.05 = +5%
             window_return_ratios.append(return_ratio)
 
             # Prune trials with too few trades in a window.
+            days_in_window = (window_end - window_start).days or 1
+            min_trades = int(days_in_window * 0.2)  # Minimum 0.2 trades/day.
             trade_count = engine.results['signal'].ne('hold').sum()
-            if trade_count < min_trades_per_window:
+            if trade_count < min_trades:
                 raise optuna.TrialPruned()
 
-            total_signal_count += len(engine.results)
-            total_trade_count += trade_count
+            all_window_results.append(engine.results.copy())
 
-        trial.set_user_attr("trade_count", total_trade_count)
+        # --- Calculate activity penalty --- #
+        # Combine results from all windows and deduplicate those which overlap.
+        results = pd.concat(all_window_results).sort_index()
+        results = results[~results.index.duplicated(keep='first')]
+        trade_count = results['signal'].ne('hold').sum()
+        trial.set_user_attr("trade_count", trade_count)
 
-        # Reward activity and prune trials with too few trades.
-        min_trade_ratio = 0.0001  # Require at least ~525 trades/year (~1.4/day).
-        if total_trade_count / total_signal_count < min_trade_ratio:
-            raise optuna.TrialPruned()
-        activity_bonus = min(total_trade_count / 200, 0.2)  # Cap bonus at 20%.
+        # Calculate penalty adaptively based on trade frequency.
+        duration_days = (results.index[-1] - results.index[0]).days or 1
+        ideal_trade_count = duration_days * 0.8  # Target: 0.8 trades/day.
+        total_rows = len(results)
+        ideal_ratio = ideal_trade_count / total_rows if total_rows else 0
+        actual_ratio = trade_count / total_rows if total_rows else 0
+        penalty_weight = 0.25
+        penalty = min(max(ideal_ratio - actual_ratio, 0) * penalty_weight, 0.3)
 
-        # Use geometric mean to account for compounding across windows.
-        return (pd.Series(window_return_ratios).prod() ** (1 / len(window_return_ratios))) + activity_bonus
+        # --- Calculate geometric mean of return ratios to account for compounding --- #
+        avg_return = pd.Series(window_return_ratios).prod() ** (1 / len(window_return_ratios))
+        return avg_return - penalty
     return objective
 
 
