@@ -44,8 +44,7 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
             engine.set_ohlc_window(window_start, window_end)
             engine.run()
             final_balance = engine.get_final_quote_balance(initial_balance)
-            return_ratio = final_balance / initial_balance  # e.g. 1.05 = +5%
-            window_return_ratios.append(return_ratio)
+            window_return_ratios.append(final_balance / initial_balance)  # e.g. 1.05 = +5%
             all_window_results.append(engine.results.copy())
 
         # --- Calculate activity penalty --- #
@@ -61,8 +60,8 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
         total_rows = len(results)
         ideal_ratio = ideal_trade_count / total_rows if total_rows else 0
         actual_ratio = trade_count / total_rows if total_rows else 0
-        penalty_weight = 0.25
-        penalty = min(max(ideal_ratio - actual_ratio, 0) * penalty_weight, 0.3)
+        penalty_weight = 0.5
+        penalty = min(max(ideal_ratio - actual_ratio, 0) * penalty_weight, 0.5)
 
         # --- Calculate geometric mean of return ratios to account for compounding --- #
         avg_return = pd.Series(window_return_ratios).prod() ** (1 / len(window_return_ratios))
