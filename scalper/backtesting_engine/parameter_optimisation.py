@@ -124,19 +124,32 @@ def create_study(storage, study_name: str, n_trials: int) -> optuna.study.Study:
 
 
 def create_evaluation_windows(start: float, end: float) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
-    ''' Generate a list of non-overlapping evaluation windows between two timestamps. '''
-    start = pd.Timestamp(start, unit='s')
-    end = pd.Timestamp(end, unit='s')
-    window_months = 1
-
+    ''' Generate a list of evaluation windows between two timestamps. '''
+    start_ts = pd.Timestamp(start, unit='s')
+    end_ts = pd.Timestamp(end, unit='s')
+    months_in_window = 3
+    step_months = 1
+    warmup_days = 1
     windows = []
-    current = start
-    while current + pd.DateOffset(months=window_months) <= end:
-        eval_start = current
-        eval_end = current + pd.DateOffset(months=window_months) - pd.DateOffset(days=1)
-        windows.append((eval_start, eval_end))
-        current += pd.DateOffset(months=1)
+
+    # First window: exact start date → last minute of window
+    first_end = calculate_period_end_timestamp(start_ts, months_in_window)
+    windows.append((start_ts, min(first_end, end_ts)))
+
+    # Subsequent windows: one day before the previous window's end → last minute of window
+    current = first_end + pd.Timedelta(minutes=1)
+    while current < end_ts:
+        window_start = current - pd.DateOffset(days=warmup_days)
+        window_end = calculate_period_end_timestamp(current, months_in_window)
+        windows.append((max(window_start, start_ts), min(window_end, end_ts)))
+        current = window_end + pd.Timedelta(minutes=1)
     return windows
+
+
+def calculate_period_end_timestamp(start: pd.Timestamp, months: int) -> pd.Timestamp:
+    ''' Gets the last minute of the period spanning `months` from `start`. '''
+    period_end = start + pd.DateOffset(months=months)
+    return period_end - pd.Timedelta(minutes=1)
 
 
 def optimise(n_trials: int, study: optuna.study.Study, engine,
