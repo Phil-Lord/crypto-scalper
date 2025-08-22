@@ -30,9 +30,6 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
                 if not constraint(params):
                     raise optuna.TrialPruned()
 
-        # --- Strategy definition --- #
-        engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
-
         # --- Optimisation setup --- #
         initial_balance = 1000
         window_return_ratios = []
@@ -40,6 +37,9 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
 
         # --- Window-based optimisation --- #
         for window_start, window_end in windows:
+            # Strategy definition
+            engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
+
             # Run strategy on window and calculate return ratio.
             engine.set_ohlc_window(window_start, window_end)
             engine.run()
