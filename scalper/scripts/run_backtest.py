@@ -76,6 +76,7 @@ def output_results(engine: BacktestingEngine, results: pd.DataFrame, pair: str) 
     ''' Output the results of the backtest. '''
     print(f'Final Quote Balance: {engine.get_final_quote_balance(INITIAL_QUOTE_BALANCE)}')
     if PLOT_RESULTS:
+        print('No. trades:', results['signal'].ne('hold').sum())
         position_profits = engine.calculate_position_profits(INITIAL_QUOTE_BALANCE)
         plot_results(results, pair)
         plot_position_profits(position_profits)
