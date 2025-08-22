@@ -75,7 +75,7 @@ def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int 
     study_name = create_study_name(engine)
     storage = create_storage()
     study = create_study(storage, study_name, n_trials)
-    windows = create_evaluation_windows(engine.start, engine.end)
+    windows = create_windows(engine.start, engine.end)
     optimise(n_trials, study, engine, windows, param_grid, constraints)
     return {'best_params': study.best_params, 'best_profit': study.best_value, 'study': study}
 
@@ -123,8 +123,8 @@ def create_study(storage, study_name: str, n_trials: int) -> optuna.study.Study:
         return optuna.load_study(study_name=study_name, storage=storage)
 
 
-def create_evaluation_windows(start: float, end: float) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
-    ''' Generate a list of evaluation windows between two timestamps. '''
+def create_windows(start: float, end: float) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
+    ''' Generate a list of windows between two timestamps. '''
     start_ts = pd.Timestamp(start, unit='s')
     end_ts = pd.Timestamp(end, unit='s')
     months_in_window = 3
