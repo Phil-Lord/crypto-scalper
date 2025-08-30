@@ -124,32 +124,43 @@ def create_study(storage, study_name: str, n_trials: int) -> optuna.study.Study:
 
 
 def create_windows(start: float, end: float) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
-    ''' Generate a list of windows between two timestamps. '''
-    start_ts = pd.Timestamp(start, unit='s')
-    end_ts = pd.Timestamp(end, unit='s')
+    ''' 
+    Generate a list of rolling 3-month windows between two timestamps. 
+
+    - Each window spans exactly 3 calendar months. 
+    - Windows step forward by 1 month. 
+    - From the second window onward, the start is shifted back by 1 day (warmup). 
+    - The end of each window is exclusive, represented as (logical_end - 1 second). 
+    - Incomplete windows beyond the provided end timestamp are discarded.
+    '''
     months_in_window = 3
     step_months = 1
     warmup_days = 1
+
+    start_ts = pd.Timestamp(start, unit='s').round('ms')
+    end_ts = pd.Timestamp(end, unit='s').round('ms')
+
     windows = []
 
-    # First window: exact start date → last minute of window
-    first_end = calculate_period_end_timestamp(start_ts, months_in_window)
-    windows.append((start_ts, min(first_end, end_ts)))
+    i = 0
+    while True:
+        # Window end = start + 3 months - 1 second
+        window_end = start_ts + pd.DateOffset(months=months_in_window) - pd.Timedelta(seconds=1)
 
-    # Subsequent windows: one day before the previous window's end → last minute of window
-    current = first_end + pd.Timedelta(minutes=1)
-    while current < end_ts:
-        window_start = current - pd.DateOffset(days=warmup_days)
-        window_end = calculate_period_end_timestamp(current, months_in_window)
-        windows.append((max(window_start, start_ts), min(window_end, end_ts)))
-        current = window_end + pd.Timedelta(minutes=1)
+        # Stop if window exceeds end
+        if window_end > end_ts:
+            break
+
+        # Apply warmup for all but the first window
+        window_start = start_ts if i == 0 else start_ts - pd.Timedelta(days=warmup_days)
+
+        windows.append((window_start, window_end))
+
+        # Step forward 1 month
+        start_ts += pd.DateOffset(months=step_months)
+        i += 1
+
     return windows
-
-
-def calculate_period_end_timestamp(start: pd.Timestamp, months: int) -> pd.Timestamp:
-    ''' Gets the last minute of the period spanning `months` from `start`. '''
-    period_end = start + pd.DateOffset(months=months)
-    return period_end - pd.Timedelta(minutes=1)
 
 
 def optimise(n_trials: int, study: optuna.study.Study, engine,
