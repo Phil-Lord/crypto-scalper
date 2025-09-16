@@ -1,6 +1,7 @@
 import os
 import warnings
 
+import numpy as np
 import optuna
 from optuna.exceptions import ExperimentalWarning
 import pandas as pd
@@ -32,8 +33,7 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
 
         # --- Optimisation setup --- #
         initial_balance = 1000
-        window_return_ratios = []
-        all_window_results = []
+        adjusted_window_returns = []
 
         # --- Window-based optimisation --- #
         for window_start, window_end in windows:
@@ -44,28 +44,27 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
             engine.set_ohlc_window(window_start, window_end)
             engine.run()
             final_balance = engine.get_final_quote_balance(initial_balance)
-            window_return_ratios.append(final_balance / initial_balance)  # e.g. 1.05 = +5%
-            all_window_results.append(engine.results.copy())
+            window_return = (final_balance / initial_balance)  # e.g. 1.05 = +5%
 
-        # --- Calculate activity penalty --- #
-        # Combine results from all windows and deduplicate those which overlap.
-        results = pd.concat(all_window_results).sort_index()
-        results = results[~results.index.duplicated(keep='first')]
-        trade_count = results['signal'].ne('hold').sum()
-        trial.set_user_attr('trade_count', int(trade_count))
+            # --- Per-window logistic activity penalty --- #
+            results = engine.results
+            trade_count = results['signal'].ne('hold').sum()
+            duration_days = (window_end - window_start).days or 1
+            ideal_trade_count = duration_days * 0.3  # Target: 0.3 trades/day.
 
-        # Calculate penalty adaptively based on trade frequency.
-        duration_days = (results.index[-1] - results.index[0]).days or 1
-        ideal_trade_count = duration_days * 0.8  # Target: 0.8 trades/day.
-        total_rows = len(results)
-        ideal_ratio = ideal_trade_count / total_rows if total_rows else 0
-        actual_ratio = trade_count / total_rows if total_rows else 0
-        penalty_weight = 0.5
-        penalty = min(max(ideal_ratio - actual_ratio, 0) * penalty_weight, 0.5)
+            # Logistic penalty: smoothly increases as trade_count approaches ideal
+            k = 0.01  # steepness of curve
+            penalty = 1 / (1 + np.exp(-k * (trade_count - ideal_trade_count)))
+
+            # Apply penalty to return
+            adjusted_return = window_return * penalty
+            adjusted_window_returns.append(adjusted_return)
+            trial.set_user_attr(
+                f"trades_{window_start.date()}_{window_end.date()}", int(trade_count))
 
         # --- Calculate geometric mean of return ratios to account for compounding --- #
-        avg_return = pd.Series(window_return_ratios).prod() ** (1 / len(window_return_ratios))
-        return avg_return - penalty
+        avg_return = pd.Series(adjusted_window_returns).prod() ** (1 / len(adjusted_window_returns))
+        return avg_return
     return objective
 
 
