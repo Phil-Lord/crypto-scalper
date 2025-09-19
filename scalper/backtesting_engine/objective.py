@@ -9,21 +9,8 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
                   windows: list[tuple[pd.Timestamp, pd.Timestamp]] = None) -> callable:
     def objective(trial: optuna.Trial) -> float:
         ''' Optimisation Objective: Maximise geometric mean of per-window return ratios. '''
-        # --- Parameter suggestion --- #
-        params = {}
-        for name, (low, high) in param_grid.items():
-            if isinstance(low, int):
-                params[name] = trial.suggest_int(name, low, high)
-            elif isinstance(low, float):
-                params[name] = trial.suggest_float(name, low, high)
-            else:
-                raise ValueError(f'Unsupported parameter type for {name}')
-
-        # --- Constraint pruning --- #
-        if constraints:
-            for constraint in constraints:
-                if not constraint(params):
-                    raise optuna.TrialPruned()
+        params = suggest_parameters(trial, param_grid)
+        prune_invalid_trials(constraints, params)
 
         # --- Optimisation setup --- #
         initial_balance = 1000
@@ -60,3 +47,24 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
         avg_return = pd.Series(adjusted_window_returns).prod() ** (1 / len(adjusted_window_returns))
         return avg_return
     return objective
+
+
+def suggest_parameters(trial: optuna.Trial, param_grid: dict[str, list[any]]) -> dict[str, any]:
+    ''' Suggest a value for each parameter in the grid. '''
+    params = {}
+    for name, (low, high) in param_grid.items():
+        if isinstance(low, int):
+            params[name] = trial.suggest_int(name, low, high)
+        elif isinstance(low, float):
+            params[name] = trial.suggest_float(name, low, high)
+        else:
+            raise ValueError(f'Unsupported parameter type for {name}')
+    return params
+
+
+def prune_invalid_trials(constraints: list[callable], params: dict[str, list[any]]) -> None:
+    ''' Prune trials that violate constraints. '''
+    if constraints:
+        for constraint in constraints:
+            if not constraint(params):
+                raise optuna.TrialPruned()
