@@ -10,7 +10,8 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
     def objective(trial: optuna.Trial) -> float:
         ''' Optimisation Objective: Maximise geometric mean of per-window return ratios. '''
         params = suggest_parameters(trial, param_grid)
-        prune_invalid_trials(constraints, params)
+        if parameters_violate_constraints(constraints, params):
+            raise optuna.TrialPruned()
 
         # --- Optimisation setup --- #
         initial_balance = 1000
@@ -62,9 +63,10 @@ def suggest_parameters(trial: optuna.Trial, param_grid: dict[str, list[any]]) ->
     return params
 
 
-def prune_invalid_trials(constraints: list[callable], params: dict[str, list[any]]) -> None:
-    ''' Prune trials that violate constraints. '''
+def parameters_violate_constraints(constraints: list[callable], params: dict[str, list[any]]) -> bool:
+    ''' Check if parameters violate constraints. '''
     if constraints:
         for constraint in constraints:
             if not constraint(params):
-                raise optuna.TrialPruned()
+                return True
+    return False
