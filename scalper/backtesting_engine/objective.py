@@ -4,6 +4,8 @@ import numpy as np
 
 from strategy_manager import StrategyManager
 
+INITIAL_BALANCE = 1000
+
 
 def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[callable] = None,
                   windows: list[tuple[pd.Timestamp, pd.Timestamp]] = None) -> callable:
@@ -13,40 +15,22 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
         if parameters_violate_constraints(constraints, params):
             raise optuna.TrialPruned()
 
-        # --- Optimisation setup --- #
-        initial_balance = 1000
+        # --- Window-based optimisation --- #
         adjusted_window_returns = []
 
-        # --- Window-based optimisation --- #
         for window_start, window_end in windows:
-            # Strategy definition
-            engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
+            run_strategy_on_window(engine, params, window_start, window_end)
 
-            # Run strategy on window and calculate return ratio.
-            engine.set_ohlc_window(window_start, window_end)
-            engine.run()
-            final_balance = engine.get_final_quote_balance(initial_balance)
-            window_return = (final_balance / initial_balance)  # e.g. 1.05 = +5%
+            # Calculate penalty.
+            trade_count = engine.results['signal'].ne('hold').sum()
+            penalty = calculate_penalty(trade_count, window_start, window_end)
+            log_window_trial_count(trial, window_start, window_end, trade_count)
 
-            # --- Per-window logistic activity penalty --- #
-            results = engine.results
-            trade_count = results['signal'].ne('hold').sum()
-            duration_days = (window_end - window_start).days or 1
-            ideal_trade_count = duration_days * 0.3  # Target: 0.3 trades/day.
+            # Calculate return ratio and apply penalty.
+            final_balance = engine.get_final_quote_balance(INITIAL_BALANCE)
+            adjusted_window_returns.append(calculate_adjusted_return(final_balance, penalty))
 
-            # Logistic penalty: smoothly increases as trade_count approaches ideal
-            k = 0.01  # steepness of curve
-            penalty = 1 / (1 + np.exp(-k * (trade_count - ideal_trade_count)))
-
-            # Apply penalty to return
-            adjusted_return = window_return * penalty
-            adjusted_window_returns.append(adjusted_return)
-            trial.set_user_attr(
-                f"trades_{window_start.date()}_{window_end.date()}", int(trade_count))
-
-        # --- Calculate geometric mean of return ratios to account for compounding --- #
-        avg_return = pd.Series(adjusted_window_returns).prod() ** (1 / len(adjusted_window_returns))
-        return avg_return
+        return calculate_geometric_mean(adjusted_window_returns)
     return objective
 
 
@@ -70,3 +54,34 @@ def parameters_violate_constraints(constraints: list[callable], params: dict[str
             if not constraint(params):
                 return True
     return False
+
+
+def run_strategy_on_window(engine, params: dict[str, any], start: pd.Timestamp, end: pd.Timestamp) -> None:
+    ''' Configure and run the strategy on an OHLC window. '''
+    engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
+    engine.set_ohlc_window(start, end)
+    engine.run()
+
+
+def calculate_penalty(trade_count: int, start: pd.Timestamp, end: pd.Timestamp) -> float:
+    ''' Calculate per-window logistic activity penalty, which adapts smoothly with trade count. '''
+    duration_days = (end - start).days or 1
+    ideal_trade_count = duration_days * 0.3  # Target: 0.3 trades/day.
+    k = 0.01  # steepness of curve
+    return 1 / (1 + np.exp(-k * (trade_count - ideal_trade_count)))
+
+
+def log_window_trial_count(trial: optuna.Trial, start: pd.Timestamp, end: pd.Timestamp, count: int) -> None:
+    ''' Log window trade count as user attribute. '''
+    trial.set_user_attr(f"trades_{start.date()}_{end.date()}", int(count))
+
+
+def calculate_adjusted_return(final_balance: float, penalty: float) -> float:
+    ''' Calculate return ratio adjusted by penalty. '''
+    window_return = final_balance / INITIAL_BALANCE  # e.g. 1005 / 1000 = 1.05 (+5%)
+    return window_return * penalty
+
+
+def calculate_geometric_mean(returns: list[float]) -> float:
+    ''' Calculate geometric mean of return ratios to account for compounding. '''
+    return pd.Series(returns).prod() ** (1 / len(returns))
