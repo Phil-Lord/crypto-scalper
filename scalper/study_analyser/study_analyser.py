@@ -1,5 +1,4 @@
 import json
-import subprocess
 
 import optuna
 import pandas as pd
@@ -48,8 +47,3 @@ class StudyAnalyser:
 
     def plot_parameter_stability(self):
         StudyPlotter.plot_parameter_stability(self.study)
-
-    def launch_dashboard(self) -> None:
-        url = OPTUNA_DB_URL.replace('postgresql://', 'postgresql+psycopg2://')
-        print('Launching Optuna dashboard at http://localhost:8080 ...')
-        subprocess.run(['optuna-dashboard', url])
