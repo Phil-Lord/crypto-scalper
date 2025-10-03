@@ -1,10 +1,7 @@
-import json
-
 import click
 import pandas as pd
 
 from backtesting_engine import BacktestingEngine
-from strategy_manager import StrategyManager
 from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_results, SMA_CONFIG, SMA_GRID, PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
 
 USE_DEFAULT_STRATEGY_CONFIGS = True
@@ -30,11 +27,10 @@ def run_backtest(pair: str, strategy_name: str, start: str = None, end: str = No
     engine = create_engine(pair, strategy_name, start, end, interval, vectorised, **params)
 
     if optimise:
-        engine = optimise_parameters(engine, strategy_name, grid)
-        engine.set_ohlc_window(start, end)
-
-    results = engine.run()
-    output_results(engine, results, pair)
+        engine.optimise_parameters(grid, N_TRIALS)
+    else:
+        results = engine.run()
+        output_results(engine, results, pair)
 
 
 def get_params_for_strategy(strategy_name: str) -> tuple:
@@ -57,19 +53,6 @@ def create_engine(pair: str, strategy_name: str, start: str, end: str, interval:
         end = get_second_timestamp(*parse_datetime(end))
 
     return BacktestingEngine(kraken_pair, strategy_name, start, end, interval, vectorised, **params)
-
-
-def optimise_parameters(engine: BacktestingEngine, strategy_name: str, grid: dict) -> BacktestingEngine:
-    ''' Optimise parameters for the specified strategy. '''
-    optimisation_results = engine.optimise_parameters(grid, N_TRIALS)
-    best_parameters = json.dumps(optimisation_results['best_params'], indent=4)
-    print(f'Best Parameters: {best_parameters.replace('"', "'")}')
-    print(f'Best Profit: {optimisation_results['best_profit']}')
-
-    engine.strategy = StrategyManager().get_strategy(
-        strategy_name, **optimisation_results['best_params'])
-
-    return engine
 
 
 def output_results(engine: BacktestingEngine, results: pd.DataFrame, pair: str) -> None:
