@@ -64,11 +64,16 @@ def run_strategy_on_window(engine, params: dict[str, any], start: pd.Timestamp, 
 
 
 def calculate_penalty(trade_count: int, start: pd.Timestamp, end: pd.Timestamp) -> float:
-    ''' Calculate per-window logistic activity penalty, which adapts smoothly with trade count. '''
+    '''
+    Calculate per-window logistic activity penalty, which adapts smoothly with trade count.
+    - Ideal trade count is 0.3 trades/day.
+    - Penalty multiplier scales from x0 (no trades) to x1 (ideal and above).
+    '''
     duration_days = (end - start).days or 1
-    ideal_trade_count = duration_days * 0.3  # Target: 0.3 trades/day.
-    k = 0.01  # steepness of curve
-    return 1 / (1 + np.exp(-k * (trade_count - ideal_trade_count)))
+    ideal_trade_count = duration_days * 0.3  # Target: 0.3 trades/day
+    k = 0.02  # Steepness of curve (0.02 is reasonably forgiving)
+    raw = 1 / (1 + np.exp(-k * (trade_count - ideal_trade_count)))  # Scale to [0,1], ideal = 0.5
+    return min(1.0, raw * 2)  # Scale to [0,2], cap = 1, ideal = 1
 
 
 def log_window_trial_count(trial: optuna.Trial, start: pd.Timestamp, end: pd.Timestamp, count: int) -> None:
