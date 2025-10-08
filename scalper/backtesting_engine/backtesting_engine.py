@@ -53,6 +53,8 @@ class BacktestingEngine:
         return get_final_quote_balance(self.results, initial_quote_balance)
 
     def set_ohlc_window(self, start: pd.Timestamp, end: pd.Timestamp) -> None:
+        if self.ohlc_full is None:
+            self._load_ohlc_data()
         self.ohlc_window = self.ohlc_full.loc[start:end]
 
     def _load_ohlc_data(self) -> None:
