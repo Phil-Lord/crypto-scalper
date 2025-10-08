@@ -12,13 +12,13 @@ class StudyAnalyser:
         self.study_name = study_name
         self.study = self._load_study()
 
-    def _load_study(self) -> None:
+    def _load_study(self) -> optuna.Study:
         storage = optuna.storages.RDBStorage(
             url=OPTUNA_DB_URL,
             engine_kwargs={
                 'pool_pre_ping': True,
                 'connect_args': {
-                    'application_name': 'analysis_script',
+                    'application_name': 'study_analyser',
                     'keepalives_idle': 30
                 }
             }
