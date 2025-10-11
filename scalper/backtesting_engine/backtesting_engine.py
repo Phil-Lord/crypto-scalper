@@ -18,12 +18,10 @@ class BacktestingEngine:
         self.ohlc_full = None
         self.ohlc_window = None
         self.results = None
+        self._load_ohlc_data()
 
     def run(self) -> pd.DataFrame:
         ''' Load trades from the database and generate a strategy signal for each interval. '''
-        if self.ohlc_full is None:
-            self._load_ohlc_data()
-
         if self.vectorised:
             self.results = self.strategy.vectorised_compute(self.ohlc_window)
         else:
@@ -37,8 +35,6 @@ class BacktestingEngine:
         return self.results
 
     def optimise_parameters(self, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
-        if self.ohlc_full is None:
-            self._load_ohlc_data()
         strategy_constraints = getattr(self.strategy.__class__, 'constraints', lambda: [])()
         return optimise_parameters(self, param_grid, n_trials, strategy_constraints)
 
@@ -53,8 +49,6 @@ class BacktestingEngine:
         return get_final_quote_balance(self.results, initial_quote_balance)
 
     def set_ohlc_window(self, start: pd.Timestamp, end: pd.Timestamp) -> None:
-        if self.ohlc_full is None:
-            self._load_ohlc_data()
         self.ohlc_window = self.ohlc_full.loc[start:end]
 
     def _load_ohlc_data(self) -> None:
