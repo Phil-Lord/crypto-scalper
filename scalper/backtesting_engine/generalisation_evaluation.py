@@ -77,7 +77,7 @@ def run_evaluation(engine: BacktestingEngine, top_param_sets: list[dict], window
                 'trial_number': param_set['trial_number'],
                 'window_balances': window_balances
             })
-        pbar.update(1)
+            pbar.update(1)
     return results
 
 
