@@ -5,19 +5,19 @@ from tqdm import tqdm
 from .backtesting_engine import BacktestingEngine
 from .objective import run_strategy_on_window
 from .parameter_optimisation import create_windows
+from strategy_manager import StrategyManager
 from utils import get_second_timestamp, OPTUNA_DB_URL
 
 
 INITIAL_BALANCE = 1000
 
 
-def find_params(study_name: str) -> None:
+def find_params(study_name: str, walk_forward: bool = False) -> list[dict]:
     study = load_study(study_name)
     top_param_sets = get_top_param_sets(study, 5)
 
     start = get_second_timestamp(2025, 1, 1)
     end = get_second_timestamp(2025, 9, 1)
-    windows = create_windows(start, end)
 
     engine = BacktestingEngine(
         pair='XXBTZGBP',
@@ -29,7 +29,11 @@ def find_params(study_name: str) -> None:
         **top_param_sets[0]['params']
     )
 
-    results = run_evaluation(engine, top_param_sets, windows)
+    if not walk_forward:
+        return run_raw_evaluation(engine, top_param_sets)
+
+    windows = create_windows(start, end)
+    results = run_window_evaluation(engine, top_param_sets, windows)
     return calculate_mean_returns(results)
 
 
@@ -64,7 +68,22 @@ def get_top_param_sets(study: optuna.Study, n: int = 5) -> list[dict]:
     return top_param_sets
 
 
-def run_evaluation(engine: BacktestingEngine, top_param_sets: list[dict], windows: list[tuple[int, int]]) -> list[dict]:
+def run_raw_evaluation(engine: BacktestingEngine, top_param_sets: list[dict]) -> list[dict]:
+    results = []
+    with tqdm(total=len(top_param_sets), desc=f'Evaluating', dynamic_ncols=True, bar_format='{l_bar}{bar}') as pbar:
+        for param_set in top_param_sets:
+            engine.strategy = StrategyManager().get_strategy(
+                engine.strategy.__class__.__name__, **param_set['params'])
+            engine.run()
+            results.append({
+                'trial_number': param_set['trial_number'],
+                'final_balance': float(engine.get_final_quote_balance(INITIAL_BALANCE))
+            })
+            pbar.update(1)
+    return sorted(results, key=lambda x: x['final_balance'], reverse=True)
+
+
+def run_window_evaluation(engine: BacktestingEngine, top_param_sets: list[dict], windows: list[tuple[int, int]]) -> list[dict]:
     results = []
     with tqdm(total=len(top_param_sets), desc=f'Evaluating', dynamic_ncols=True, bar_format='{l_bar}{bar}') as pbar:
         for param_set in top_param_sets:
@@ -77,6 +96,7 @@ def run_evaluation(engine: BacktestingEngine, top_param_sets: list[dict], window
                 'trial_number': param_set['trial_number'],
                 'window_balances': window_balances
             })
+            # TODO: Update for each window in each param set
             pbar.update(1)
     return results
 
