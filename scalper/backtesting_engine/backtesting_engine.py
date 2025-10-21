@@ -48,7 +48,9 @@ class BacktestingEngine:
             raise ValueError('Backtest yet to be ran, call run() first.')
         return get_final_quote_balance(self.results, initial_quote_balance)
 
-    def set_ohlc_window(self, start: pd.Timestamp, end: pd.Timestamp) -> None:
+    def set_ohlc_window(self, start: pd.Timestamp = None, end: pd.Timestamp = None) -> None:
+        if start or end is None:
+            self.ohlc_window = self.ohlc_full
         self.ohlc_window = self.ohlc_full.loc[start:end]
 
     def _load_ohlc_data(self) -> None:
