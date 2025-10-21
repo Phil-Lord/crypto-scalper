@@ -15,7 +15,11 @@ INITIAL_BALANCE = 1000
 
 def find_params(study_name: str, num_sets: int, start: float, end: float) -> None:
     study = load_study(study_name)
-    top_param_sets = get_top_param_sets(study, num_sets)
+    evaluated_trials = get_evaluted_trials(study_name, start, end)
+    if len(evaluated_trials) >= num_sets:
+        print(f'The top {num_sets} parameter sets have already been evaluated for this period.')
+        return
+    top_param_sets = get_top_param_sets(study, num_sets, evaluated_trials)
 
     engine = BacktestingEngine(
         pair='XXBTZGBP',
@@ -47,11 +51,30 @@ def load_study(study_name: str) -> optuna.Study:
     return optuna.load_study(study_name=study_name, storage=storage)
 
 
-def get_top_param_sets(study: optuna.Study, n: int) -> list[dict]:
+def get_evaluted_trials(study_name: str, start: float, end: float) -> set[int]:
+    conn = sqlite3.connect('gen-eval.db')
+    cursor = conn.cursor()
+    create_table(cursor)
+
+    query = '''
+        SELECT trial_number FROM generalisation_evaluation
+        WHERE study_name = ? AND start_timestamp = ? AND end_timestamp = ?
+    '''
+    cursor.execute(query, (study_name, start, end))
+    rows = cursor.fetchall()
+    conn.close()
+
+    evaluated_trials = {row[0] for row in rows}
+    print(f'Found {len(evaluated_trials)} previously evaluated trials.')
+    return evaluated_trials
+
+
+def get_top_param_sets(study: optuna.Study, n: int, evaluated_trials: set[int]) -> list[dict]:
     print(f'Extracting top {n} parameter sets from study...')
     completed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
     reverse = study.direction == optuna.study.StudyDirection.MAXIMIZE
     top_trials = sorted(completed_trials, key=lambda t: t.value, reverse=reverse)[:n]
+    top_trials = [t for t in top_trials if t.number not in evaluated_trials]
     top_param_sets = [
         {
             "trial_number": t.number,
