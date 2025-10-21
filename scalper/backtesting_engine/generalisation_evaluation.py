@@ -7,18 +7,15 @@ from .backtesting_engine import BacktestingEngine
 from .objective import run_strategy_on_window
 from .parameter_optimisation import create_windows
 from strategy_manager import StrategyManager
-from utils import get_second_timestamp, OPTUNA_DB_URL
+from utils import OPTUNA_DB_URL
 
 
 INITIAL_BALANCE = 1000
 
 
-def find_params(study_name: str) -> None:
+def find_params(study_name: str, num_sets: int, start: float, end: float) -> None:
     study = load_study(study_name)
-    top_param_sets = get_top_param_sets(study, 5)
-
-    start = get_second_timestamp(2025, 1, 1)
-    end = get_second_timestamp(2025, 9, 1)
+    top_param_sets = get_top_param_sets(study, num_sets)
 
     engine = BacktestingEngine(
         pair='XXBTZGBP',
@@ -50,7 +47,7 @@ def load_study(study_name: str) -> optuna.Study:
     return optuna.load_study(study_name=study_name, storage=storage)
 
 
-def get_top_param_sets(study: optuna.Study, n: int = 5) -> list[dict]:
+def get_top_param_sets(study: optuna.Study, n: int) -> list[dict]:
     print(f'Extracting top {n} parameter sets from study...')
     completed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
     reverse = study.direction == optuna.study.StudyDirection.MAXIMIZE
