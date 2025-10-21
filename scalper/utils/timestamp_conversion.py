@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 
-def parse_datetime(datetime_string: str):
+def parse_datetime(datetime_string: str) -> list[int]:
     '''
     Converts a datetime in the string format 'YYYY-MM-DD-hh-mm-ss' to a list of integers.
 
