@@ -16,10 +16,9 @@ INITIAL_BALANCE = 1000
 def find_params(study_name: str, num_sets: int, start: float, end: float) -> None:
     study = load_study(study_name)
     evaluated_trials = get_evaluted_trials(study_name, start, end)
-    if len(evaluated_trials) >= num_sets:
-        print(f'The top {num_sets} parameter sets have already been evaluated for this period.')
-        return
     top_param_sets = get_top_param_sets(study, num_sets, evaluated_trials)
+    if len(top_param_sets) == 0:
+        return
 
     engine = BacktestingEngine(
         pair='XXBTZGBP',
@@ -65,7 +64,6 @@ def get_evaluted_trials(study_name: str, start: float, end: float) -> set[int]:
     conn.close()
 
     evaluated_trials = {row[0] for row in rows}
-    print(f'Found {len(evaluated_trials)} previously evaluated trials.')
     return evaluated_trials
 
 
@@ -75,6 +73,8 @@ def get_top_param_sets(study: optuna.Study, n: int, evaluated_trials: set[int]) 
     reverse = study.direction == optuna.study.StudyDirection.MAXIMIZE
     top_trials = sorted(completed_trials, key=lambda t: t.value, reverse=reverse)[:n]
     top_trials = [t for t in top_trials if t.number not in evaluated_trials]
+    print(f'Selected {len(top_trials)} new parameter sets for evaluation.')
+
     top_param_sets = [
         {
             "trial_number": t.number,
