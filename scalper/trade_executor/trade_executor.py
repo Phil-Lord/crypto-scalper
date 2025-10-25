@@ -51,6 +51,10 @@ class TradeExecutor:
         ''' Call strategy manager to get trade signal. '''
         return self.strategy.generate_signal(price)['signal']
 
+    def log_interval_results(self, price: float, signal: str):
+        ''' Log the results of the interval. '''
+        logger.info(f'Interval result: price={price:.2f}, signal={signal}')
+
     def execute_trade(self, signal: str):
         ''' Call exchange connector to add order. '''
         balances = self.balance_connector.fetch()
@@ -67,7 +71,3 @@ class TradeExecutor:
             # TODO: Log execution price, volume, and fee.
         except Exception as e:
             logger.error(f'Trade execution failed: {e}', exc_info=True)
-
-    def log_interval_results(self, price: float, signal: str):
-        ''' Log the results of the interval. '''
-        logger.info(f'Interval result: price={price:.2f}, signal={signal}')
