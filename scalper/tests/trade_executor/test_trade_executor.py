@@ -1,3 +1,4 @@
+import logging
 import pytest
 
 from trade_executor.trade_executor import TradeExecutor
@@ -28,7 +29,7 @@ class TestTradeExecutor:
         return mocker.patch(f'{self.MODULE_NAME}.TickerConnector').return_value
 
     @pytest.mark.execute_interval
-    def test_trade_executor(self, strategy_manager_patch, add_order_connector_patch,
+    def test_trade_executor(self, caplog, strategy_manager_patch, add_order_connector_patch,
                             balance_connector_patch, ticker_connector_patch):
         # Given
         ticker_connector_patch.fetch.return_value = {'c': [50]}
@@ -40,10 +41,19 @@ class TestTradeExecutor:
         }
 
         # When
+        caplog.set_level(logging.INFO)
         executor = TradeExecutor('XXBTZGBP', 1, 'testStrategy', param1=10, param2=20)
         executor.execute_interval()
 
         # Then
+        expected_messages = [
+            "Initialised TradeExecutor: XXBTZGBP - testStrategy - {'param1': 10, 'param2': 20}",
+            "Interval result: price=50.00, signal=buy",
+            "Placing BUY order: volume=100"
+        ]
+        for i, message in enumerate(expected_messages):
+            assert caplog.records[i].message == message
+
         strategy_manager_patch().get_strategy.assert_called_once_with(
             'testStrategy', param1=10, param2=20
         )
