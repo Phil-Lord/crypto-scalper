@@ -13,7 +13,7 @@ def start_scalping(pair: str, interval: int, strategy_name: str) -> None:
     if params is None:
         return
     executor = TradeExecutor(get_kraken_pair(pair), interval, strategy_name, **params)
-    executor.start()
+    executor.execute_interval()
 
 
 def get_params_for_strategy(strategy_name: str) -> dict[str, any]:

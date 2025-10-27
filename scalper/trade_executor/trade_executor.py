@@ -1,4 +1,3 @@
-import time
 import logging
 
 from exchange_connector import AddOrderConnector, BalanceConnector, TickerConnector
@@ -26,22 +25,19 @@ class TradeExecutor:
         self.balance_connector = BalanceConnector()
         self.add_order_connector = AddOrderConnector()
         self.strategy = StrategyManager().get_strategy(strategy_name, **strategy_params)
+        logger.info(f'Initialised TradeExecutor: {pair} - {strategy_name} - {strategy_params}')
 
-    def start(self) -> None:
-        logger.info(
-            f'TradeExecutor started for {self.pair} using {self.strategy.__class__.__name__}')
-
-        while True:
-            try:
-                price = self.get_price()
-                signal = self.run_strategy(price)
-                self.log_interval_results(price, signal)
-                if signal != 'hold':
-                    self.execute_trade(signal)
-            except Exception as e:
-                logger.error(f'Error in TradeExecutor: {e}', exc_info=True)
+    def execute_interval(self) -> None:
+        ''' Runs one trade decision cycle. '''
+        try:
+            price = self.get_price()
+            signal = self.run_strategy(price)
+            self.log_interval_results(price, signal)
+            if signal != 'hold':
+                self.execute_trade(signal)
+        except Exception as e:
+            logger.error(f'Error in TradeExecutor: {e}', exc_info=True)
             # TODO: Add an except which kills the loop when error is minimum balance not met.
-            time.sleep(self.interval * 60)
 
     def get_price(self) -> float:
         ''' Call exchange connector to get ticker price data. '''
@@ -63,11 +59,12 @@ class TradeExecutor:
         elif signal == 'sell':
             volume = balances[self.symbols['base']]
 
-        logger.info(f'Placing {signal.upper()} order: volume={volume}')
         try:
+            logger.info(f'Placing {signal.upper()} order: volume={volume}')
             order_result = self.add_order_connector.place(self.pair, signal, volume)
-            logger.info(
-                f'Trade executed: id: {order_result['txid']}, volume: {order_result['descr']['order']}')
+            order_id = order_result.get('txid')
+            order_descr = order_result.get('descr', {}).get('order')
+            logger.info(f'Trade executed: id={order_id}, order={order_descr}')
             # TODO: Log execution price, volume, and fee.
         except Exception as e:
             logger.error(f'Trade execution failed: {e}', exc_info=True)
