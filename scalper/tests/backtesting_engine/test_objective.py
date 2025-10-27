@@ -19,7 +19,7 @@ def strategy_manager_patch(mocker):
 def test_get_objective(engine_patch, strategy_manager_patch):
     # Given
     engine_patch.strategy.__class__.__name__ = 'TestStrategyName'
-    strategy_manager_patch.get_strategy.return_value = None
+    strategy_manager_patch.return_value.get_strategy.return_value = None
     engine_patch.set_ohlc_window.return_value = None
     engine_patch.run.return_value = None
     engine_patch.get_final_quote_balance.return_value = 1500

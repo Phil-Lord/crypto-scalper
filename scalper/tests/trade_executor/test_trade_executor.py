@@ -1,55 +1,49 @@
 import pytest
 
-
-class DummyFileHandler:
-    def __init__(self, *a, **k): pass
-    def setFormatter(self, *a, **k): pass
-    def setLevel(self, *a, **k): pass
-    def emit(self, *a, **k): pass
-    def close(self): pass
+from trade_executor.trade_executor import TradeExecutor
 
 
-class DummyTicker:
-    def fetch(self, pair):
-        return {'c': [100]}
+@pytest.mark.trade_executor
+class TestTradeExecutor:
+    @pytest.fixture()
+    def strategy_manager_patch(self, mocker):
+        patch = mocker.patch('trade_executor.trade_executor.StrategyManager')
+        patch.return_value.get_strategy.return_value = None
+        return patch
 
+    @pytest.fixture()
+    def add_order_connector_patch(self, mocker):
+        return mocker.patch('trade_executor.trade_executor.AddOrderConnector')
 
-class DummyBalance:
-    def fetch(self):
-        return {'ZGBP': 1000, 'XXBT': 1}
+    @pytest.fixture()
+    def balance_connector_patch(self, mocker):
+        return mocker.patch('trade_executor.trade_executor.BalanceConnector')
 
+    @pytest.fixture()
+    def ticker_connector_patch(self, mocker):
+        return mocker.patch('trade_executor.trade_executor.TickerConnector')
 
-class DummyOrder:
-    def place(self, pair, signal, volume):
-        return {'txid': '1', 'descr': {'order': 'buy'}}
+    @pytest.mark.execute_interval
+    def test_trade_executor(self, strategy_manager_patch, add_order_connector_patch,
+                            balance_connector_patch, ticker_connector_patch):
+        # Given
+        ticker_connector_patch.fetch.return_value = {'c': [50]}
+        strategy_manager_patch.generate_signal.return_value = {'signal': 'buy'}
+        balance_connector_patch.fetch.return_value = {'GBP': 100, 'BTC': 0}
+        add_order_connector_patch.place.return_value = {
+            'txid': 'testId',
+            'descr': {'order': 'buy 0.002 BTC at 50 GBP'}
+        }
 
+        # When
+        executor = TradeExecutor('XXBTZGBP', 1, 'testStrategy', param1=10, param2=20)
+        executor.execute_interval()
 
-class DummyStrategy:
-    def generate_signal(self, price):
-        return {'signal': 'buy'}
-
-    def __class__(self):
-        return type('S', (), {})
-
-
-@pytest.fixture(autouse=True)
-def patch_filehandler(monkeypatch):
-    monkeypatch.setattr('logging.FileHandler', DummyFileHandler)
-
-
-def test_trade_executor(monkeypatch):
-    from trade_executor.trade_executor import TradeExecutor
-
-    monkeypatch.setattr('logging.FileHandler', DummyFileHandler)
-    monkeypatch.setattr('strategy_manager.StrategyManager.get_strategy',
-                        lambda self, name, **kwargs: DummyStrategy())
-    executor = TradeExecutor('XXBTZGBP', 1, 'dummy')
-    executor.ticker_connector = DummyTicker()
-    executor.balance_connector = DummyBalance()
-    executor.add_order_connector = DummyOrder()
-    executor.strategy = DummyStrategy()
-    assert executor.get_price() == 100
-    assert executor.run_strategy(100) == 'buy'
-    executor.log_interval_results(100, 'buy')
-    executor.execute_trade('buy')
-    executor.execute_trade('sell')
+        # Then
+        strategy_manager_patch().get_strategy.assert_called_once_with(
+            'testStrategy', param1=10, param2=20
+        )
+        ticker_connector_patch.fetch.assert_called_once_with('XXBTZGBP')
+        strategy_manager_patch().generate_signal.assert_called_once_with(50.0)
+        balance_connector_patch.fetch.assert_called_once()
+        add_order_connector_patch.place.assert_called_once_with('XXBTZGBP', 'buy', 100)
