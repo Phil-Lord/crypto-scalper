@@ -1,0 +1,18 @@
+site_name: Scalper
+site_url: https://scalper.org/docs
+extra_css:
+  - stylesheets/extra.css
+theme:
+  name: material
+  favicon: images/dog-side.svg
+  icon:
+    logo: material/dog-side
+  palette:
+    - scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode

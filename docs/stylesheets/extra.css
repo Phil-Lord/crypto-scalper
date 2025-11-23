@@ -1,0 +1,27 @@
+[data-md-color-scheme="slate"] {
+    /* Primary colour (top bar) */
+    --md-primary-fg-color: #0C4B33;
+
+    /* Icons in top bar */
+    --md-primary-bg-color: white;
+
+    /* Accent colour (interactable elements - hovered links, buttons, scrollbars, etc.) */
+    --md-accent-fg-color: #187f58;
+
+    /* Main page background colour */
+    --md-default-bg-color: #0d1116;
+
+    /* Main Body Text color */
+    --md-default-fg-color: #c0c9d2;
+}
+
+[data-md-color-scheme="default"] {
+    /* Primary colour (top bar) */
+    --md-primary-fg-color: #0C4B33;
+
+    /* Icons in top bar */
+    --md-primary-bg-color: white;
+
+    /* Accent colour (interactable elements - hovered links, buttons, scrollbars, etc.) */
+    --md-accent-fg-color: #187f58;
+}
