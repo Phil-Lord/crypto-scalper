@@ -16,3 +16,10 @@ theme:
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
+nav:
+  - index.md
+  - parameter-optimisation.md
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
