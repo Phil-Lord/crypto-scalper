@@ -19,6 +19,7 @@ theme:
 nav:
   - index.md
   - parameter-optimisation.md
+  - cloud-architecture.md
 markdown_extensions:
   - admonition
   - pymdownx.details
