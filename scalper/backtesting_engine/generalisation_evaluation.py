@@ -7,7 +7,7 @@ from .backtesting_engine import BacktestingEngine
 from .objective import run_strategy_on_window
 from .parameter_optimisation import create_windows
 from strategy_manager import StrategyManager
-from utils import OPTUNA_DB_URL
+from utils import GEN_EVAL_DB_PATH, OPTUNA_DB_URL
 
 
 INITIAL_BALANCE = 1000
@@ -51,7 +51,7 @@ def load_study(study_name: str) -> optuna.Study:
 
 
 def get_evaluted_trials(study_name: str, start: float, end: float) -> set[int]:
-    conn = sqlite3.connect('gen-eval.db')
+    conn = sqlite3.connect(GEN_EVAL_DB_PATH)
     cursor = conn.cursor()
     create_table(cursor)
 
@@ -119,7 +119,7 @@ def run_evaluation(engine: BacktestingEngine, top_param_sets: list[dict], window
 
 
 def save_results_to_db(results: list[dict], study_name: str, start: float, end: float) -> None:
-    conn = sqlite3.connect('gen-eval.db')
+    conn = sqlite3.connect(GEN_EVAL_DB_PATH)
     cursor = conn.cursor()
     create_table(cursor)
 
