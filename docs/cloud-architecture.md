@@ -18,7 +18,9 @@ trading cycle per execution. This has several advantages:
 
 AWS Lambda is used as the compute environment, triggered every interval by Amazon EventBridge
 Scheduler. This provides simple, managed cron-style scheduling without wasting compute resources or
-necessitating manual uptime management.
+necessitating manual uptime management. Here's the flow:
+
+EventBridge → Lambda → [TradeExecutor](trade-executor.md) → runs 1 interval + maybe executes trade.
 
 ## Database
 
