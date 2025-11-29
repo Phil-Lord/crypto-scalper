@@ -20,7 +20,8 @@ nav:
   - index.md
   - parameter-optimisation.md
   - cloud-architecture.md
+  - trade-executor.md
 markdown_extensions:
   - admonition
-  - pymdownx.details
   - pymdownx.superfences
+  - pymdownx.emoji
