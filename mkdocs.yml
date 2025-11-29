@@ -18,6 +18,7 @@ theme:
         name: Switch to dark mode
 nav:
   - index.md
+  - data-system.md
   - parameter-optimisation.md
   - cloud-architecture.md
   - trade-executor.md
