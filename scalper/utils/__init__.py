@@ -1,4 +1,4 @@
-from .constants import OPTUNA_DB_URL, ROOT_DIR
+from .constants import OPTUNA_DB_URL, ROOT_DIR, TRADES_DB_PATH
 from .data_visualisation import plot_position_profits, plot_results, plot_trade_data_from_db
 from .env_vars import get_env_var
 from .optuna_utils import get_study_choices
