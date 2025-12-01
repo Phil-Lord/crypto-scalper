@@ -1,6 +1,6 @@
 import pandas as pd
 
-from data_system import TradesRepository
+from data_system import SQLAlchemyClient, TradesService
 from .profit_calculation import calculate_position_profits, get_final_quote_balance
 from .parameter_optimisation import optimise_parameters
 from strategy_manager import StrategyManager
@@ -58,7 +58,9 @@ class BacktestingEngine:
         Load trade data from the database, indexed by timestamp (as millisecond-precise datetimes).
         Then resample into forward-filled ohlc data for each interval.
         '''
-        trades = TradesRepository().get(self.pair, self.start, self.end)
+        client = SQLAlchemyClient()
+        service = TradesService(client)
+        trades = service.get(self.pair, self.start, self.end)
         trades["timestamp"] = pd.to_datetime(trades["timestamp"], unit="s")
         trades.set_index("timestamp", inplace=True)
 

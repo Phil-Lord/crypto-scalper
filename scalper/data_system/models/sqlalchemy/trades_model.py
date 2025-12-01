@@ -1,12 +1,10 @@
 from sqlalchemy import BigInteger, Float, Index, String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
+
+from .base_model import Model
 
 
-class Base(DeclarativeBase):
-    pass
-
-
-class Trade(Base):
+class Trade(Model):
     '''
     ORM-mapped class for storing trade data.
 

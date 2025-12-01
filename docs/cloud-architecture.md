@@ -29,7 +29,7 @@ Supabase (Postgres) stores trading data integrating seemlessly with AWS. The fre
 SQL access is provided for both analytics and scalper storage.
 
 The `interval_results` table is used to store results following each live trading interval. The
-client configuration and repository for the table is stored within the [Data System](data-system.md) module. For
+client configuration and service for the table is stored within the [Data System](data-system.md) module. For
 each interval, the [TradeExecutor](trade-executor.md) instance uses its [IntervalContext](trade-executor.md#interval-context-object)
 to load any required state from the `interval_results` table before running the strategy and save
 its results afterwards. The table below shows the fields for the `interval_results` table.
