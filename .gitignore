@@ -166,3 +166,6 @@ cython_debug/
 *.db-shm
 *.db-wal
 local_storage/
+
+# Anon
+.DS_Store
