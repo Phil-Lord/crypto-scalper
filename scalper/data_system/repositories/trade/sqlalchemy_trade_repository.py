@@ -1,22 +1,16 @@
 import pandas as pd
 from sqlalchemy import func, text
 
-from .base_service import Service
 from data_system.clients import SQLAlchemyClient
 from data_system.models import Trade
+from .trade_repository import TradeRepository
 
 
-class TradesService(Service):
-    def __init__(self, client: SQLAlchemyClient) -> None:
-        self.client = client
+class SqlAlchemyTradeRepository(TradeRepository):
+    def __init__(self) -> None:
+        self.client = SQLAlchemyClient()
 
     def add(self, raw_trades: list[list[any]], pair: str) -> None:
-        '''
-        Inserts a list of trades for a certain pair in their raw format from the Kraken API.
-
-        :param raw_trades: List of trade lists, e.g. [[price, vol, time, b/s, m/l, misc, id], ...].
-        :param pair: Trading pair identifier, e.g. 'XXBTZGBP'.
-        '''
         print(f'Inserting {pair} trades.')
         session = self.client.connect()
         try:
@@ -32,16 +26,7 @@ class TradesService(Service):
         finally:
             session.close()
 
-    def get(self, pair: str, start: int = None, end: int = None) -> pd.DataFrame:
-        '''
-        Fetches trades for a certain pair between a start and end date.
-
-        :param pair: Trading pair identifier, e.g. 'XXBTZGBP'.
-        :param start: Start timestamp. If None, fetches from the earliest trade.
-        :param end: End timestamp. If None, fetches up to the latest trade.
-
-        :return: Trades Dataframe.
-        '''
+    def get(self, pair: str, start: int = None, end: int = None) -> list[dict]:
         print(f'Fetching {pair} trades from {start or 'start'} to {end or 'end'}.')
         session = self.client.connect()
         try:

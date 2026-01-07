@@ -1,6 +1,6 @@
 import click
 
-from data_system import SQLAlchemyClient, TradesService
+from data_system import SqlAlchemyTradeRepository
 from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_trade_data_from_db
 
 
@@ -9,8 +9,7 @@ from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_tr
 @click.option('--start', '-s', required=False, help='Start timestamp (e.g. 2025-1-1-0-0-0)')
 @click.option('--end', '-e', required=False, help='End timestamp (e.g. 2025-1-1-23-59-59)')
 def fetch_trades(pair: str, start: str = None, end: str = None) -> None:
-    client = SQLAlchemyClient()
-    service = TradesService(client)
+    service = SqlAlchemyTradeRepository()
 
     kraken_pair = get_kraken_pair(pair)
     if start is not None:

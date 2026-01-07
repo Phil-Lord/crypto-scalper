@@ -1,14 +1,15 @@
 import pandas as pd
 
-from data_system import SQLAlchemyClient, TradesService
+from data_system import TradeRepository
 from .profit_calculation import calculate_position_profits, get_final_quote_balance
 from .parameter_optimisation import optimise_parameters
 from strategy_manager import StrategyManager
 
 
 class BacktestingEngine:
-    def __init__(self, pair: str, strategy_name: str, start: float = None, end: float = None,
-                 interval: int = None, vectorised: bool = None, **strategy_params):
+    def __init__(self, pair: str, strategy_name: str, repository: TradeRepository,
+                 start: float = None, end: float = None, interval: int = None,
+                 vectorised: bool = None, **strategy_params):
         self.pair = pair
         self.start = start
         self.end = end
@@ -18,7 +19,7 @@ class BacktestingEngine:
         self.ohlc_full = None
         self.ohlc_window = None
         self.results = None
-        self._load_ohlc_data()
+        self._load_ohlc_data(repository)
 
     def run(self) -> pd.DataFrame:
         ''' Load trades from the database and generate a strategy signal for each interval. '''
@@ -53,14 +54,12 @@ class BacktestingEngine:
             self.ohlc_window = self.ohlc_full
         self.ohlc_window = self.ohlc_full.loc[start:end]
 
-    def _load_ohlc_data(self) -> None:
+    def _load_ohlc_data(self, repository: TradeRepository) -> None:
         '''
         Load trade data from the database, indexed by timestamp (as millisecond-precise datetimes).
         Then resample into forward-filled ohlc data for each interval.
         '''
-        client = SQLAlchemyClient()
-        service = TradesService(client)
-        trades = service.get(self.pair, self.start, self.end)
+        trades = repository.get(self.pair, self.start, self.end)
         trades["timestamp"] = pd.to_datetime(trades["timestamp"], unit="s")
         trades.set_index("timestamp", inplace=True)
 

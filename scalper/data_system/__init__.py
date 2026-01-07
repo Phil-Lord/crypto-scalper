@@ -1,2 +1,2 @@
-from .clients.sqlalchemy_client import SQLAlchemyClient
-from .services.trades_service import TradesService
+from .repositories.trade.sqlalchemy_trade_repository import SqlAlchemyTradeRepository
+from .repositories.trade.trade_repository import TradeRepository
