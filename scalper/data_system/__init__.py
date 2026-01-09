@@ -1,2 +1,4 @@
+from .repositories.interval_result.interval_result_repository import IntervalResultRepository
+from .repositories.interval_result.supabase_interval_result_repository import SupabaseIntervalResultRepository
 from .repositories.trade.sqlalchemy_trade_repository import SqlAlchemyTradeRepository
 from .repositories.trade.trade_repository import TradeRepository
