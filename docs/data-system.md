@@ -5,7 +5,7 @@ data access services for other modules. It uses a multi-backend architecture as 
 different database tools and management services, namely:
 
 - **SQLAlchemy** for local backtesting tables, e.g. `trades` and `generalisation_evaluation`.
-- **Supabase** for live trading tables, e.g. `interval_results`, `bot_configs`, and `bot_runs`.
+- **Supabase** for live trading tables, e.g. `bots`, `bot_runs`, and `bot_ticks`.
 
 ## Module Architecture
 

@@ -1,4 +1,4 @@
-from .repositories.interval_result.bot_tick_repository import BotTickRepository
-from .repositories.interval_result.supabase_bot_tick_repository import SupabaseBotTickRepository
+from .repositories.bot_tick.bot_tick_repository import BotTickRepository
+from .repositories.bot_tick.supabase_bot_tick_repository import SupabaseBotTickRepository
 from .repositories.trade.sqlalchemy_trade_repository import SqlAlchemyTradeRepository
 from .repositories.trade.trade_repository import TradeRepository
