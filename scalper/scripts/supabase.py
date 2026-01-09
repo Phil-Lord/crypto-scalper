@@ -1,8 +1,8 @@
-from data_system import SupabaseIntervalResultRepository
+from data_system import SupabaseBotTickRepository
 
 
 def supabase():
-    repository = SupabaseIntervalResultRepository()
+    repository = SupabaseBotTickRepository()
 
 
 if __name__ == "__main__":

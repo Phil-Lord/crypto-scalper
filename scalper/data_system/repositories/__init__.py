@@ -1,4 +1,4 @@
-from .interval_result.interval_result_repository import IntervalResultRepository
-from .interval_result.supabase_interval_result_repository import SupabaseIntervalResultRepository
+from .interval_result.bot_tick_repository import BotTickRepository
+from .interval_result.supabase_bot_tick_repository import SupabaseBotTickRepository
 from .trade.sqlalchemy_trade_repository import SqlAlchemyTradeRepository
 from .trade.trade_repository import TradeRepository
