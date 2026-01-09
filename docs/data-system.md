@@ -4,29 +4,47 @@ This is the storage module for the system, it defines database configurations/mo
 data access services for other modules. It uses a multi-backend architecture as we need to support
 different database tools and management services, namely:
 
-- SQLAlchemy for the `trades` table, which stores historic trade data for backtesting.
-- Supabase for the `interval_results` table, which stores live trading results.
+- **SQLAlchemy** for local backtesting tables, e.g. `trades` and `generalisation_evaluation`.
+- **Supabase** for live trading tables, e.g. `interval_results`, `bot_configs`, and `bot_runs`.
 
-## Module Structure
+## Module Architecture
 
-### `clients/` - Raw database clients
+The data system implements the **Repository Pattern** to decouple application logic from the
+underlying database technologies. This architecture allows the system to remain agnostic to _where_
+the data is stored.
 
-- `base_client.py`: Abstract base class definition.
-- `sqlalchemy_client.py`: Creates engine/session for SQLAlchemy.
-- `supabase_client.py`: Holds the Supabase Python client and initialises connection.
+### Layer Breakdown
 
-### `services/` - Provide table-specific operations using clients
+The module is organised into four distinct layers:
 
-- `trades_service.py`: Uses SQLAlchemy client and Trades model.
-- `interval_service.py`: Uses Supabase client.
+| Layer            | Responsibility                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------------- |
+| **Models**       | **Data structure** - Contains ORM definitions and typed dataclasses.                         |
+| **Config**       | **Environment settings** - Handles credentials, URLs, and database paths.                    |
+| **Clients**      | **Connectivity** - Handles low-level connections; _"How do we talk to the DB?"_.             |
+| **Repositories** | **Logic** - Handles CRUD operations and business queries; _"What does the app want to do?"_. |
 
-### `models/` - ORM definitions and typed dataclasses for models
+### The Repository Pattern in Practice
 
-- `sqlalchemy/base.py`: ABC for ORM SQL Alchemy models.
-- `sqlalchemy/trades_model.py`: ORM model for `trades` table.
-- `supabase/interval_results_schema.py`: Schema descriptor dataclass for `interval_results` table.
+To achieve backend interchangeability (e.g., swapping SQLAlchemy for Supabase), the repo layer
+utilises a strict separation between **Interfaces** and **Implementations**:
 
-### `config/` - Credentials, URLs, database paths, etc.
+1. **Base Repositories _(The Interface)_:** We expose an abstract base class for each table. This
+   acts as a _"contract"_, defining what methods are available (e.g., `get_trade_by_id`) without
+   defining how they work. Consumers of the data system rely solely on these base classes.
 
-- `database_config.py`: Settings for SQL DB
-- `supabase_config.py`: Settings for Supabase client
+2. **Specific Repositories _(The Implementation)_:** These classes implement the Base Repository
+   using a specific **Client**. For example, a `SqlAlchemyTradeRepository` implements the
+   `TradeRepository` interface using the SQLAlchemy client.
+
+### Repository Pattern Benefits
+
+1. **Decoupling:** Consumers can ask for a `TradeRepository` without caring if the underlying
+   implementation is local (SQLAlchemy) or cloud-based (Supabase).
+
+2. **Testability:** We can easily inject mock repositories or in-memory databases for testing
+   without changing application logic.
+
+3. **Flexibility:** Database backends can be swapped or migrated without impacting trading logic.
+
+> _Today I store trades in PostgreSQL, tomorrow in Supabase, next week in DuckDB!_
