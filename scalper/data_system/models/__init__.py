@@ -1,1 +1,1 @@
-from .sqlalchemy.trades_model import Trade
+from .sqlalchemy.trade_model import Trade
