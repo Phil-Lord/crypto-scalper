@@ -22,6 +22,7 @@ nav:
   - parameter-optimisation.md
   - cloud-architecture.md
   - trade-executor.md
+  - architecture-decision-log.md
 markdown_extensions:
   - admonition
   - pymdownx.superfences
