@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from uuid import UUID
+from uuid import UUID, uuid4
 
 
 @dataclass(frozen=True)
@@ -14,7 +14,7 @@ class BotRun:
         started_at (datetime): Timestamp when the bot run started, defaults to current UTC time.
         completed_at (datetime): Timestamp when the bot run ended, if applicable.
     '''
-    id: UUID
+    id: UUID = field(default_factory=uuid4)
     bot_id: str
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: datetime | None = None
