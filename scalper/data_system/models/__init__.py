@@ -1,4 +1,4 @@
 from .sqlalchemy.trade_model import Trade
-from .supabase.bot_model import Bot
-from .supabase.bot_run_model import BotRun
-from .supabase.bot_tick_model import BotTick
+from .dataclasses.bot_model import Bot
+from .dataclasses.bot_run_model import BotRun
+from .dataclasses.bot_tick_model import BotTick, Signal
