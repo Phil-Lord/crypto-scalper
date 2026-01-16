@@ -1,5 +1,27 @@
-from abc import ABC
+from abc import ABC, abstractmethod
+
+from data_system.models import BotRun
 
 
 class BotRunRepository(ABC):
-    pass
+    @abstractmethod
+    def add(self, result: BotRun) -> BotRun:
+        '''
+        Adds a new bot run record.
+
+        :param result: The bot run record to add.
+
+        :return: The added bot run record.
+        '''
+        pass
+
+    @abstractmethod
+    def get(self, id: str) -> BotRun:
+        '''
+        Fetches a bot run by its ID.
+
+        :param id: Bot run ID.
+
+        :return: The bot run record.
+        '''
+        pass
