@@ -32,6 +32,19 @@ This is primarily so I don't forget **_why_** I did something.
 
 ## Data System Decisions
 
+### Having the `bot_id` column on `bot_ticks`
+
+#### Decision
+
+- We should keep the `bot_id` column on the `bot_ticks` table, even though it's denormalised.
+
+#### Reasoning
+
+- For time-series data (trading ticks), **read performance** is king.
+- **Denormalisation** is standard best practice for read performance.
+- Without denormalisation, getting _"All ticks for Bot X"_ involves a JOIN on bot_runs - slow!
+- We'll have duplicate data, but we can partition (Postgres requires the key's presence).
+
 ## Trade Executor Decisions
 
 ## Backtesting Engine Decisions
