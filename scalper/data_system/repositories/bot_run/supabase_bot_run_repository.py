@@ -11,8 +11,13 @@ class SupabaseBotRunRepository(BotRunRepository):
     def __init__(self) -> None:
         self.client = SupabaseClient().get_client()
 
-    def add(self, result: BotRun) -> BotRun:
-        response = (self.client.table(self.TABLE_NAME).insert(asdict(result)).execute())
+    def add(self, bot_run: BotRun) -> BotRun:
+        record = asdict(bot_run)
+        record['id'] = str(bot_run.id)  # Convert UUID to string
+        record['started_at'] = bot_run.started_at.isoformat()
+        if bot_run.completed_at:
+            record['completed_at'] = bot_run.completed_at.isoformat()
+        response = (self.client.table(self.TABLE_NAME).insert(record).execute())
         return BotRun(**response.data[0])
 
     def get(self, id: str) -> BotRun:

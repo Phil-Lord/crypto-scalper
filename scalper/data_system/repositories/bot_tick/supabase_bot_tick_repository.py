@@ -11,8 +11,15 @@ class SupabaseBotTickRepository(BotTickRepository):
     def __init__(self) -> None:
         self.client = SupabaseClient().get_client()
 
-    def add(self, result: BotTick) -> BotTick:
-        response = (self.client.table(self.TABLE_NAME).insert(asdict(result)).execute())
+    def add(self, bot_tick: BotTick) -> BotTick:
+        record = asdict(bot_tick)
+        record.pop('id', None)  # Remove id as it's auto-generated
+        record['run_id'] = str(bot_tick.run_id)  # Convert UUID to string
+        record['timestamp'] = bot_tick.timestamp.isoformat()
+        if bot_tick.executed_at:
+            record['executed_at'] = bot_tick.executed_at.isoformat()
+
+        response = (self.client.table(self.TABLE_NAME).insert(record).execute())
         return BotTick(**response.data[0])
 
     def get_by_bot_id(self, bot_id: str) -> list[BotTick]:

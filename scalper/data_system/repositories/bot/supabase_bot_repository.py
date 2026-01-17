@@ -11,8 +11,10 @@ class SupabaseBotRepository(BotRepository):
     def __init__(self) -> None:
         self.client = SupabaseClient().get_client()
 
-    def add(self, result: Bot) -> Bot:
-        response = (self.client.table(self.TABLE_NAME).insert(asdict(result)).execute())
+    def add(self, bot: Bot) -> Bot:
+        record = asdict(bot)
+        record['created_at'] = bot.created_at.isoformat()
+        response = (self.client.table(self.TABLE_NAME).insert(record).execute())
         return Bot(**response.data[0])
 
     def get(self, id: str) -> Bot:

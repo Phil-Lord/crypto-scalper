@@ -5,12 +5,11 @@ from data_system.models import Bot
 
 class BotRepository(ABC):
     @abstractmethod
-    def add(self, result: Bot) -> Bot:
+    def add(self, bot: Bot) -> Bot:
         '''
         Adds a new bot record.
 
-        :param result: The bot record to add.
-
+        :param bot: The bot record to add.
         :return: The added bot record.
         '''
         pass
@@ -21,7 +20,6 @@ class BotRepository(ABC):
         Fetches a bot by its ID.
 
         :param id: Bot ID.
-
         :return: The bot record.
         '''
         pass
