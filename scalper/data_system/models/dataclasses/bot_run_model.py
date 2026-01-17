@@ -14,7 +14,7 @@ class BotRun:
         started_at (datetime): Timestamp when the bot run started, defaults to current UTC time.
         completed_at (datetime): Timestamp when the bot run ended, if applicable.
     '''
-    id: UUID = field(default_factory=uuid4)
     bot_id: str
+    id: UUID = field(default_factory=uuid4)
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: datetime | None = None
