@@ -1,4 +1,5 @@
 from .models.dataclasses.bot_model import Bot
+from .models.dataclasses.bot_order_model import BotOrder, Side
 from .models.dataclasses.bot_run_model import BotRun
 from .models.dataclasses.bot_tick_model import BotTick, Signal
 
@@ -10,6 +11,9 @@ from .repositories.bot_run.supabase_bot_run_repository import SupabaseBotRunRepo
 
 from .repositories.bot_tick.bot_tick_repository import BotTickRepository
 from .repositories.bot_tick.supabase_bot_tick_repository import SupabaseBotTickRepository
+
+from .repositories.bot_order.bot_order_repository import BotOrderRepository
+from .repositories.bot_order.supabase_bot_order_repository import SupabaseBotOrderRepository
 
 from .repositories.trade.sqlalchemy_trade_repository import SqlAlchemyTradeRepository
 from .repositories.trade.trade_repository import TradeRepository

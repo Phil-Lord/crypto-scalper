@@ -7,5 +7,8 @@ from .bot_run.supabase_bot_run_repository import SupabaseBotRunRepository
 from .bot_tick.bot_tick_repository import BotTickRepository
 from .bot_tick.supabase_bot_tick_repository import SupabaseBotTickRepository
 
+from .bot_order.bot_order_repository import BotOrderRepository
+from .bot_order.supabase_bot_order_repository import SupabaseBotOrderRepository
+
 from .trade.sqlalchemy_trade_repository import SqlAlchemyTradeRepository
 from .trade.trade_repository import TradeRepository

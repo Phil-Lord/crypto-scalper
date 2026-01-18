@@ -25,34 +25,21 @@ CREATE INDEX idx_bot_runs_bot_started ON bot_runs (bot_id, started_at DESC);
 
 -- Table: bot_ticks
 CREATE TABLE bot_ticks (
-    id BIGSERIAL PRIMARY KEY,                     -- Matches BotTick.id (int)
-
     -- Identifiers
+    id BIGSERIAL PRIMARY KEY,                     -- Matches BotTick.id (int)
     bot_id TEXT NOT NULL REFERENCES bots(id),     -- Denormalized for faster filtering
     run_id UUID NOT NULL REFERENCES bot_runs(id) ON DELETE CASCADE,
 
-    -- Time Series Data
+    -- Tick Data
     timestamp TIMESTAMPTZ NOT NULL,               -- Matches BotTick.timestamp (The Heartbeat)
+    price DECIMAL(32, 12) NOT NULL,               -- Matches BotTick.price
+    signal TEXT NOT NULL,                         -- Matches BotTick.signal ('buy', 'sell', 'hold')
+    error TEXT,                                   -- Matches BotTick.error
 
-    -- Post-interval Portfolio State
+    -- Portfolio State
     balance_base DECIMAL(32, 12) NOT NULL,        -- Matches BotTick.balance_base
     balance_quote DECIMAL(32, 12) NOT NULL,       -- Matches BotTick.balance_quote
 
-    -- Market State
-    price DECIMAL(32, 12) NOT NULL,               -- Matches BotTick.price
-    signal TEXT NOT NULL,                         -- Matches BotTick.signal ('buy', 'sell', 'hold')
-
-    -- Order Execution Details
-    order_executed BOOLEAN NOT NULL DEFAULT FALSE,
-    executed_at TIMESTAMPTZ,                      -- Nullable
-    execution_price DECIMAL(32, 12),              -- Nullable
-    execution_volume DECIMAL(32, 12),             -- Nullable (Note: Mapped float -> Decimal for safety)
-    execution_fee DECIMAL(32, 12),                -- Nullable
-
-    -- Error Information
-    error TEXT,                                   -- Matches BotTick.error
-
-    -- Constraints
     CONSTRAINT chk_signal CHECK (signal IN ('buy', 'sell', 'hold'))
 );
 
@@ -61,3 +48,24 @@ CREATE INDEX idx_bot_ticks_run_time ON bot_ticks (run_id, timestamp ASC);
 
 -- Optional Index: Helps debug by quickly finding rows where errors occurred
 CREATE INDEX idx_bot_ticks_errors ON bot_ticks (id) WHERE error IS NOT NULL;
+
+
+-- Table: bot_orders
+CREATE TABLE bot_orders (
+    -- Primary Key
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    -- Foreign Keys
+    bot_id TEXT NOT NULL REFERENCES bots(id),
+    run_id UUID NOT NULL REFERENCES bot_runs(id) ON DELETE CASCADE,
+    tick_id BIGINT REFERENCES bot_ticks(id),
+
+    -- Order Details
+    side TEXT NOT NULL,
+    price DECIMAL(32, 12) NOT NULL,
+    volume DECIMAL(32, 12) NOT NULL,  -- Mapped float -> Decimal for safety
+    fee DECIMAL(32, 12),
+    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT chk_side CHECK (side IN ('buy', 'sell'))
+);

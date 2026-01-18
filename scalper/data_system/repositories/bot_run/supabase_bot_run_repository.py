@@ -12,11 +12,13 @@ class SupabaseBotRunRepository(BotRunRepository):
         self.client = SupabaseClient().get_client()
 
     def add(self, bot_run: BotRun) -> BotRun:
+        # Convert UUID to string and datetimes to ISO format
         record = asdict(bot_run)
-        record['id'] = str(bot_run.id)  # Convert UUID to string
+        record['id'] = str(bot_run.id)
         record['started_at'] = bot_run.started_at.isoformat()
         if bot_run.completed_at:
             record['completed_at'] = bot_run.completed_at.isoformat()
+
         response = (self.client.table(self.TABLE_NAME).insert(record).execute())
         return BotRun(**response.data[0])
 
