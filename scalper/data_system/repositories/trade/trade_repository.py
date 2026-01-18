@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 class TradeRepository(ABC):
     @abstractmethod
-    def add(self, raw_trades: list[list[any]]) -> None:
+    def add(self, raw_trades: list[list[any]], pair: str) -> None:
         '''
         Inserts a list of trades for a certain pair in their raw format from the Kraken API.
 
