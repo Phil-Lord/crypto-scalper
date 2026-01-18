@@ -27,7 +27,7 @@ class SupabaseBotOrderRepository(BotOrderRepository):
             .table(self.TABLE_NAME)
             .select("*")
             .eq("bot_id", bot_id)
-            .order("timestamp", desc=True)
+            .order("executed_at", desc=True)
             .execute()
         )
         return [BotOrder(**row) for row in response.data]

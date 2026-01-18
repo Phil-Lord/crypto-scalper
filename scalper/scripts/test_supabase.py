@@ -1,12 +1,13 @@
 from datetime import datetime
 import questionary
 
-from data_system import Bot, BotRun, BotTick, SupabaseBotRepository, SupabaseBotRunRepository, SupabaseBotTickRepository
+from data_system import Bot, BotOrder, BotRun, BotTick, SupabaseBotOrderRepository, SupabaseBotRepository, SupabaseBotRunRepository, SupabaseBotTickRepository
 
 
 def test_supabase():
-    table = questionary.select('Select a table:', choices=['bots', 'bot_runs', 'bot_ticks']).ask()
-    action = questionary.select('Select an action:', choices=['add', 'get']).ask()
+    table = questionary.select(
+        'Table:', choices=['bots', 'bot_runs', 'bot_ticks', 'bot_orders']).ask()
+    action = questionary.select('Action:', choices=['add', 'get']).ask()
 
     if table == 'bots':
         bot(action)
@@ -14,6 +15,8 @@ def test_supabase():
         bot_run(action)
     elif table == 'bot_ticks':
         bot_tick(action)
+    elif table == 'bot_orders':
+        bot_order(action)
 
 
 def bot(action: str):
@@ -53,21 +56,35 @@ def bot_tick(action: str):
             bot_id=ask('bot_id:'),
             run_id=ask('bot_run_id:'),
             timestamp=ask_datetime('timestamp:'),
-            balance_base=ask('balance_base:'),
-            balance_quote=ask('balance_quote:'),
             price=ask('price:'),
             signal=ask('signal:'),
-            order_executed=questionary.confirm('order_executed:').ask(),
-            executed_at=ask_datetime('executed_at:'),
-            execution_price=ask('execution_price:'),
-            execution_volume=ask('execution_volume:'),
-            execution_fee=ask('execution_fee:'),
-            error=ask('error:')
+            error=ask('error:'),
+            balance_base=ask('balance_base:'),
+            balance_quote=ask('balance_quote:')
         ))
         print('Added bot tick:', bot_tick)
     elif action == 'get':
         bot_tick = repository.get_by_bot_id(ask('bot_id:'))
         print('Retrieved bot ticks:', bot_tick)
+
+
+def bot_order(action: str):
+    repository = SupabaseBotOrderRepository()
+    if action == 'add':
+        bot_order = repository.add(BotOrder(
+            bot_id=ask('bot_id:'),
+            run_id=ask('bot_run_id:'),
+            tick_id=ask('tick_id:'),
+            side=ask('side:'),
+            price=ask('price:'),
+            volume=ask('volume:'),
+            fee=ask('fee:'),
+            executed_at=ask_datetime('executed_at:')
+        ))
+        print('Added bot order:', bot_order)
+    elif action == 'get':
+        bot_order = repository.get_by_bot_id(ask('bot_id:'))
+        print('Retrieved bot orders:', bot_order)
 
 
 def ask(message: str) -> str:
