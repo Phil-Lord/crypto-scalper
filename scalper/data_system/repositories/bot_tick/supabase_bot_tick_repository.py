@@ -1,6 +1,7 @@
 from dataclasses import asdict
 
-from data_system.clients import SupabaseClient
+from supabase import Client
+
 from data_system.models import BotTick
 from .bot_tick_repository import BotTickRepository
 
@@ -8,8 +9,8 @@ from .bot_tick_repository import BotTickRepository
 class SupabaseBotTickRepository(BotTickRepository):
     TABLE_NAME = 'bot_ticks'
 
-    def __init__(self) -> None:
-        self.client = SupabaseClient().get_client()
+    def __init__(self, client: Client) -> None:
+        self.client = client
 
     def add(self, bot_tick: BotTick) -> BotTick:
         record = asdict(bot_tick)

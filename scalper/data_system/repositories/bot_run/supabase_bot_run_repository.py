@@ -1,6 +1,7 @@
 from dataclasses import asdict
 
-from data_system.clients import SupabaseClient
+from supabase import Client
+
 from data_system.models import BotRun
 from .bot_run_repository import BotRunRepository
 
@@ -8,8 +9,8 @@ from .bot_run_repository import BotRunRepository
 class SupabaseBotRunRepository(BotRunRepository):
     TABLE_NAME = 'bot_runs'
 
-    def __init__(self) -> None:
-        self.client = SupabaseClient().get_client()
+    def __init__(self, client: Client) -> None:
+        self.client = client
 
     def add(self, bot_run: BotRun) -> BotRun:
         # Convert UUID to string and datetimes to ISO format

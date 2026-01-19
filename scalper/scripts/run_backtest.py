@@ -2,7 +2,7 @@ import click
 import pandas as pd
 
 from backtesting_engine import BacktestingEngine
-from data_system import SqlAlchemyTradeRepository
+from data_system import SQLAlchemyClient, SqlAlchemyTradeRepository
 from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_results, SMA_CONFIG, SMA_GRID, PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
 
 USE_DEFAULT_STRATEGY_CONFIGS = True
@@ -47,7 +47,8 @@ def get_params_for_strategy(strategy_name: str) -> tuple:
 def create_engine(pair: str, strategy_name: str, start: str, end: str, interval: int, vectorised: bool, **params) -> BacktestingEngine:
     ''' Create a backtesting engine with the specified parameters. '''
     kraken_pair = get_kraken_pair(pair)
-    repository = SqlAlchemyTradeRepository()
+    client = SQLAlchemyClient()
+    repository = SqlAlchemyTradeRepository(client)
 
     if start is not None:
         start = get_second_timestamp(*parse_datetime(start))

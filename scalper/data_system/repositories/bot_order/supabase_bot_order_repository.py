@@ -1,6 +1,7 @@
 from dataclasses import asdict
 
-from data_system.clients import SupabaseClient
+from supabase import Client
+
 from data_system.models import BotOrder
 from .bot_order_repository import BotOrderRepository
 
@@ -8,8 +9,8 @@ from .bot_order_repository import BotOrderRepository
 class SupabaseBotOrderRepository(BotOrderRepository):
     TABLE_NAME = 'bot_orders'
 
-    def __init__(self) -> None:
-        self.client = SupabaseClient().get_client()
+    def __init__(self, client: Client) -> None:
+        self.client = client
 
     def add(self, bot_order: BotOrder) -> BotOrder:
         # Convert UUIDs to strings and datetime to ISO format

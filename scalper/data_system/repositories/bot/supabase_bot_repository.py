@@ -1,6 +1,7 @@
 from dataclasses import asdict
 
-from data_system.clients import SupabaseClient
+from supabase import Client
+
 from data_system.models import Bot
 from .bot_repository import BotRepository
 
@@ -8,8 +9,8 @@ from .bot_repository import BotRepository
 class SupabaseBotRepository(BotRepository):
     TABLE_NAME = 'bots'
 
-    def __init__(self) -> None:
-        self.client = SupabaseClient().get_client()
+    def __init__(self, client: Client) -> None:
+        self.client = client
 
     def add(self, bot: Bot) -> Bot:
         record = asdict(bot)

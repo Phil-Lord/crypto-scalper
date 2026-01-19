@@ -1,7 +1,9 @@
 from datetime import datetime
 import questionary
 
-from data_system import Bot, BotOrder, BotRun, BotTick, SupabaseBotOrderRepository, SupabaseBotRepository, SupabaseBotRunRepository, SupabaseBotTickRepository
+from supabase import Client
+
+from data_system import Bot, BotOrder, BotRun, BotTick, SupabaseBotOrderRepository, SupabaseBotRepository, SupabaseBotRunRepository, SupabaseBotTickRepository, SupabaseClient
 
 
 def test_supabase():
@@ -9,18 +11,19 @@ def test_supabase():
         'Table:', choices=['bots', 'bot_runs', 'bot_ticks', 'bot_orders']).ask()
     action = questionary.select('Action:', choices=['add', 'get']).ask()
 
+    client = SupabaseClient().get_client()
     if table == 'bots':
-        bot(action)
+        bot(action, client)
     elif table == 'bot_runs':
-        bot_run(action)
+        bot_run(action, client)
     elif table == 'bot_ticks':
-        bot_tick(action)
+        bot_tick(action, client)
     elif table == 'bot_orders':
-        bot_order(action)
+        bot_order(action, client)
 
 
-def bot(action: str):
-    repository = SupabaseBotRepository()
+def bot(action: str, client: Client):
+    repository = SupabaseBotRepository(client)
     if action == 'add':
         bot = repository.add(Bot(
             id=ask('id:'),
@@ -36,8 +39,8 @@ def bot(action: str):
         print('Retrieved bot:', bot)
 
 
-def bot_run(action: str):
-    repository = SupabaseBotRunRepository()
+def bot_run(action: str, client: Client):
+    repository = SupabaseBotRunRepository(client)
     if action == 'add':
         bot_run = repository.add(BotRun(
             bot_id=ask('bot_id:'),
@@ -49,8 +52,8 @@ def bot_run(action: str):
         print('Retrieved bot run:', bot_run)
 
 
-def bot_tick(action: str):
-    repository = SupabaseBotTickRepository()
+def bot_tick(action: str, client: Client):
+    repository = SupabaseBotTickRepository(client)
     if action == 'add':
         bot_tick = repository.add(BotTick(
             bot_id=ask('bot_id:'),
@@ -68,8 +71,8 @@ def bot_tick(action: str):
         print('Retrieved bot ticks:', bot_tick)
 
 
-def bot_order(action: str):
-    repository = SupabaseBotOrderRepository()
+def bot_order(action: str, client: Client):
+    repository = SupabaseBotOrderRepository(client)
     if action == 'add':
         bot_order = repository.add(BotOrder(
             bot_id=ask('bot_id:'),

@@ -1,3 +1,6 @@
+from .clients.sqlalchemy_client import SQLAlchemyClient
+from .clients.supabase_client import SupabaseClient
+
 from .models.dataclasses.bot_model import Bot
 from .models.dataclasses.bot_order_model import BotOrder, Side
 from .models.dataclasses.bot_run_model import BotRun

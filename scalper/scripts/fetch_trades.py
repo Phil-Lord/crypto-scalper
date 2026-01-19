@@ -1,6 +1,6 @@
 import click
 
-from data_system import SqlAlchemyTradeRepository
+from data_system import SQLAlchemyClient, SqlAlchemyTradeRepository
 from exchange_connector import TradesConnector
 from utils import get_kraken_pair, get_nano_timestamp, parse_datetime
 
@@ -11,14 +11,15 @@ from utils import get_kraken_pair, get_nano_timestamp, parse_datetime
 @click.option('--end', '-e', required=True, help='End timestamp (e.g. 2025-1-1-23-59-59)')
 def fetch_trades(pair: str, start: str, end: str) -> None:
     connector = TradesConnector()
-    service = SqlAlchemyTradeRepository()
+    client = SQLAlchemyClient()
+    repository = SqlAlchemyTradeRepository(client)
 
     kraken_pair = get_kraken_pair(pair)
     start_timestamp = get_nano_timestamp(*parse_datetime(start))
     end_timestamp = get_nano_timestamp(*parse_datetime(end))
 
     trades = connector.fetch(kraken_pair, start_timestamp, end_timestamp)
-    service.add(trades, kraken_pair)
+    repository.add(trades, kraken_pair)
 
 
 if __name__ == '__main__':

@@ -7,8 +7,8 @@ from .trade_repository import TradeRepository
 
 
 class SqlAlchemyTradeRepository(TradeRepository):
-    def __init__(self) -> None:
-        self.client = SQLAlchemyClient()
+    def __init__(self, client: SQLAlchemyClient) -> None:
+        self.client = client
 
     def add(self, raw_trades: list[list[any]], pair: str) -> None:
         print(f'Inserting {pair} trades.')
