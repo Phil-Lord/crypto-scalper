@@ -1,9 +1,11 @@
 from datetime import datetime
+
 import questionary
 
-from supabase import Client
-
-from data_system import Bot, BotOrder, BotRun, BotTick, SupabaseBotOrderRepository, SupabaseBotRepository, SupabaseBotRunRepository, SupabaseBotTickRepository, SupabaseClient
+from data_system import (
+    Bot, BotOrder, BotRun, BotTick, SupabaseBotOrderRepository, SupabaseBotRepository,
+    SupabaseBotRunRepository, SupabaseBotTickRepository, SupabaseClient
+)
 
 
 def test_supabase():
@@ -11,7 +13,7 @@ def test_supabase():
         'Table:', choices=['bots', 'bot_runs', 'bot_ticks', 'bot_orders']).ask()
     action = questionary.select('Action:', choices=['add', 'get']).ask()
 
-    client = SupabaseClient().get_client()
+    client = SupabaseClient()
     if table == 'bots':
         bot(action, client)
     elif table == 'bot_runs':
@@ -22,7 +24,7 @@ def test_supabase():
         bot_order(action, client)
 
 
-def bot(action: str, client: Client):
+def bot(action: str, client: SupabaseClient):
     repository = SupabaseBotRepository(client)
     if action == 'add':
         bot = repository.add(Bot(
@@ -39,7 +41,7 @@ def bot(action: str, client: Client):
         print('Retrieved bot:', bot)
 
 
-def bot_run(action: str, client: Client):
+def bot_run(action: str, client: SupabaseClient):
     repository = SupabaseBotRunRepository(client)
     if action == 'add':
         bot_run = repository.add(BotRun(
@@ -52,7 +54,7 @@ def bot_run(action: str, client: Client):
         print('Retrieved bot run:', bot_run)
 
 
-def bot_tick(action: str, client: Client):
+def bot_tick(action: str, client: SupabaseClient):
     repository = SupabaseBotTickRepository(client)
     if action == 'add':
         bot_tick = repository.add(BotTick(
@@ -71,7 +73,7 @@ def bot_tick(action: str, client: Client):
         print('Retrieved bot ticks:', bot_tick)
 
 
-def bot_order(action: str, client: Client):
+def bot_order(action: str, client: SupabaseClient):
     repository = SupabaseBotOrderRepository(client)
     if action == 'add':
         bot_order = repository.add(BotOrder(
