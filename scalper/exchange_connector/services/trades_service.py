@@ -1,10 +1,12 @@
+from typing import Any
+
 from tqdm import tqdm
 
 from .kraken_service import KrakenService
 
 
 class TradesService(KrakenService):
-    def fetch_trades(self, pair: str, since: int, until: int) -> list[list[any]]:
+    def fetch_trades(self, pair: str, since: int, until: int) -> list[list[Any]]:
         self.validate_pair(pair)
         trades = []
         current_since = since

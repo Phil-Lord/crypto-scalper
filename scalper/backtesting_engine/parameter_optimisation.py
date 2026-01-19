@@ -1,4 +1,5 @@
 import os
+from typing import Any
 import warnings
 
 import optuna
@@ -10,8 +11,8 @@ from .objective import get_objective
 from utils import OPTUNA_DB_URL
 
 
-def optimise_parameters(engine, param_grid: dict[str, list[any]], n_trials: int = 100,
-                        constraints: list[callable] = None) -> dict[str, any]:
+def optimise_parameters(engine, param_grid: dict[str, list[Any]], n_trials: int = 100,
+                        constraints: list[callable] = None) -> dict[str, Any]:
     warnings.filterwarnings('ignore', category=ExperimentalWarning)
     study_name = create_study_name(engine)
     storage = create_storage()
@@ -105,7 +106,7 @@ def create_windows(start: float, end: float) -> list[tuple[pd.Timestamp, pd.Time
 
 
 def optimise(n_trials: int, study: optuna.study.Study, engine,
-             windows: list[tuple[pd.Timestamp, pd.Timestamp]], param_grid: dict[str, list[any]],
+             windows: list[tuple[pd.Timestamp, pd.Timestamp]], param_grid: dict[str, list[Any]],
              constraints: list[callable] = None) -> None:
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     progress_callback = TqdmProgressCallback(n_trials)

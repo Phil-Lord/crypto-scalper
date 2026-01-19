@@ -1,4 +1,5 @@
 import requests
+from typing import Any
 
 from .exceptions import KrakenTooManyRequestsError
 from exchange_connector.kraken_utils import get_headers
@@ -7,7 +8,7 @@ from exchange_connector.kraken_utils import get_headers
 class KrakenApiClient:
     BASE_URL = 'https://api.kraken.com'
 
-    def make_request(self, method: str, endpoint: str, params: dict) -> dict[str, any]:
+    def make_request(self, method: str, endpoint: str, params: dict) -> dict[str, Any]:
         try:
             url = self.BASE_URL + endpoint
             if method.upper() == 'GET':
@@ -22,7 +23,7 @@ class KrakenApiClient:
         except ValueError:
             raise RuntimeError('Failed to parse JSON response.')
 
-    def handle_errors(self, response: dict[str, any]) -> None:
+    def handle_errors(self, response: dict[str, Any]) -> None:
         if 'error' in response and response['error']:
             if response['error'] == ['EGeneral:Too many requests']:
                 raise KrakenTooManyRequestsError()

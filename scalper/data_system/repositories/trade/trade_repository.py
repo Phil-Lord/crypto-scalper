@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class TradeRepository(ABC):
     @abstractmethod
-    def add(self, raw_trades: list[list[any]], pair: str) -> None:
+    def add(self, raw_trades: list[list[Any]], pair: str) -> None:
         '''
         Inserts a list of trades for a certain pair in their raw format from the Kraken API.
 

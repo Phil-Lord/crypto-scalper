@@ -1,6 +1,7 @@
+import subprocess
+
 import click
 import questionary
-import subprocess
 
 from study_analyser import StudyAnalyser
 from utils import get_study_choices, OPTUNA_DB_URL

@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 import pandas as pd
 
 
 class Rule(ABC):
     @abstractmethod
-    def check(self, current_state: dict[str, any]) -> str:
+    def check(self, current_state: dict[str, Any]) -> str:
         ''' Check rule against current state during live trading. '''
         pass
 

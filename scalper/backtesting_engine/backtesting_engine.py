@@ -1,3 +1,5 @@
+from typing import Any
+
 import pandas as pd
 
 from data_system import TradeRepository
@@ -35,7 +37,7 @@ class BacktestingEngine:
 
         return self.results
 
-    def optimise_parameters(self, param_grid: dict[str, list[any]], n_trials: int = 100) -> dict[str, any]:
+    def optimise_parameters(self, param_grid: dict[str, list[Any]], n_trials: int = 100) -> dict[str, Any]:
         strategy_constraints = getattr(self.strategy.__class__, 'constraints', lambda: [])()
         return optimise_parameters(self, param_grid, n_trials, strategy_constraints)
 

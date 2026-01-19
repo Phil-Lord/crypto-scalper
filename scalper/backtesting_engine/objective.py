@@ -1,3 +1,5 @@
+from typing import Any
+
 import optuna
 import pandas as pd
 import numpy as np
@@ -7,7 +9,7 @@ from strategy_manager import StrategyManager
 INITIAL_BALANCE = 1000
 
 
-def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[callable] = None,
+def get_objective(engine, param_grid: dict[str, list[Any]], constraints: list[callable] = None,
                   windows: list[tuple[pd.Timestamp, pd.Timestamp]] = None) -> callable:
     def objective(trial: optuna.Trial) -> float:
         ''' Optimisation Objective: Maximise geometric mean of per-window return ratios. '''
@@ -34,7 +36,7 @@ def get_objective(engine, param_grid: dict[str, list[any]], constraints: list[ca
     return objective
 
 
-def suggest_parameters(trial: optuna.Trial, param_grid: dict[str, list[any]]) -> dict[str, any]:
+def suggest_parameters(trial: optuna.Trial, param_grid: dict[str, list[Any]]) -> dict[str, Any]:
     ''' Suggest a value for each parameter in the grid. '''
     params = {}
     for name, (low, high) in param_grid.items():
@@ -47,7 +49,7 @@ def suggest_parameters(trial: optuna.Trial, param_grid: dict[str, list[any]]) ->
     return params
 
 
-def parameters_violate_constraints(constraints: list[callable], params: dict[str, list[any]]) -> bool:
+def parameters_violate_constraints(constraints: list[callable], params: dict[str, list[Any]]) -> bool:
     ''' Check if parameters violate constraints. '''
     if constraints:
         for constraint in constraints:
@@ -56,7 +58,7 @@ def parameters_violate_constraints(constraints: list[callable], params: dict[str
     return False
 
 
-def run_strategy_on_window(engine, params: dict[str, any], start: pd.Timestamp, end: pd.Timestamp) -> None:
+def run_strategy_on_window(engine, params: dict[str, Any], start: pd.Timestamp, end: pd.Timestamp) -> None:
     ''' Configure and run the strategy on an OHLC window. '''
     engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
     engine.set_ohlc_window(start, end)

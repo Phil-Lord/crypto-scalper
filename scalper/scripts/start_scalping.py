@@ -1,3 +1,5 @@
+from typing import Any
+
 import click
 
 from trade_executor import TradeExecutor
@@ -16,7 +18,7 @@ def start_scalping(pair: str, interval: int, strategy_name: str) -> None:
     executor.execute_interval()
 
 
-def get_params_for_strategy(strategy_name: str) -> dict[str, any]:
+def get_params_for_strategy(strategy_name: str) -> dict[str, Any]:
     if strategy_name == 'SmaStrategy':
         return SMA_CONFIG
     elif strategy_name == 'PrecisionTrendStrategy':

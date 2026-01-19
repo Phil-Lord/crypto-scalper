@@ -1,3 +1,5 @@
+from typing import Any
+
 import pandas as pd
 from sqlalchemy import func, text
 
@@ -10,7 +12,7 @@ class SQLAlchemyTradeRepository(TradeRepository):
     def __init__(self, client: SQLAlchemyClient) -> None:
         self.client = client
 
-    def add(self, raw_trades: list[list[any]], pair: str) -> None:
+    def add(self, raw_trades: list[list[Any]], pair: str) -> None:
         print(f'Inserting {pair} trades.')
         session = self.client.connect()
         try:
@@ -44,7 +46,7 @@ class SQLAlchemyTradeRepository(TradeRepository):
         finally:
             session.close()
 
-    def __process_raw_trades(self, raw_trades: list[list[any]], pair: str) -> list[dict]:
+    def __process_raw_trades(self, raw_trades: list[list[Any]], pair: str) -> list[dict]:
         ''' Converts raw trade data into a list of dictionaries matching the Trade model format. '''
         return [
             {
