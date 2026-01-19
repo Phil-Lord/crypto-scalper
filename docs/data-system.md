@@ -34,7 +34,7 @@ utilises a strict separation between **Interfaces** and **Implementations**:
    defining how they work. Consumers of the data system rely solely on these base classes.
 
 2. **Specific Repositories _(The Implementation)_:** These classes implement the Base Repository
-   using a specific **Client**. For example, a `SqlAlchemyTradeRepository` implements the
+   using a specific **Client**. For example, a `SQLAlchemyTradeRepository` implements the
    `TradeRepository` interface using the SQLAlchemy client.
 
 ### Repository Pattern Benefits

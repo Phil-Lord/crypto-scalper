@@ -6,7 +6,7 @@ from data_system.models import Trade
 from .trade_repository import TradeRepository
 
 
-class SqlAlchemyTradeRepository(TradeRepository):
+class SQLAlchemyTradeRepository(TradeRepository):
     def __init__(self, client: SQLAlchemyClient) -> None:
         self.client = client
 

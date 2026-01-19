@@ -18,5 +18,5 @@ from .repositories.bot_tick.supabase_bot_tick_repository import SupabaseBotTickR
 from .repositories.bot_order.bot_order_repository import BotOrderRepository
 from .repositories.bot_order.supabase_bot_order_repository import SupabaseBotOrderRepository
 
-from .repositories.trade.sqlalchemy_trade_repository import SqlAlchemyTradeRepository
+from .repositories.trade.sqlalchemy_trade_repository import SQLAlchemyTradeRepository
 from .repositories.trade.trade_repository import TradeRepository
