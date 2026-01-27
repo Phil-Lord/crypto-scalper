@@ -1,4 +1,6 @@
+-- ============================================================================
 -- PostgreSQL Schema for Live Trading Tables --
+-- ============================================================================
 
 -- Table: bots
 CREATE TABLE bots (
@@ -69,3 +71,31 @@ CREATE TABLE bot_orders (
 
     CONSTRAINT chk_side CHECK (side IN ('buy', 'sell'))
 );
+
+
+-- ============================================================================
+-- SQLite Schema for Backtesting Tables --
+-- ============================================================================
+
+-- Table: trades
+-- Stores historical trade data fetched from Kraken API for backtesting.
+CREATE TABLE trades (
+    -- Composite Primary Key: trade_id is only unique per pair on Kraken
+    trade_id BIGINT NOT NULL,       -- Matches Trade.trade_id (from Kraken API)
+    pair TEXT NOT NULL,             -- Matches Trade.pair (e.g., 'XXBTZGBP')
+
+    -- Trade Data
+    price FLOAT NOT NULL,           -- Matches Trade.price
+    volume FLOAT NOT NULL,          -- Matches Trade.volume
+    timestamp FLOAT NOT NULL,       -- Matches Trade.timestamp (Unix seconds, sub-second precision)
+    side TEXT NOT NULL,             -- Matches Trade.side ('b' = buy, 's' = sell)
+    order_type TEXT NOT NULL,       -- Matches Trade.order_type ('m' = market, 'l' = limit)
+
+    PRIMARY KEY (trade_id, pair)
+);
+
+-- Index: Optimises the most common query pattern (fetching trades for a pair within a time range)
+CREATE INDEX ix_trades_pair_timestamp ON trades (pair, timestamp);
+
+-- Index: Supports queries filtering by pair only (without time constraint)
+CREATE INDEX ix_trades_pair ON trades (pair);

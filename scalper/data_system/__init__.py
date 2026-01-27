@@ -5,6 +5,7 @@ from .models.dataclasses.bot_model import Bot
 from .models.dataclasses.bot_order_model import BotOrder, Side
 from .models.dataclasses.bot_run_model import BotRun
 from .models.dataclasses.bot_tick_model import BotTick, Signal
+from .models.dataclasses.trade_model import Trade
 
 from .repositories.bot.bot_repository import BotRepository
 from .repositories.bot.supabase_bot_repository import SupabaseBotRepository
