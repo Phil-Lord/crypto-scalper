@@ -19,7 +19,7 @@ def fetch_trades(pair: str, start: str, end: str) -> None:
     end_timestamp = get_nano_timestamp(*parse_datetime(end))
 
     trades = connector.fetch(kraken_pair, start_timestamp, end_timestamp)
-    repository.add(trades, kraken_pair)
+    repository.add(trades)
 
 
 if __name__ == '__main__':

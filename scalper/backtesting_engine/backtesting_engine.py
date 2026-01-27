@@ -61,7 +61,11 @@ class BacktestingEngine:
         Load trade data from the database, indexed by timestamp (as millisecond-precise datetimes).
         Then resample into forward-filled ohlc data for each interval.
         '''
-        trades = repository.get(self.pair, self.start, self.end)
+        trade_list = repository.get(self.pair, self.start, self.end)
+        trades = pd.DataFrame([
+            {'timestamp': t.timestamp, 'price': t.price}
+            for t in trade_list
+        ])
         trades["timestamp"] = pd.to_datetime(trades["timestamp"], unit="s")
         trades.set_index("timestamp", inplace=True)
 

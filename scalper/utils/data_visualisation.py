@@ -56,13 +56,27 @@ def plot_line(results: pd.DataFrame, column_name: str, colour: str) -> None:
     plt.plot(results.index, results[column_name], label=column_name, color=colour, linestyle='--')
 
 
-def plot_trade_data_from_db(trades: pd.DataFrame) -> None:
-    trades["timestamp"] = pd.to_datetime(trades["timestamp"], unit="s")
+def plot_trade_data_from_db(trades: list) -> None:
+    '''
+    Plot trade prices over time.
+
+    :param trades: List of objects with .timestamp, .price, .volume, .side attributes.
+    '''
+    trades_df = pd.DataFrame([
+        {
+            'timestamp': t.timestamp,
+            'price': t.price,
+            'volume': t.volume,
+            'side': t.side
+        }
+        for t in trades
+    ])
+    trades_df["timestamp"] = pd.to_datetime(trades_df["timestamp"], unit="s")
 
     plt.figure(figsize=(10, 5))
     plt.plot(
-        trades['timestamp'],
-        trades['price'],
+        trades_df['timestamp'],
+        trades_df['price'],
         label='Trade Price',
         color='blue'
     )

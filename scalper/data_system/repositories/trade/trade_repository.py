@@ -1,27 +1,26 @@
 from abc import ABC, abstractmethod
-from typing import Any
+
+from data_system.models import Trade
 
 
 class TradeRepository(ABC):
     @abstractmethod
-    def add(self, raw_trades: list[list[Any]], pair: str) -> None:
+    def add(self, trades: list[Trade]) -> None:
         '''
-        Inserts a list of trades for a certain pair in their raw format from the Kraken API.
+        Inserts a list of trades into the database.
 
-        :param raw_trades: List of trade lists, e.g. [[price, vol, time, b/s, m/l, misc, id], ...].
-        :param pair: Trading pair identifier, e.g. 'XXBTZGBP'.
+        :param trades: List of Trade domain objects to persist.
         '''
         pass
 
     @abstractmethod
-    def get(self, pair: str, start: int = None, end: int = None) -> list[dict]:
+    def get(self, pair: str, start: float = None, end: float = None) -> list[Trade]:
         '''
-        Fetches trades for a certain pair between a start and end date.
+        Fetches trades for a trading pair within a time range.
 
-        :param pair: Trading pair identifier, e.g. 'XXBTZGBP'.
-        :param start: Start timestamp. If None, fetches from the earliest trade.
-        :param end: End timestamp. If None, fetches up to the latest trade.
-
-        :return: Trades Dataframe.
+        :param pair: Trading pair identifier, e.g., 'XXBTZGBP'.
+        :param start: Start timestamp (Unix seconds). If None, fetches from earliest.
+        :param end: End timestamp (Unix seconds). If None, fetches up to latest.
+        :return: List of Trade domain objects.
         '''
         pass

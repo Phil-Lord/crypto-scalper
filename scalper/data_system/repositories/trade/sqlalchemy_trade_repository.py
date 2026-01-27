@@ -1,7 +1,6 @@
-from typing import Any
+from dataclasses import asdict
 
-import pandas as pd
-from sqlalchemy import func, text
+from sqlalchemy import text
 
 from data_system.clients import SQLAlchemyClient
 from data_system.models import Trade
@@ -12,51 +11,64 @@ class SQLAlchemyTradeRepository(TradeRepository):
     def __init__(self, client: SQLAlchemyClient) -> None:
         self.client = client
 
-    def add(self, raw_trades: list[list[Any]], pair: str) -> None:
-        print(f'Inserting {pair} trades.')
+    def add(self, trades: list[Trade]) -> None:
+        if not trades:
+            return
+
+        print(f'Inserting {len(trades)} trades for {trades[0].pair}.')
         session = self.client.connect()
         try:
-            trades = self.__process_raw_trades(raw_trades, pair)
+            records = [asdict(t) for t in trades]
 
             stmt = text("""
                 INSERT OR IGNORE INTO trades (trade_id, pair, price, volume, timestamp, side, order_type)
                 VALUES (:trade_id, :pair, :price, :volume, :timestamp, :side, :order_type)
             """)
 
-            session.execute(stmt, trades)
+            session.execute(stmt, records)
             session.commit()
         finally:
             session.close()
 
-    def get(self, pair: str, start: int = None, end: int = None) -> list[dict]:
-        print(f'Fetching {pair} trades from {start or 'start'} to {end or 'end'}.')
+    def get(self, pair: str, start: float = None, end: float = None) -> list[Trade]:
         session = self.client.connect()
         try:
-            start = start or session.query(func.min(Trade.timestamp)).filter(
-                Trade.pair == pair).scalar()
-            end = end or session.query(func.max(Trade.timestamp)).filter(
-                Trade.pair == pair).scalar()
+            # Get min/max timestamps if not provided
+            if start is None:
+                start = session.execute(
+                    text("SELECT MIN(timestamp) FROM trades WHERE pair = :pair"),
+                    {"pair": pair}
+                ).scalar()
 
-            query = session.query(Trade).filter(
-                Trade.pair == pair,
-                Trade.timestamp.between(start, end)
-            ).statement
+            if end is None:
+                end = session.execute(
+                    text("SELECT MAX(timestamp) FROM trades WHERE pair = :pair"),
+                    {"pair": pair}
+                ).scalar()
 
-            return pd.read_sql(query, session.bind)
+            print(f'Fetching {pair} trades from {start} to {end}.')
+
+            query = text("""
+                SELECT trade_id, pair, price, volume, timestamp, side, order_type
+                FROM trades
+                WHERE pair = :pair AND timestamp BETWEEN :start AND :end
+                ORDER BY timestamp ASC
+            """)
+
+            result = session.execute(query, {"pair": pair, "start": start, "end": end})
+            rows = result.fetchall()
+
+            return [
+                Trade(
+                    trade_id=row[0],
+                    pair=row[1],
+                    price=row[2],
+                    volume=row[3],
+                    timestamp=row[4],
+                    side=row[5],
+                    order_type=row[6]
+                )
+                for row in rows
+            ]
         finally:
             session.close()
-
-    def __process_raw_trades(self, raw_trades: list[list[Any]], pair: str) -> list[dict]:
-        ''' Converts raw trade data into a list of dictionaries matching the Trade model format. '''
-        return [
-            {
-                'trade_id': int(trade[6]),
-                'pair': pair,
-                'price': float(trade[0]),
-                'volume': float(trade[1]),
-                'timestamp': float(trade[2]),
-                'side': str(trade[3]),
-                'order_type': str(trade[4])
-            }
-            for trade in raw_trades
-        ]
