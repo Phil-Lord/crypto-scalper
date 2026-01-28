@@ -1,5 +1,8 @@
+from contextlib import contextmanager
+from typing import Generator
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 
 from data_system.config import LocalSQLiteConfig
 
@@ -11,8 +14,23 @@ class SQLAlchemyClient():
         self.engine = create_engine(url or LocalSQLiteConfig.SCALPER_DB_URL)
         self.SessionLocal = sessionmaker(bind=self.engine, autoflush=False)
 
-    def connect(self) -> sessionmaker:
-        return self.SessionLocal()
+    @contextmanager
+    def session(self) -> Generator[Session, None, None]:
+        '''
+        Context manager for database sessions.
 
-    def close(self) -> None:
-        self.engine.dispose()
+        Automatically commits on success, rolls back on error, and closes the session.
+
+        Usage:
+            with client.session() as session:
+                session.execute(...)
+        '''
+        session = self.SessionLocal()
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()

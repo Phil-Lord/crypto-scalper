@@ -16,8 +16,7 @@ class SQLAlchemyTradeRepository(TradeRepository):
             return
 
         print(f'Inserting {len(trades)} trades for {trades[0].pair}.')
-        session = self.client.connect()
-        try:
+        with self.client.session() as session:
             records = [asdict(t) for t in trades]
 
             stmt = text("""
@@ -26,13 +25,9 @@ class SQLAlchemyTradeRepository(TradeRepository):
             """)
 
             session.execute(stmt, records)
-            session.commit()
-        finally:
-            session.close()
 
     def get(self, pair: str, start: float = None, end: float = None) -> list[Trade]:
-        session = self.client.connect()
-        try:
+        with self.client.session() as session:
             # Get min/max timestamps if not provided
             if start is None:
                 start = session.execute(
@@ -70,5 +65,3 @@ class SQLAlchemyTradeRepository(TradeRepository):
                 )
                 for row in rows
             ]
-        finally:
-            session.close()
