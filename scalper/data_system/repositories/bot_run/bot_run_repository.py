@@ -15,11 +15,11 @@ class BotRunRepository(ABC):
         pass
 
     @abstractmethod
-    def get(self, id: str) -> BotRun:
+    def get(self, id: str) -> BotRun | None:
         '''
         Fetches a bot run by its ID.
 
         :param id: Bot run ID.
-        :return: The bot run record.
+        :return: The bot run record, or None if not found.
         '''
         pass

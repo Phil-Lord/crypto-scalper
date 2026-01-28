@@ -23,7 +23,7 @@ class SupabaseBotRunRepository(BotRunRepository):
         response = (self.client.table(self.TABLE_NAME).insert(record).execute())
         return BotRun(**response.data[0])
 
-    def get(self, id: str) -> BotRun:
+    def get(self, id: str) -> BotRun | None:
         response = (
             self.client
             .table(self.TABLE_NAME)
@@ -31,4 +31,6 @@ class SupabaseBotRunRepository(BotRunRepository):
             .eq("id", id)
             .execute()
         )
+        if not response.data:
+            return None
         return BotRun(**response.data[0])

@@ -18,7 +18,7 @@ class SupabaseBotRepository(BotRepository):
         response = (self.client.table(self.TABLE_NAME).insert(record).execute())
         return Bot(**response.data[0])
 
-    def get(self, id: str) -> Bot:
+    def get(self, id: str) -> Bot | None:
         response = (
             self.client
             .table(self.TABLE_NAME)
@@ -26,4 +26,6 @@ class SupabaseBotRepository(BotRepository):
             .eq("id", id)
             .execute()
         )
+        if not response.data:
+            return None
         return Bot(**response.data[0])
