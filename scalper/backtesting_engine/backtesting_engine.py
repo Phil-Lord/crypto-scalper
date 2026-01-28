@@ -62,6 +62,10 @@ class BacktestingEngine:
         Then resample into forward-filled ohlc data for each interval.
         '''
         trade_list = repository.get(self.pair, self.start, self.end)
+
+        if not trade_list:
+            raise ValueError(f'No trades found for {self.pair} in the specified time range.')
+
         trades = pd.DataFrame([
             {'timestamp': t.timestamp, 'price': t.price}
             for t in trade_list

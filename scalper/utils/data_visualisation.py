@@ -62,6 +62,10 @@ def plot_trade_data_from_db(trades: list) -> None:
 
     :param trades: List of objects with .timestamp, .price, .volume, .side attributes.
     '''
+    if not trades:
+        print("No trades to plot.")
+        return
+
     trades_df = pd.DataFrame([
         {
             'timestamp': t.timestamp,
