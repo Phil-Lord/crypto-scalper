@@ -1,5 +1,5 @@
-from .dataclasses.bot_model import Bot
-from .dataclasses.bot_order_model import BotOrder, Side
-from .dataclasses.bot_run_model import BotRun
-from .dataclasses.bot_tick_model import BotTick, Signal
-from .dataclasses.trade_model import Trade
+from .bot_model import Bot
+from .bot_order_model import BotOrder, Side
+from .bot_run_model import BotRun
+from .bot_tick_model import BotTick, Signal
+from .trade_model import Trade
