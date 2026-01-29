@@ -99,3 +99,17 @@ CREATE INDEX ix_trades_pair_timestamp ON trades (pair, timestamp);
 
 -- Index: Supports queries filtering by pair only (without time constraint)
 CREATE INDEX ix_trades_pair ON trades (pair);
+
+
+-- Table: generalisation_evaluation
+-- Stores results of evaluating Optuna trial parameters across time windows.
+CREATE TABLE generalisation_evaluation (
+    study_name TEXT NOT NULL,           -- Matches GeneralisationEvaluation.study_name
+    trial_number INTEGER NOT NULL,      -- Matches GeneralisationEvaluation.trial_number
+    start_timestamp REAL NOT NULL,      -- Matches GeneralisationEvaluation.start_timestamp
+    end_timestamp REAL NOT NULL,        -- Matches GeneralisationEvaluation.end_timestamp
+    final_balance REAL,                 -- Matches GeneralisationEvaluation.final_balance (nullable)
+    geo_mean_return REAL,               -- Matches GeneralisationEvaluation.geo_mean_return (nullable)
+
+    PRIMARY KEY (study_name, trial_number, start_timestamp, end_timestamp)
+);

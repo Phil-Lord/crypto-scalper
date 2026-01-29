@@ -5,6 +5,7 @@ from .models.bot_model import Bot
 from .models.bot_order_model import BotOrder, Side
 from .models.bot_run_model import BotRun
 from .models.bot_tick_model import BotTick, Signal
+from .models.generalisation_evaluation_model import GeneralisationEvaluation
 from .models.trade_model import Trade
 
 from .repositories.bot.bot_repository import BotRepository
@@ -18,6 +19,9 @@ from .repositories.bot_tick.supabase_bot_tick_repository import SupabaseBotTickR
 
 from .repositories.bot_order.bot_order_repository import BotOrderRepository
 from .repositories.bot_order.supabase_bot_order_repository import SupabaseBotOrderRepository
+
+from .repositories.generalisation_evaluation.generalisation_evaluation_repository import GeneralisationEvaluationRepository
+from .repositories.generalisation_evaluation.sqlalchemy_generalisation_evaluation_repository import SQLAlchemyGeneralisationEvaluationRepository
 
 from .repositories.trade.sqlalchemy_trade_repository import SQLAlchemyTradeRepository
 from .repositories.trade.trade_repository import TradeRepository

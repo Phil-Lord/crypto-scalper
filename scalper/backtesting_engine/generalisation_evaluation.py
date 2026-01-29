@@ -1,13 +1,19 @@
 import optuna
 import pandas as pd
-import sqlite3
 from tqdm import tqdm
 
 from .backtesting_engine import BacktestingEngine
 from .objective import run_strategy_on_window
 from .parameter_optimisation import create_windows
+from data_system import (
+    GeneralisationEvaluation,
+    GeneralisationEvaluationRepository,
+    SQLAlchemyClient,
+    SQLAlchemyGeneralisationEvaluationRepository,
+    SQLAlchemyTradeRepository
+)
 from strategy_manager import StrategyManager
-from utils import GEN_EVAL_DB_PATH, OPTUNA_DB_URL
+from utils import OPTUNA_DB_URL
 
 
 INITIAL_BALANCE = 1000
@@ -15,7 +21,12 @@ INITIAL_BALANCE = 1000
 
 def find_params(study_name: str, num_sets: int, start: float, end: float) -> None:
     study = load_study(study_name)
-    evaluated_trials = get_evaluted_trials(study_name, start, end)
+
+    client = SQLAlchemyClient()
+    eval_repo = SQLAlchemyGeneralisationEvaluationRepository(client)
+    trade_repo = SQLAlchemyTradeRepository(client)
+
+    evaluated_trials = eval_repo.get_evaluated_trial_numbers(study_name, start, end)
     top_param_sets = get_top_param_sets(study, num_sets, evaluated_trials)
     if len(top_param_sets) == 0:
         return
@@ -23,6 +34,7 @@ def find_params(study_name: str, num_sets: int, start: float, end: float) -> Non
     engine = BacktestingEngine(
         pair='XXBTZGBP',
         strategy_name='PrecisionTrendStrategy',
+        repository=trade_repo,
         start=start,
         end=end,
         interval=1,
@@ -32,7 +44,7 @@ def find_params(study_name: str, num_sets: int, start: float, end: float) -> Non
 
     windows = create_windows(start, end)
     results = run_evaluation(engine, top_param_sets, windows)
-    save_results_to_db(results, study_name, start, end)
+    save_results(eval_repo, results, study_name, start, end)
 
 
 def load_study(study_name: str) -> optuna.Study:
@@ -48,23 +60,6 @@ def load_study(study_name: str) -> optuna.Study:
         }
     )
     return optuna.load_study(study_name=study_name, storage=storage)
-
-
-def get_evaluted_trials(study_name: str, start: float, end: float) -> set[int]:
-    conn = sqlite3.connect(GEN_EVAL_DB_PATH)
-    cursor = conn.cursor()
-    create_table(cursor)
-
-    query = '''
-        SELECT trial_number FROM generalisation_evaluation
-        WHERE study_name = ? AND start_timestamp = ? AND end_timestamp = ?
-    '''
-    cursor.execute(query, (study_name, start, end))
-    rows = cursor.fetchall()
-    conn.close()
-
-    evaluated_trials = {row[0] for row in rows}
-    return evaluated_trials
 
 
 def get_top_param_sets(study: optuna.Study, n: int, evaluated_trials: set[int]) -> list[dict]:
@@ -118,43 +113,22 @@ def run_evaluation(engine: BacktestingEngine, top_param_sets: list[dict], window
     return results
 
 
-def save_results_to_db(results: list[dict], study_name: str, start: float, end: float) -> None:
-    conn = sqlite3.connect(GEN_EVAL_DB_PATH)
-    cursor = conn.cursor()
-    create_table(cursor)
-
-    query = '''
-        INSERT OR REPLACE INTO generalisation_evaluation (
-            study_name, trial_number, start_timestamp, end_timestamp, final_balance, geo_mean_return
-        ) VALUES (?, ?, ?, ?, ?, ?)
-    '''
-    cursor.executemany(
-        query,
-        [
-            (
-                study_name,
-                result['trial_number'],
-                start,
-                end,
-                result.get('final_balance', None),
-                result.get('geo_mean_return', None)
-            )
-            for result in results
-        ]
-    )
-    conn.commit()
-    conn.close()
-
-
-def create_table(cursor: sqlite3.Cursor) -> None:
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS generalisation_evaluation (
-            study_name TEXT,
-            trial_number INTEGER,
-            start_timestamp REAL,
-            end_timestamp REAL,
-            final_balance REAL,
-            geo_mean_return REAL,
-            PRIMARY KEY (study_name, trial_number, start_timestamp, end_timestamp)
+def save_results(
+    repository: GeneralisationEvaluationRepository,
+    results: list[dict],
+    study_name: str,
+    start: float,
+    end: float
+) -> None:
+    evaluations = [
+        GeneralisationEvaluation(
+            study_name=study_name,
+            trial_number=result['trial_number'],
+            start_timestamp=start,
+            end_timestamp=end,
+            final_balance=result.get('final_balance'),
+            geo_mean_return=result.get('geo_mean_return')
         )
-    ''')
+        for result in results
+    ]
+    repository.add(evaluations)
