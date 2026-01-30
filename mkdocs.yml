@@ -18,7 +18,11 @@ theme:
         name: Switch to dark mode
 nav:
   - index.md
-  - data-system.md
+  - Data System:
+      - data-system/index.md
+      - data-system/module-architecture.md
+      - data-system/backends.md
+      - data-system/schema-reference.md
   - parameter-optimisation.md
   - cloud-architecture.md
   - trade-executor.md

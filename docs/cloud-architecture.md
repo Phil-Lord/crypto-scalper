@@ -24,49 +24,37 @@ EventBridge → Lambda → [TradeExecutor](trade-executor.md) → runs 1 interva
 
 ## Database
 
-Supabase (Postgres) stores trading data integrating seemlessly with AWS. The free tier
-(500 MB database, 500 MB RAM, shared CPU) is sufficient for the current usage, and simple API and
-SQL access is provided for both analytics and scalper storage.
+Supabase (PostgreSQL) stores all live trading data, integrating seamlessly with AWS Lambda. The
+free tier (500 MB database, 500 MB RAM, shared CPU) is sufficient for current usage.
 
-The `interval_results` table is used to store results following each live trading interval. The
-client configuration and service for the table is stored within the [Data System](data-system.md) module. For
-each interval, the [TradeExecutor](trade-executor.md) instance uses its [IntervalContext](trade-executor.md#interval-context-object)
-to load any required state from the `interval_results` table before running the strategy and save
-its results afterwards. The table below shows the fields for the `interval_results` table.
+### Data Model
 
-| Column             | Description                            | Type                       |
-| ------------------ | -------------------------------------- | -------------------------- |
-| `id`               | UUID or serial PK                      | uuid / bigint              |
-| `bot_id`           | Unique identifier for the bot instance | text                       |
-| `timestamp`        | UTC interval start timestamp           | timestamp (with time zone) |
-| `strategy_name`    | Strategy name                          | text                       |
-| `pair`             | Trading pair (e.g., BTC/GBP)           | text                       |
-| `price`            | Market price used                      | decimal                    |
-| `signal`           | 'buy' / 'sell' / 'hold'                | text                       |
-| `base_balance`     | At start or end of interval            | decimal                    |
-| `quote_balance`    | Same                                   | decimal                    |
-| `order_executed`   | Bool                                   | boolean                    |
-| `execution_price`  | Nullable                               | decimal (nullable)         |
-| `execution_volume` | Nullable                               | decimal (nullable)         |
-| `notes`            | Optional diagnostic text               | text (nullable)            |
+The live trading database follows a clear hierarchy:
 
-To enable the running of multiple scalper instances concurrently, we use a uniqueness constraint
-on the `bot_id` and `timestamp` fields. This prevents race conditions where the same bot writes
-two rows for the same timestamp. The `bot_id` format is PAIR_INTERVAL_VERSION, i.e. `btc_1m_v1`.
-This format is predictable and makes querying easy, for example:
-
-```sql
--- It's easy to select by human-readable bot_id:
-SELECT * FROM interval_results WHERE bot_id='btc_1m_v1'
-
--- We can compare bots by strategy:
-SELECT * FROM interval_results
-WHERE bot_id LIKE 'btc_%'
-AND strategy_name = 'PrecisionTrend'
-
--- We can compare bots for a specific coin and interval:
-SELECT * FROM interval_results WHERE bot_id LIKE 'btc_1m_%'
 ```
+bots (1) ──► bot_runs (many) ──► bot_ticks (many)
+                              └─► bot_orders (many)
+```
+
+| Table        | Purpose                                                   |
+| ------------ | --------------------------------------------------------- |
+| `bots`       | Configuration identity (pair, strategy, version, params)  |
+| `bot_runs`   | Execution sessions (when a bot is "turned on")            |
+| `bot_ticks`  | Granular interval results (the immutable decision record) |
+| `bot_orders` | Executed trades linked to their triggering tick           |
+
+This separation provides:
+
+- **Relational Integrity:** Query exactly which configuration produced which result.
+- **Performance:** Indexed `run_id` lookups remain fast even with millions of ticks.
+- **Data Deduplication:** Strategy name and pair stored once in `bots`, not every tick.
+
+The `bot_id` format (`btc_1m_v1`) acts as **configuration-level identity**, while `run_id` provides
+**execution session identity** - enabling bot reuse across restarts and long-term performance
+tracking per configuration.
+
+> For detailed schema definitions, indexes, and constraints, see the
+> [Schema Reference](data-system/schema-reference.md) documentation.
 
 ## Container-based Deployment
 
