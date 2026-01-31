@@ -1,6 +1,10 @@
+from contextlib import contextmanager
+from unittest.mock import MagicMock
+
 import pytest
 
 from data_system.clients.sqlalchemy_client import SQLAlchemyClient
+from data_system.models.generalisation_evaluation_model import GeneralisationEvaluation
 from data_system.repositories.generalisation_evaluation.sqlalchemy_generalisation_evaluation_repository import (
     SQLAlchemyGeneralisationEvaluationRepository,
 )
@@ -11,11 +15,34 @@ from data_system.repositories.generalisation_evaluation.sqlalchemy_generalisatio
 @pytest.mark.sqlalchemy_generalisation_evaluation_repository
 class TestSQLAlchemyGeneralisationEvaluationRepository:
     @pytest.fixture
-    def mock_client(self, mocker):
-        return mocker.MagicMock(spec=SQLAlchemyClient)
+    def mock_session(self, mocker):
+        return mocker.MagicMock()
 
-    def test_add_with_empty_list_does_nothing(self, mock_client):
+    @pytest.fixture
+    def mock_client(self, mocker, mock_session):
+        client = mocker.MagicMock(spec=SQLAlchemyClient)
+
+        @contextmanager
+        def session_context():
+            yield mock_session
+
+        client.session = session_context
+        return client
+
+    @pytest.fixture
+    def sample_evaluation(self) -> GeneralisationEvaluation:
+        return GeneralisationEvaluation(
+            study_name='test_study',
+            trial_number=1,
+            start_timestamp=1704067200.0,
+            end_timestamp=1704153600.0,
+            final_balance=1050.50,
+            geo_mean_return=1.0025
+        )
+
+    def test_add_with_empty_list_does_nothing(self, mocker):
         # Given
+        mock_client = mocker.MagicMock(spec=SQLAlchemyClient)
         repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
 
         # When
@@ -23,3 +50,105 @@ class TestSQLAlchemyGeneralisationEvaluationRepository:
 
         # Then
         mock_client.session.assert_not_called()
+
+    def test_add_inserts_evaluations(self, mock_client, mock_session, sample_evaluation: GeneralisationEvaluation):
+        # Given
+        repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
+
+        # When
+        repository.add([sample_evaluation])
+
+        # Then
+        mock_session.execute.assert_called_once()
+
+    def test_add_passes_correct_records_to_execute(self, mock_client, mock_session, sample_evaluation: GeneralisationEvaluation):
+        # Given
+        repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
+
+        # When
+        repository.add([sample_evaluation])
+
+        # Then
+        call_args = mock_session.execute.call_args
+        records = call_args[0][1]
+        assert len(records) == 1
+        assert records[0]['study_name'] == sample_evaluation.study_name
+        assert records[0]['trial_number'] == sample_evaluation.trial_number
+
+    def test_add_handles_multiple_evaluations(self, mock_client, mock_session):
+        # Given
+        evaluations = [
+            GeneralisationEvaluation(
+                study_name='test_study',
+                trial_number=i,
+                start_timestamp=1704067200.0,
+                end_timestamp=1704153600.0
+            )
+            for i in range(3)
+        ]
+        repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
+
+        # When
+        repository.add(evaluations)
+
+        # Then
+        call_args = mock_session.execute.call_args
+        records = call_args[0][1]
+        assert len(records) == 3
+        assert records[0]['trial_number'] == 0
+        assert records[1]['trial_number'] == 1
+        assert records[2]['trial_number'] == 2
+
+    def test_get_evaluated_trial_numbers_returns_empty_set_when_no_results(self, mock_client, mock_session):
+        # Given
+        mock_result = MagicMock()
+        mock_result.fetchall.return_value = []
+        mock_session.execute.return_value = mock_result
+        repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
+
+        # When
+        result = repository.get_evaluated_trial_numbers(
+            study_name='test_study',
+            start=1704067200.0,
+            end=1704153600.0
+        )
+
+        # Then
+        assert result == set()
+
+    def test_get_evaluated_trial_numbers_returns_trial_numbers(self, mock_client, mock_session):
+        # Given
+        mock_result = MagicMock()
+        mock_result.fetchall.return_value = [(1,), (2,), (5,)]
+        mock_session.execute.return_value = mock_result
+        repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
+
+        # When
+        result = repository.get_evaluated_trial_numbers(
+            study_name='test_study',
+            start=1704067200.0,
+            end=1704153600.0
+        )
+
+        # Then
+        assert result == {1, 2, 5}
+
+    def test_get_evaluated_trial_numbers_passes_correct_params(self, mock_client, mock_session):
+        # Given
+        mock_result = MagicMock()
+        mock_result.fetchall.return_value = []
+        mock_session.execute.return_value = mock_result
+        repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
+        study_name = 'my_study'
+        start = 1704067200.0
+        end = 1704153600.0
+
+        # When
+        repository.get_evaluated_trial_numbers(study_name, start, end)
+
+        # Then
+        call_args = mock_session.execute.call_args
+        params = call_args[0][1]
+        assert params['study_name'] == study_name
+        assert params['start'] == start
+        assert params['end'] == end

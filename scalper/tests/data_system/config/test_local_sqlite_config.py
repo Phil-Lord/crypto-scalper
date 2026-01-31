@@ -14,3 +14,18 @@ class TestLocalSQLiteConfig:
         # Then
         assert url.startswith('sqlite:///')
         assert 'scalper.db' in url
+
+    def test_local_storage_path_exists(self):
+        # When
+        path = LocalSQLiteConfig.LOCAL_STORAGE_PATH
+
+        # Then
+        assert path is not None
+        assert 'local_storage' in str(path)
+
+    def test_local_storage_path_is_under_scalper(self):
+        # When
+        path = LocalSQLiteConfig.LOCAL_STORAGE_PATH
+
+        # Then
+        assert 'scalper' in str(path)
