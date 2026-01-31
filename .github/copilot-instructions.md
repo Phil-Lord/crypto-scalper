@@ -301,6 +301,7 @@ def sample_trade(self) -> Trade:
 | Model file  | `{entity}_model.py` | `bot_tick_model.py`    |
 | Test file   | `test_{module}.py`  | `test_trade_model.py`  |
 | Config file | `{context}_config.py` | `supabase_config.py` |
+| Script file | `{action}_{target}.py` | `fetch_trades.py`    |
 
 ### Module Exports (`__init__.py`)
 
@@ -309,6 +310,64 @@ Export the public API explicitly:
 ```python
 from .models.bot_model import Bot
 from .models.trade_model import Trade
+```
+
+### Scripts (`scalper/scripts/`)
+
+Standalone scripts for local testing and manual operations live in `scalper/scripts/`. These are
+entry points for testing implementations, not production code. Examples:
+
+- `fetch_trades.py` — Fetch trade data from Kraken
+- `run_backtest.py` — Run a backtest locally
+- `start_scalping.py` — Start live trading
+
+Scripts don't require unit tests but may require clear docstrings explaining usage.
+
+#### Script Structure
+
+Use **Click** for command-line interfaces:
+
+```python
+import click
+
+@click.command()
+@click.option('--pair', '-p', required=True, help='Trading pair (e.g. BTCGBP)')
+@click.option('--start', '-s', required=True, help='Start timestamp (e.g. 2025-1-1-0-0-0)')
+def fetch_trades(pair: str, start: str) -> None:
+    '''Fetch trades from the exchange and store locally.'''
+    # Implementation...
+
+if __name__ == '__main__':
+    fetch_trades()
+```
+
+#### Script Conventions
+
+- **CLI with Click** — Use `@click.command()` and `@click.option()` for arguments
+- **Short flags** — Provide `-p` style shortcuts for common options
+- **Helper functions** — Extract logic into helper functions for readability
+- **Entry point guard** — Always use `if __name__ == '__main__':`
+
+For complex scripts, break into helper functions:
+
+```python
+@click.command()
+@click.option('--pair', '-p', required=True)
+def run_backtest(pair: str) -> None:
+    '''Run a backtest on the specified trading pair.'''
+    engine = create_engine(pair)
+    results = engine.run()
+    output_results(results)
+
+
+def create_engine(pair: str) -> BacktestingEngine:
+    '''Create a backtesting engine with default configuration.'''
+    # Setup logic...
+
+
+def output_results(results: pd.DataFrame) -> None:
+    '''Display and plot backtest results.'''
+    # Output logic...
 ```
 
 ---
