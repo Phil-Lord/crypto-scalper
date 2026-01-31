@@ -1,0 +1,494 @@
+# Copilot Instructions
+
+These instructions guide AI agents working on the `crypto-scalper` project. Standards are derived
+from the Data System module—the project's reference implementation.
+
+---
+
+## Project Overview
+
+A cryptocurrency scalping bot with:
+
+- **Backtesting Engine** — Local parameter optimisation using Optuna
+- **Data System** — Multi-backend storage (SQLAlchemy/SQLite + Supabase/PostgreSQL)
+- **Exchange Connector** — Kraken API integration
+- **Strategy Manager** — Trading strategy implementations
+- **Trade Executor** — Live trading execution
+
+---
+
+# Part 1: Universal Standards
+
+These standards apply to **all code** in the project.
+
+---
+
+## Python Style
+
+### Language Version
+
+- **Python 3.12+** — Use modern syntax throughout
+- Use `str | None` not `Optional[str]`
+- Use `list[Trade]` not `List[Trade]`
+
+### Formatting
+
+- **PEP 8** with 100-character line limit
+- **Single quotes** for strings, even docstrings
+- **Trailing commas** in multi-line collections
+- **No unused imports** — Keep imports minimal and organised
+
+### Imports
+
+Organise imports in this order, separated by blank lines:
+
+1. Standard library
+2. Third-party packages
+3. Local modules (relative imports within a module, absolute for cross-module)
+
+```python
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+
+import pytest
+
+from data_system.models import Trade
+from .trade_repository import TradeRepository
+```
+
+### Type Hints
+
+Always use type hints for function signatures:
+
+```python
+def get(self, pair: str, start: float = None, end: float = None) -> list[Trade]:
+```
+
+---
+
+## Models & Data Structures
+
+### Dataclass Conventions
+
+Domain models should be **frozen dataclasses**:
+
+```python
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+
+
+@dataclass(frozen=True)
+class Bot:
+    '''
+    Dataclass representing a trading bot configuration.
+
+    Attributes:
+        id (str): Human-readable unique identifier for the bot, e.g., `btc_1m_001`.
+        pair (str): Trading pair in Kraken format, e.g., `XXBTZGBP`.
+    '''
+    id: str
+    pair: str
+    strategy_name: str
+    interval: int
+    parameters: dict[str, Any]
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+```
+
+Key patterns:
+
+- Use `frozen=True` for immutability
+- Required fields first, optional/defaulted fields last
+- Use `field(default_factory=...)` for mutable defaults
+- Document all attributes in the docstring
+
+### Enums
+
+Use `str, Enum` for string-compatible enums:
+
+```python
+class Signal(str, Enum):
+    BUY = 'buy'
+    HOLD = 'hold'
+    SELL = 'sell'
+```
+
+### Type Choices
+
+| Use Case                 | Type       | Notes                           |
+| ------------------------ | ---------- | ------------------------------- |
+| IDs (exchange)           | `int`      | e.g., `trade_id: int`           |
+| IDs (human-readable)     | `str`      | e.g., `bot_id: 'btc_1m_001'`    |
+| IDs (database-generated) | `UUID`     | e.g., `run_id: UUID`            |
+| Timestamps (Unix)        | `float`    | Sub-second precision            |
+| Timestamps (Datetime)    | `datetime` | Always timezone-aware (UTC)     |
+| Money (backtesting)      | `float`    | Speed over precision            |
+| Money (live trading)     | `Decimal`  | Precision for real transactions |
+
+---
+
+## Documentation
+
+### Docstring Style
+
+Use **reStructuredText** style:
+
+```python
+def get(self, pair: str, start: float = None, end: float = None) -> list[Trade]:
+    '''
+    Fetches trades for a trading pair within a time range.
+
+    :param pair: Trading pair identifier, e.g., 'XXBTZGBP'.
+    :param start: Start timestamp (Unix seconds). If None, fetches from earliest.
+    :param end: End timestamp (Unix seconds). If None, fetches up to latest.
+    :return: List of Trade domain objects.
+    '''
+```
+
+For dataclasses, document attributes in the class docstring:
+
+```python
+@dataclass(frozen=True)
+class Trade:
+    '''
+    Dataclass representing a single trade from the exchange.
+
+    Attributes:
+        trade_id (int): Unique trade identifier from the exchange.
+        pair (str): Trading pair identifier, e.g., 'XXBTZGBP'.
+
+    Note:
+        Primary key is composite (trade_id, pair) since trade IDs are only
+        unique per trading pair on Kraken.
+    '''
+```
+
+### Module Documentation
+
+Create markdown docs in `/docs/` for significant modules:
+
+- `index.md` — Overview and contents table
+- Additional pages as needed for architecture, schemas, etc.
+
+---
+
+## Testing
+
+### Framework & Configuration
+
+- **pytest** with **pytest-mock** for mocking
+- Tests live in `scalper/tests/`, mirroring source structure
+- Python path configured in `pytest.ini`
+
+### Naming Conventions
+
+| Element     | Convention                                | Example                                    |
+| ----------- | ----------------------------------------- | ------------------------------------------ |
+| Test file   | `test_{module}.py`                        | `test_trade_model.py`                      |
+| Test class  | `Test{ClassName}`                         | `TestTrade`                                |
+| Test method | `test_{action}_{condition}_{expectation}` | `test_get_returns_none_when_bot_not_found` |
+
+### Test Structure
+
+Use the **Given/When/Then** pattern with comments:
+
+```python
+def test_add_inserts_trades(self, mock_client, mock_session, sample_trade: Trade):
+    # Given
+    repository = SQLAlchemyTradeRepository(mock_client)
+
+    # When
+    repository.add([sample_trade])
+
+    # Then
+    mock_session.execute.assert_called_once()
+```
+
+For simple tests, `# When / Then` can be combined:
+
+```python
+def test_trade_is_frozen(self, sample_trade_data):
+    # Given
+    trade = Trade(**sample_trade_data)
+
+    # When / Then
+    with pytest.raises(AttributeError):
+        trade.price = 60000.0
+```
+
+### Pytest Markers
+
+Use hierarchical markers for granular test selection:
+
+```python
+@pytest.mark.data_system      # Module level
+@pytest.mark.repositories     # Category level
+@pytest.mark.supabase_bot_repository  # Class level
+class TestSupabaseBotRepository:
+```
+
+Register all markers in `pytest.ini`, and `Makefile` targets for running subsets.
+
+### Fixtures
+
+- Define fixtures in the test class when class-specific
+- Use descriptive names: `sample_trade_data`, `mock_supabase_client`
+- Type hint fixture return values
+
+```python
+@pytest.fixture
+def sample_trade(self) -> Trade:
+    return Trade(
+        trade_id=123456789,
+        pair='XXBTZGBP',
+        price=50000.0,
+        ...
+    )
+```
+
+---
+
+## File & Module Naming
+
+| Type        | Convention          | Example                |
+| ----------- | ------------------- | ---------------------- |
+| Module      | `snake_case/`       | `data_system/`         |
+| Python file | `snake_case.py`     | `trade_repository.py`  |
+| Model file  | `{entity}_model.py` | `bot_tick_model.py`    |
+| Test file   | `test_{module}.py`  | `test_trade_model.py`  |
+| Config file | `{context}_config.py` | `supabase_config.py` |
+
+### Module Exports (`__init__.py`)
+
+Export the public API explicitly:
+
+```python
+from .models.bot_model import Bot
+from .models.trade_model import Trade
+```
+
+---
+
+## Configuration
+
+### Environment Variables
+
+Use the `get_env_var` utility from `utils`:
+
+```python
+from utils import get_env_var
+
+class SupabaseConfig:
+    URL = get_env_var('SUPABASE_URL')
+    KEY = get_env_var('SUPABASE_KEY')
+```
+
+### Config Classes
+
+Configuration classes are simple containers with class attributes:
+
+```python
+class LocalSQLiteConfig:
+    LOCAL_STORAGE_PATH = ROOT_DIR / 'scalper' / 'local_storage'
+    SCALPER_DB_URL = f'sqlite:///{LOCAL_STORAGE_PATH / "scalper.db"}'
+```
+
+---
+
+# Part 2: Architectural Patterns
+
+These patterns apply **when relevant**. Not all modules need all patterns.
+
+---
+
+## Repository Pattern
+
+**When to use:** Modules that need data access with potential for multiple backends.
+
+**Example:** Data System uses repositories to abstract SQLAlchemy vs Supabase.
+
+### Structure
+
+Separate interfaces from implementations:
+
+1. **Base Repository (Interface):** Abstract base class defining the contract
+2. **Specific Repository (Implementation):** Concrete class for a specific backend
+
+```python
+# Interface
+class TradeRepository(ABC):
+    @abstractmethod
+    def add(self, trades: list[Trade]) -> None:
+        pass
+
+# Implementation
+class SQLAlchemyTradeRepository(TradeRepository):
+    def __init__(self, client: SQLAlchemyClient) -> None:
+        self.client = client
+
+    def add(self, trades: list[Trade]) -> None:
+        # Implementation details...
+```
+
+### Naming Convention
+
+`{Backend}{Entity}Repository` — e.g., `SupabaseBotRepository`, `SQLAlchemyTradeRepository`
+
+### File Structure
+
+```
+repositories/
+└── entity/
+    ├── entity_repository.py           # Abstract base class
+    └── backend_entity_repository.py   # Concrete implementation
+```
+
+---
+
+## Dependency Injection
+
+**When to use:** Classes that depend on external services (databases, APIs, clients).
+
+Inject dependencies rather than instantiating them internally:
+
+```python
+# Correct
+def __init__(self, client: SQLAlchemyClient) -> None:
+    self.client = client
+
+# Wrong - don't do this
+def __init__(self) -> None:
+    self.client = SQLAlchemyClient()
+```
+
+---
+
+## Client Abstraction
+
+**When to use:** Wrapping third-party SDKs or managing database connections.
+
+### Context Manager Pattern
+
+For transaction-based clients (e.g., SQLAlchemy):
+
+```python
+@contextmanager
+def session(self) -> Generator[Session, None, None]:
+    session = self.SessionLocal()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+```
+
+### Proxy Pattern
+
+For delegating to underlying clients (e.g., Supabase):
+
+```python
+class SupabaseClient:
+    def __init__(self) -> None:
+        self._client = create_client(SupabaseConfig.URL, SupabaseConfig.KEY)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._client, name)
+```
+
+---
+
+## Layered Module Structure
+
+**When to use:** Complex modules with multiple concerns (data, config, logic).
+
+```
+module_name/
+├── __init__.py          # Public API exports
+├── models/              # Immutable dataclasses
+├── config/              # Environment/settings classes
+├── clients/             # Low-level connectivity
+└── repositories/        # Business logic / CRUD
+```
+
+Simpler modules may only need a flat structure with a few files.
+
+---
+
+# Part 3: Domain Knowledge
+
+Trading-specific conventions for this project.
+
+---
+
+## Trading Pairs
+
+- Use Kraken format: `XXBTZGBP`, `XETHZUSD`
+- Always store in Kraken format for consistency
+
+## Bot IDs
+
+Human-readable format: `{asset}_{interval}_{version}`
+
+- Examples: `btc_1m_001`, `eth_5m_v2`
+
+## Signals vs Sides
+
+- **Signals:** `buy`, `hold`, `sell` — Strategy decisions
+- **Sides:** `buy`, `sell` — Order execution
+- **Legacy sides:** `b`, `s` — Kraken API format for historical trades
+
+---
+
+# Part 4: Database Conventions
+
+Apply when working with database schemas or models that map to tables.
+
+---
+
+## Naming
+
+- **Tables:** Plural, snake_case (`bot_ticks`, `bot_orders`)
+- **Columns:** Singular, snake_case (`balance_base`, `created_at`)
+- **Primary keys:** `id` (or component names for composite keys)
+- **Foreign keys:** `{referenced_table_singular}_id` (e.g., `bot_id`, `run_id`)
+
+## Type Mapping
+
+| Python Type | PostgreSQL       | SQLite      |
+| ----------- | ---------------- | ----------- |
+| `str`       | `TEXT`           | `TEXT`      |
+| `int`       | `INTEGER/BIGINT` | `INTEGER`   |
+| `float`     | `FLOAT/DECIMAL`  | `REAL`      |
+| `datetime`  | `TIMESTAMPTZ`    | N/A         |
+| `UUID`      | `UUID`           | N/A         |
+| `dict`      | `JSONB`          | N/A         |
+| `Decimal`   | `DECIMAL(32,12)` | N/A         |
+
+## Constraints
+
+- Use `CHECK` constraints for enum-like fields
+- Use `ON DELETE CASCADE` for child tables
+- Add indexes for common query patterns
+- Document composite primary keys in model docstrings
+
+---
+
+# Checklists
+
+## New Feature Checklist
+
+- [ ] Models are frozen dataclasses with full docstrings
+- [ ] All methods have type hints
+- [ ] Tests use Given/When/Then structure
+- [ ] Tests have appropriate pytest markers
+- [ ] Markers registered in `pytest.ini`
+- [ ] Public API exported in `__init__.py`
+
+## Repository Pattern Checklist (when applicable)
+
+- [ ] Abstract base class defines the interface
+- [ ] Implementation injected with client (dependency injection)
+- [ ] Naming follows `{Backend}{Entity}Repository`
+- [ ] Both interface and implementation exported
