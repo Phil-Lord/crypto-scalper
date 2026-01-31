@@ -128,9 +128,23 @@ class Signal(str, Enum):
 
 ## Documentation
 
+### When to Write Docstrings
+
+Docstrings are required for:
+
+- **Domain models (dataclasses)** — Document all attributes
+- **Public API functions** — Repository methods, service functions
+- **Complex logic** — Anything non-obvious
+
+Docstrings are NOT required for:
+
+- **Constants and config values** — Self-explanatory by name
+- **Simple utility functions** — If the name and signature are clear
+- **Internal helpers** — Short functions with obvious purpose
+
 ### Docstring Style
 
-Use **reStructuredText** style:
+When writing docstrings, use **reStructuredText** style:
 
 ```python
 def get(self, pair: str, start: float = None, end: float = None) -> list[Trade]:
@@ -226,7 +240,24 @@ Use hierarchical markers for granular test selection:
 class TestSupabaseBotRepository:
 ```
 
-Register all markers in `pytest.ini`, and `Makefile` targets for running subsets.
+Register all markers in `pytest.ini`.
+
+### Makefile Targets
+
+Add `make` targets for running module tests:
+
+```makefile
+# In .PHONY declaration
+.PHONY: test test/utils test/data_system
+
+# Module-level target
+test/utils:
+	pytest -m utils
+
+# Category-level target (for larger modules)
+test/data_system/models:
+	pytest -m "data_system and models"
+```
 
 ### Fixtures
 
