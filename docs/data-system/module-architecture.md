@@ -39,3 +39,31 @@ utilises a strict separation between **Interfaces** and **Implementations**:
 3. **Flexibility:** Database backends can be swapped or migrated without impacting trading logic.
 
 > _Today I store trades in PostgreSQL, tomorrow in Supabase, next week in DuckDB!_
+
+## Getting Started
+
+Here's how to wire up the data system in consuming code:
+
+```python
+# For local backtesting (SQLAlchemy/SQLite)
+from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
+
+client = SQLAlchemyClient()
+trade_repo = SQLAlchemyTradeRepository(client)
+
+# Fetch trades for backtesting
+trades = trade_repo.get(pair='XXBTZGBP', start=1704067200.0, end=1704153600.0)
+```
+
+```python
+# For live trading (Supabase/PostgreSQL)
+from data_system import SupabaseClient, SupabaseBotRepository, SupabaseBotRunRepository
+
+client = SupabaseClient()
+bot_repo = SupabaseBotRepository(client)
+run_repo = SupabaseBotRunRepository(client)
+
+# Create a bot and start a run
+bot = bot_repo.get('btc_1m_v1')
+run = run_repo.add(BotRun(bot_id=bot.id))
+```
