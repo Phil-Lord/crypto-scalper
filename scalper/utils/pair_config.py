@@ -22,7 +22,7 @@ def get_kraken_pair(raw_pair: str) -> str:
     return kraken_pair
 
 
-def get_kraken_pair_symbols(kraken_pair: str) -> dict:
+def get_kraken_pair_symbols(kraken_pair: str) -> dict[str, str]:
     ''' Given a Kraken pair (e.g. 'XXBTZGBP'), return the base and quote symbols. '''
     symbols = kraken_pair_to_symbols.get(kraken_pair, None)
     if symbols is None:

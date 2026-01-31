@@ -86,7 +86,7 @@ def plot_trade_data_from_db(trades: list) -> None:
     )
     plt.xlabel('Time')
     plt.ylabel('Price')
-    plt.title("Trade Prices Over Time")
+    plt.title('Trade Prices Over Time')
     plt.legend()
     plt.grid()
     plt.show()

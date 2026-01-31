@@ -1,8 +1,12 @@
-.PHONY: test test/data_system test/data_system/models test/data_system/repositories test/data_system/config test/data_system/clients
+.PHONY: test test/utils test/data_system test/data_system/models test/data_system/repositories test/data_system/config test/data_system/clients
 
 # Run all tests
 test:
 	pytest
+
+# Run all utils tests
+test/utils:
+	pytest -m utils
 
 # Run all data_system tests
 test/data_system:

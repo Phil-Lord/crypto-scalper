@@ -3,6 +3,7 @@ import pytest
 from utils import parse_datetime, get_nano_timestamp, get_second_timestamp
 
 
+@pytest.mark.utils
 @pytest.mark.timestamp_conversion
 class TestTimestampConversion:
     # --- parse_datetime --- #
