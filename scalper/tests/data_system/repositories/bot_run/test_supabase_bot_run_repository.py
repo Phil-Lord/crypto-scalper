@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -60,7 +60,7 @@ class TestSupabaseBotRunRepository:
         repository = SupabaseBotRunRepository(mock_supabase_client)
 
         # When
-        result = repository.get('nonexistent_run_id')
+        result = repository.get(uuid4())
 
         # Then
         assert result is None
@@ -72,7 +72,7 @@ class TestSupabaseBotRunRepository:
         repository = SupabaseBotRunRepository(mock_supabase_client)
 
         # When
-        result = repository.get(str(sample_run.id))
+        result = repository.get(sample_run.id)
 
         # Then
         assert result is not None
@@ -83,14 +83,14 @@ class TestSupabaseBotRunRepository:
         # Given
         self._set_select_response(mock_supabase_client, [])
         repository = SupabaseBotRunRepository(mock_supabase_client)
-        run_id = 'test_run_id'
+        run_id = uuid4()
 
         # When
         repository.get(run_id)
 
         # Then
         mock_supabase_client.table.return_value.select.return_value.eq.assert_called_once_with(
-            'id', run_id)
+            'id', str(run_id))
 
     def test_add_inserts_run_and_returns_result(self, mock_supabase_client, sample_run: BotRun, mock_response_data: dict):
         # Given

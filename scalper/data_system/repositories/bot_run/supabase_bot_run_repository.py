@@ -25,12 +25,12 @@ class SupabaseBotRunRepository(BotRunRepository):
         response = (self.client.table(self.TABLE_NAME).insert(record).execute())
         return self._to_bot_run(response.data[0])
 
-    def get(self, id: str) -> BotRun | None:
+    def get(self, id: UUID) -> BotRun | None:
         response = (
             self.client
             .table(self.TABLE_NAME)
             .select("*")
-            .eq("id", id)
+            .eq("id", str(id))
             .execute()
         )
         if not response.data:

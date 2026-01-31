@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from uuid import UUID
 
 from data_system.models import BotRun
 
@@ -15,11 +16,11 @@ class BotRunRepository(ABC):
         pass
 
     @abstractmethod
-    def get(self, id: str) -> BotRun | None:
+    def get(self, id: UUID) -> BotRun | None:
         '''
         Fetches a bot run by its ID.
 
-        :param id: Bot run ID.
+        :param id: Bot run UUID.
         :return: The bot run record, or None if not found.
         '''
         pass
