@@ -82,7 +82,9 @@ class TestSQLAlchemyGeneralisationEvaluationRepository:
                 study_name='test_study',
                 trial_number=i,
                 start_timestamp=1704067200.0,
-                end_timestamp=1704153600.0
+                end_timestamp=1704153600.0,
+                final_balance=1050.50 + i,
+                geo_mean_return=1.0025
             )
             for i in range(3)
         ]

@@ -13,10 +13,12 @@ class TestGeneralisationEvaluation:
             'study_name': 'test_study',
             'trial_number': 1,
             'start_timestamp': 1704067200.0,  # 2024-01-01 00:00:00 UTC
-            'end_timestamp': 1704153600.0     # 2024-01-02 00:00:00 UTC
+            'end_timestamp': 1704153600.0,    # 2024-01-02 00:00:00 UTC
+            'final_balance': 1050.50,
+            'geo_mean_return': 1.0025
         }
 
-    def test_creates_evaluation_with_required_fields(self, sample_evaluation_data):
+    def test_creates_evaluation_with_all_fields(self, sample_evaluation_data):
         # When
         evaluation = GeneralisationEvaluation(**sample_evaluation_data)
 
@@ -25,62 +27,30 @@ class TestGeneralisationEvaluation:
         assert evaluation.trial_number == sample_evaluation_data['trial_number']
         assert evaluation.start_timestamp == sample_evaluation_data['start_timestamp']
         assert evaluation.end_timestamp == sample_evaluation_data['end_timestamp']
+        assert evaluation.final_balance == sample_evaluation_data['final_balance']
+        assert evaluation.geo_mean_return == sample_evaluation_data['geo_mean_return']
 
-    def test_final_balance_defaults_to_none(self, sample_evaluation_data):
-        # When
-        evaluation = GeneralisationEvaluation(**sample_evaluation_data)
+    def test_requires_final_balance(self):
+        # When / Then
+        with pytest.raises(TypeError):
+            GeneralisationEvaluation(
+                study_name='test_study',
+                trial_number=1,
+                start_timestamp=1704067200.0,
+                end_timestamp=1704153600.0,
+                geo_mean_return=1.0025
+            )
 
-        # Then
-        assert evaluation.final_balance is None
-
-    def test_geo_mean_return_defaults_to_none(self, sample_evaluation_data):
-        # When
-        evaluation = GeneralisationEvaluation(**sample_evaluation_data)
-
-        # Then
-        assert evaluation.geo_mean_return is None
-
-    def test_creates_evaluation_with_final_balance(self, sample_evaluation_data):
-        # Given
-        final_balance = 1050.50
-
-        # When
-        evaluation = GeneralisationEvaluation(
-            **sample_evaluation_data,
-            final_balance=final_balance
-        )
-
-        # Then
-        assert evaluation.final_balance == final_balance
-
-    def test_creates_evaluation_with_geo_mean_return(self, sample_evaluation_data):
-        # Given
-        geo_mean = 1.0025
-
-        # When
-        evaluation = GeneralisationEvaluation(
-            **sample_evaluation_data,
-            geo_mean_return=geo_mean
-        )
-
-        # Then
-        assert evaluation.geo_mean_return == geo_mean
-
-    def test_creates_evaluation_with_all_optional_fields(self, sample_evaluation_data):
-        # Given
-        final_balance = 1100.00
-        geo_mean = 1.005
-
-        # When
-        evaluation = GeneralisationEvaluation(
-            **sample_evaluation_data,
-            final_balance=final_balance,
-            geo_mean_return=geo_mean
-        )
-
-        # Then
-        assert evaluation.final_balance == final_balance
-        assert evaluation.geo_mean_return == geo_mean
+    def test_requires_geo_mean_return(self):
+        # When / Then
+        with pytest.raises(TypeError):
+            GeneralisationEvaluation(
+                study_name='test_study',
+                trial_number=1,
+                start_timestamp=1704067200.0,
+                end_timestamp=1704153600.0,
+                final_balance=1050.50
+            )
 
     def test_generalisation_evaluation_is_frozen(self, sample_evaluation_data):
         # Given

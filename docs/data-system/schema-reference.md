@@ -95,8 +95,8 @@ Stores out-of-sample evaluation results for Optuna trials.
 | `trial_number`    | INTEGER (CPK) | Trial number within the study  |
 | `start_timestamp` | FLOAT (CPK)   | Evaluation window start        |
 | `end_timestamp`   | FLOAT (CPK)   | Evaluation window end          |
-| `final_balance`   | FLOAT         | Final balance after evaluation |
-| `geo_mean_return` | FLOAT         | Geometric mean return          |
+| `final_balance`   | FLOAT NOT NULL | Final balance after evaluation |
+| `geo_mean_return` | FLOAT NOT NULL | Geometric mean return          |
 
 ---
 

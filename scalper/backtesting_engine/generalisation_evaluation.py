@@ -126,8 +126,8 @@ def save_results(
             trial_number=result['trial_number'],
             start_timestamp=start,
             end_timestamp=end,
-            final_balance=result.get('final_balance'),
-            geo_mean_return=result.get('geo_mean_return')
+            final_balance=result['final_balance'],
+            geo_mean_return=result['geo_mean_return']
         )
         for result in results
     ]

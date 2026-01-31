@@ -108,8 +108,8 @@ CREATE TABLE generalisation_evaluation (
     trial_number INTEGER NOT NULL,      -- Matches GeneralisationEvaluation.trial_number
     start_timestamp REAL NOT NULL,      -- Matches GeneralisationEvaluation.start_timestamp
     end_timestamp REAL NOT NULL,        -- Matches GeneralisationEvaluation.end_timestamp
-    final_balance REAL,                 -- Matches GeneralisationEvaluation.final_balance (nullable)
-    geo_mean_return REAL,               -- Matches GeneralisationEvaluation.geo_mean_return (nullable)
+    final_balance REAL NOT NULL,        -- Matches GeneralisationEvaluation.final_balance
+    geo_mean_return REAL NOT NULL,      -- Matches GeneralisationEvaluation.geo_mean_return
 
     PRIMARY KEY (study_name, trial_number, start_timestamp, end_timestamp)
 );
