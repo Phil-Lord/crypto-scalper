@@ -183,6 +183,15 @@ Create markdown docs in `/docs/` for significant modules:
 - `index.md` — Overview and contents table
 - Additional pages as needed for architecture, schemas, etc.
 
+### Architecture Decision Log
+
+Record non-obvious architectural decisions in `/docs/architecture-decision-log.md`. Add an entry
+when:
+
+- The decision isn't clear from the code itself
+- Future-you might ask *"why did I do it this way?"*
+- There were trade-offs worth documenting
+
 ### Prompt Files
 
 Reusable prompts live in `.github/prompts/`. When a task becomes repeatable (e.g., auditing
@@ -520,6 +529,7 @@ Apply when working with database schemas or models that map to tables.
 - [ ] Tests use Given/When/Then structure
 - [ ] Tests have appropriate pytest markers
 - [ ] Markers registered in `pytest.ini`
+- [ ] Makefile target added for new module tests
 - [ ] Public API exported in `__init__.py`
 
 ## Repository Pattern Checklist (when applicable)

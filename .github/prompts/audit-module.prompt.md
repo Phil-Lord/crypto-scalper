@@ -27,6 +27,11 @@ Audit the specified module against the project's copilot-instructions.md standar
 - [ ] **Dependency injection** — If external service dependencies
 - [ ] **Client abstraction** — If wrapping third-party SDKs
 
+### Architecture Decision Log
+
+- [ ] **Check existing decisions** — Review `/docs/architecture-decision-log.md` for relevant context
+- [ ] **Flag new decisions** — Note any non-obvious decisions that should be logged
+
 ### Output Format
 
 Provide:
