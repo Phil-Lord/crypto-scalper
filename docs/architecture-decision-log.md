@@ -1,50 +1,48 @@
 # Architecture Decision Log
 
-This document captures important architectural decisions (ADs) and their context and consequences.
-This is primarily so I don't forget **_why_** I did something.
+This document captures architectural decisions that aren't immediately obvious from the code.
+Record decisions here when future-you might ask _"why did I do it this way?"_.
 
-## System-wide Decisions
+---
 
-### Datetime Precision
+## System-wide
 
-#### Decision
+| Decision                                    | Rationale                                                                                                                    |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Use `datetime` (not `float`) for timestamps | Human-readable when debugging; PostgreSQL `TIMESTAMPTZ` has powerful time functions; Python `datetime` can be timezone-aware |
+| Always use timezone-aware UTC               | Avoids ambiguity; consistent across systems; required for `TIMESTAMPTZ`                                                      |
+| Use `Decimal` for live trading money        | Precision matters for real transactions; `float` is fine for backtesting where speed > precision                             |
 
-- The Python `datetime` type is precise enough for timestamps.
+---
 
-#### Reasoning
+## Data System
 
-- `datetime` is precise to the microsecond ($10^{-6}$ seconds).
-- For example, 12:00:00.123456 (resolves to 0.000001 seconds).
-- PostgreSQL `TIMESTAMPTZ` also resolves to microseconds by default, making a 1:1 map.
-- We will be limited by the speed of light (internet latency), not timestamp precision.
+| Decision                                             | Rationale                                                                                                                                   |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Denormalise `bot_id` on `bot_ticks`                  | Read performance is critical for time-series data; avoids JOIN on `bot_runs` for common query _"all ticks for bot X"_; enables partitioning |
+| Composite primary key `(trade_id, pair)` on `trades` | Kraken trade IDs are only unique within a trading pair                                                                                      |
+| Dual backend (SQLite + PostgreSQL)                   | SQLite for fast local backtesting; PostgreSQL/Supabase for durable cloud storage and Lambda integration                                     |
 
-### Timestamp Type
+---
 
-#### Decision
+## Trade Executor
 
-- We should store timestamps as Timezone-Aware UTC `datetime` objects in code and database.
+| Decision     | Rationale |
+| ------------ | --------- |
+| _(None yet)_ |           |
 
-#### Reasoning
+---
 
-- The 3 AM Test - If the bot crashes, copying 1735689600 into a converter is unideal.
-- SQL DBs, including PostgreSQL, have powerful time-based functions for TIMESTAMP columns.
-- Python's `datetime` objects can be "aware" (contain timezone info), `float`/`int` cannot.
+## Backtesting Engine
 
-## Data System Decisions
+| Decision     | Rationale |
+| ------------ | --------- |
+| _(None yet)_ |           |
 
-### Having the `bot_id` column on `bot_ticks`
+---
 
-#### Decision
+## Strategy Manager
 
-- We should keep the `bot_id` column on the `bot_ticks` table, even though it's denormalised.
-
-#### Reasoning
-
-- For time-series data (trading ticks), **read performance** is king.
-- **Denormalisation** is standard best practice for read performance.
-- Without denormalisation, getting _"All ticks for Bot X"_ involves a JOIN on bot_runs - slow!
-- We'll have duplicate data, but we can partition (Postgres requires the key's presence).
-
-## Trade Executor Decisions
-
-## Backtesting Engine Decisions
+| Decision     | Rationale |
+| ------------ | --------- |
+| _(None yet)_ |           |
