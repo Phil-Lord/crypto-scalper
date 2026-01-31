@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from datetime import datetime
 
 from supabase import Client
 
@@ -16,7 +17,7 @@ class SupabaseBotRepository(BotRepository):
         record = asdict(bot)
         record['created_at'] = bot.created_at.isoformat()
         response = (self.client.table(self.TABLE_NAME).insert(record).execute())
-        return Bot(**response.data[0])
+        return self._to_bot(response.data[0])
 
     def get(self, id: str) -> Bot | None:
         response = (
@@ -28,4 +29,8 @@ class SupabaseBotRepository(BotRepository):
         )
         if not response.data:
             return None
-        return Bot(**response.data[0])
+        return self._to_bot(response.data[0])
+
+    def _to_bot(self, data: dict) -> Bot:
+        data['created_at'] = datetime.fromisoformat(data['created_at'])
+        return Bot(**data)

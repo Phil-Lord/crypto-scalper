@@ -1,8 +1,12 @@
 from dataclasses import asdict
+from datetime import datetime
+from decimal import Decimal
+from uuid import UUID
 
 from supabase import Client
 
 from data_system.models import BotOrder
+from data_system.models.bot_order_model import Side
 from .bot_order_repository import BotOrderRepository
 
 
@@ -20,7 +24,7 @@ class SupabaseBotOrderRepository(BotOrderRepository):
         record['executed_at'] = bot_order.executed_at.isoformat()
 
         response = (self.client.table(self.TABLE_NAME).insert(record).execute())
-        return BotOrder(**response.data[0])
+        return self._to_bot_order(response.data[0])
 
     def get_by_bot_id(self, bot_id: str) -> list[BotOrder]:
         response = (
@@ -31,4 +35,13 @@ class SupabaseBotOrderRepository(BotOrderRepository):
             .order("executed_at", desc=True)
             .execute()
         )
-        return [BotOrder(**row) for row in response.data]
+        return [self._to_bot_order(row) for row in response.data]
+
+    def _to_bot_order(self, data: dict) -> BotOrder:
+        data['id'] = UUID(data['id'])
+        data['run_id'] = UUID(data['run_id'])
+        data['executed_at'] = datetime.fromisoformat(data['executed_at'])
+        data['price'] = Decimal(data['price'])
+        data['fee'] = Decimal(data['fee'])
+        data['side'] = Side(data['side'])
+        return BotOrder(**data)

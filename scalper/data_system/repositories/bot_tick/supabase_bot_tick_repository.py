@@ -1,8 +1,12 @@
 from dataclasses import asdict
+from datetime import datetime
+from decimal import Decimal
+from uuid import UUID
 
 from supabase import Client
 
 from data_system.models import BotTick
+from data_system.models.bot_tick_model import Signal
 from .bot_tick_repository import BotTickRepository
 
 
@@ -19,7 +23,7 @@ class SupabaseBotTickRepository(BotTickRepository):
         record['timestamp'] = bot_tick.timestamp.isoformat()  # Convert datetime to ISO format
 
         response = (self.client.table(self.TABLE_NAME).insert(record).execute())
-        return BotTick(**response.data[0])
+        return self._to_bot_tick(response.data[0])
 
     def get_by_bot_id(self, bot_id: str) -> list[BotTick]:
         response = (
@@ -30,4 +34,13 @@ class SupabaseBotTickRepository(BotTickRepository):
             .order("timestamp", desc=True)
             .execute()
         )
-        return [BotTick(**row) for row in response.data]
+        return [self._to_bot_tick(row) for row in response.data]
+
+    def _to_bot_tick(self, data: dict) -> BotTick:
+        data['run_id'] = UUID(data['run_id'])
+        data['timestamp'] = datetime.fromisoformat(data['timestamp'])
+        data['price'] = Decimal(data['price'])
+        data['balance_base'] = Decimal(data['balance_base'])
+        data['balance_quote'] = Decimal(data['balance_quote'])
+        data['signal'] = Signal(data['signal'])
+        return BotTick(**data)

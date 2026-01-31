@@ -1,4 +1,6 @@
 from dataclasses import asdict
+from datetime import datetime
+from uuid import UUID
 
 from supabase import Client
 
@@ -21,7 +23,7 @@ class SupabaseBotRunRepository(BotRunRepository):
             record['completed_at'] = bot_run.completed_at.isoformat()
 
         response = (self.client.table(self.TABLE_NAME).insert(record).execute())
-        return BotRun(**response.data[0])
+        return self._to_bot_run(response.data[0])
 
     def get(self, id: str) -> BotRun | None:
         response = (
@@ -33,4 +35,11 @@ class SupabaseBotRunRepository(BotRunRepository):
         )
         if not response.data:
             return None
-        return BotRun(**response.data[0])
+        return self._to_bot_run(response.data[0])
+
+    def _to_bot_run(self, data: dict) -> BotRun:
+        data['id'] = UUID(data['id'])
+        data['started_at'] = datetime.fromisoformat(data['started_at'])
+        if data.get('completed_at'):
+            data['completed_at'] = datetime.fromisoformat(data['completed_at'])
+        return BotRun(**data)
