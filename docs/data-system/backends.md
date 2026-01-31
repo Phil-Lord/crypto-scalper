@@ -37,6 +37,9 @@ client = SupabaseClient()  # Handles config internally
 client.table("bots").select("*").execute()  # Direct access to Supabase API
 ```
 
+> **Note:** The proxy pattern provides simpler instantiation but means IDE autocomplete and type
+> checking are not available for delegated methods on `SupabaseClient`.
+
 ## Environment Configuration
 
 | Config Class        | Source                                                 | Usage                         |

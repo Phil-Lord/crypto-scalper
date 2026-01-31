@@ -11,6 +11,9 @@ class SupabaseClient:
 
     Uses the proxy pattern to delegate all method calls to the underlying Client,
     allowing consumers to use it directly: `client = SupabaseClient()`.
+
+    Note: The proxy pattern means IDE autocomplete and type checking are not
+    available for delegated methods. This is a trade-off for simpler instantiation.
     '''
 
     _client: Client
