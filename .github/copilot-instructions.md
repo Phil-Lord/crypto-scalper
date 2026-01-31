@@ -183,6 +183,11 @@ Create markdown docs in `/docs/` for significant modules:
 - `index.md` — Overview and contents table
 - Additional pages as needed for architecture, schemas, etc.
 
+### Prompt Files
+
+Reusable prompts live in `.github/prompts/`. When a task becomes repeatable (e.g., auditing
+modules, adding strategies), consider creating a prompt file for it.
+
 ---
 
 ## Testing
