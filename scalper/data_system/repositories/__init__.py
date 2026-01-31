@@ -10,5 +10,8 @@ from .bot_tick.supabase_bot_tick_repository import SupabaseBotTickRepository
 from .bot_order.bot_order_repository import BotOrderRepository
 from .bot_order.supabase_bot_order_repository import SupabaseBotOrderRepository
 
+from .generalisation_evaluation.generalisation_evaluation_repository import GeneralisationEvaluationRepository
+from .generalisation_evaluation.sqlalchemy_generalisation_evaluation_repository import SQLAlchemyGeneralisationEvaluationRepository
+
 from .trade.sqlalchemy_trade_repository import SQLAlchemyTradeRepository
 from .trade.trade_repository import TradeRepository
