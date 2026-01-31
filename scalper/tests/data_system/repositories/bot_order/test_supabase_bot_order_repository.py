@@ -24,7 +24,7 @@ class TestSupabaseBotOrderRepository:
             tick_id=1,
             side=Side.BUY,
             price=Decimal('50000.00'),
-            volume=0.001,
+            volume=Decimal('0.001'),
             fee=Decimal('0.50'),
             executed_at=datetime.now(timezone.utc)
         )
@@ -39,7 +39,7 @@ class TestSupabaseBotOrderRepository:
             'tick_id': sample_order.tick_id,
             'side': sample_order.side.value,
             'price': str(sample_order.price),
-            'volume': sample_order.volume,
+            'volume': str(sample_order.volume),
             'fee': str(sample_order.fee),
             'executed_at': sample_order.executed_at.isoformat()
         }

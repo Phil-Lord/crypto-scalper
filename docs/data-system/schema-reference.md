@@ -59,7 +59,7 @@ Records executed trades.
 | `side`        | TEXT        | `'buy'` or `'sell'`       |
 | `price`       | DECIMAL     | Execution price           |
 | `volume`      | DECIMAL     | Trade volume              |
-| `fee`         | DECIMAL     | Fee charged (nullable)    |
+| `fee`         | DECIMAL     | Fee charged               |
 | `executed_at` | TIMESTAMPTZ | Execution timestamp       |
 
 ---

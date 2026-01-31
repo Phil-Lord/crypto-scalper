@@ -42,6 +42,7 @@ class SupabaseBotOrderRepository(BotOrderRepository):
         data['run_id'] = UUID(data['run_id'])
         data['executed_at'] = datetime.fromisoformat(data['executed_at'])
         data['price'] = Decimal(data['price'])
+        data['volume'] = Decimal(data['volume'])
         data['fee'] = Decimal(data['fee'])
         data['side'] = Side(data['side'])
         return BotOrder(**data)

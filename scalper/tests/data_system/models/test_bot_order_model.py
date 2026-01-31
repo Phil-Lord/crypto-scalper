@@ -19,7 +19,7 @@ class TestBotOrder:
             'tick_id': 1,
             'side': Side.BUY,
             'price': Decimal('50000.00'),
-            'volume': 0.001,
+            'volume': Decimal('0.001'),
             'fee': Decimal('0.50'),
             'executed_at': datetime.now(timezone.utc)
         }

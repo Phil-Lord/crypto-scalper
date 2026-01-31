@@ -65,8 +65,8 @@ CREATE TABLE bot_orders (
     -- Order Details
     side TEXT NOT NULL,
     price DECIMAL(32, 12) NOT NULL,
-    volume DECIMAL(32, 12) NOT NULL,  -- Mapped float -> Decimal for safety
-    fee DECIMAL(32, 12),
+    volume DECIMAL(32, 12) NOT NULL,
+    fee DECIMAL(32, 12) NOT NULL,
     executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT chk_side CHECK (side IN ('buy', 'sell'))

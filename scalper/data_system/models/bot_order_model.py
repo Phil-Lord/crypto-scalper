@@ -22,7 +22,7 @@ class BotOrder:
 
         side (Side): Side of the order (buy/sell).
         price (Decimal): Price at which the order was executed.
-        volume (float): Order volume.
+        volume (Decimal): Order volume.
         fee (Decimal): Fee paid.
         executed_at (datetime): Timestamp when the order was executed.
 
@@ -34,7 +34,7 @@ class BotOrder:
 
     side: Side
     price: Decimal
-    volume: float
+    volume: Decimal
     fee: Decimal
     executed_at: datetime
 
