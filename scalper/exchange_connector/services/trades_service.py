@@ -7,6 +7,14 @@ from .kraken_service import KrakenService
 
 class TradesService(KrakenService):
     def fetch_trades(self, pair: str, since: int, until: int) -> list[list[Any]]:
+        '''
+        Fetch historical trades for a trading pair with automatic pagination.
+
+        :param pair: Trading pair in Kraken format, e.g., 'XXBTZGBP'.
+        :param since: Start timestamp in nanoseconds.
+        :param until: End timestamp in nanoseconds.
+        :return: List of raw trade arrays. Each trade: [price, volume, time, side, type, misc, id].
+        '''
         self.validate_pair(pair)
         trades = []
         current_since = since
