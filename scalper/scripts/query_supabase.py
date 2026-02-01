@@ -8,7 +8,7 @@ from data_system import (
 )
 
 
-def test_supabase():
+def query_supabase():
     table = questionary.select(
         'Table:', choices=['bots', 'bot_runs', 'bot_ticks', 'bot_orders']).ask()
     action = questionary.select('Action:', choices=['add', 'get']).ask()
@@ -101,4 +101,4 @@ def ask_datetime(message: str) -> datetime:
 
 
 if __name__ == "__main__":
-    test_supabase()
+    query_supabase()
