@@ -6,9 +6,24 @@ from exchange_connector.kraken_utils import get_headers
 
 
 class KrakenApiClient:
+    '''
+    Low-level HTTP client for the Kraken API.
+
+    Handles request construction, authentication headers, and error parsing.
+    '''
+
     BASE_URL = 'https://api.kraken.com'
 
-    def make_request(self, method: str, endpoint: str, params: dict) -> dict[str, Any]:
+    def make_request(self, method: str, endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
+        '''
+        Make an HTTP request to the Kraken API.
+
+        :param method: HTTP method ('GET' or 'POST').
+        :param endpoint: API endpoint path, e.g., '/0/public/Ticker'.
+        :param params: Request parameters.
+        :return: Parsed JSON response.
+        :raises RuntimeError: If request fails or response cannot be parsed.
+        '''
         try:
             url = self.BASE_URL + endpoint
             if method.upper() == 'GET':
@@ -28,4 +43,4 @@ class KrakenApiClient:
             if response['error'] == ['EGeneral:Too many requests']:
                 raise KrakenTooManyRequestsError()
             else:
-                raise RuntimeError(f'API Error: {response['error']}.')
+                raise RuntimeError(f"API Error: {response['error']}.")

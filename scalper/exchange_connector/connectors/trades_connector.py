@@ -11,7 +11,7 @@ class TradesConnector(FetchConnector):
 
     def fetch(self, pair: str, start: int, end: int) -> list[Trade]:
         '''
-        Fetch trades from Kraken API and return as Trade domain objects.
+        Fetch raw trades from Kraken API and return as Trade domain objects.
 
         :param pair: Trading pair in Kraken format, e.g., 'XXBTZGBP'.
         :param start: Start timestamp in nanoseconds.
@@ -22,11 +22,7 @@ class TradesConnector(FetchConnector):
         return self._to_domain(raw_trades, pair)
 
     def _to_domain(self, raw_trades: list[list], pair: str) -> list[Trade]:
-        '''
-        Convert raw Kraken API trade data to Trade domain objects.
-
-        Raw format: [[price, volume, time, buy/sell, market/limit, misc, trade_id], ...]
-        '''
+        ''' Raw format: [[price, volume, time, buy/sell, market/limit, misc, trade_id], ...] '''
         return [
             Trade(
                 trade_id=int(raw[6]),

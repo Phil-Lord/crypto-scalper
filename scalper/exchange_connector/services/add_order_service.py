@@ -1,11 +1,12 @@
 import logging
+from typing import Any
 
 from exchange_connector.kraken_utils import get_nonce
 from .kraken_service import KrakenService
 
 
 class AddOrderService(KrakenService):
-    def add_order(self, pair: str, signal: str, volume: float) -> dict:
+    def add_order(self, pair: str, signal: str, volume: float) -> dict[str, Any]:
         self.validate_pair(pair)
         logging.basicConfig(level=logging.INFO)
 

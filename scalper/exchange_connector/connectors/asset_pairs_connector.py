@@ -11,4 +11,10 @@ class AssetPairsConnector(FetchConnector):
         self.service = AssetPairsService(self.client)
 
     def fetch(self, pair: str) -> dict[str, Any]:
+        '''
+        Fetch asset pair information.
+
+        :param pair: Trading pair in Kraken format, e.g., 'XXBTZGBP'.
+        :return: Asset pair details from Kraken API.
+        '''
         return self.service.fetch_asset_pairs(pair)

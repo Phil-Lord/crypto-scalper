@@ -9,5 +9,12 @@ class AddOrderConnector(PlaceConnector):
         self.service = AddOrderService(self.client)
 
     def place(self, pair: str, signal: str, volume: float) -> dict:
-        ''' Place a market order. Buy volume in quote, sell volume in base. '''
+        '''
+        Place a market order.
+
+        :param pair: Trading pair in Kraken format, e.g., 'XXBTZGBP'.
+        :param signal: Order direction - 'buy' or 'sell'.
+        :param volume: Order volume (quote currency for buy, base for sell).
+        :return: Order result from Kraken API.
+        '''
         return self.service.add_order(pair, signal, volume)

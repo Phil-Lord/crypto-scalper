@@ -11,7 +11,7 @@ def get_nonce() -> str:
     return str(int(time.time() * 1000))
 
 
-def get_headers(params: str, endpoint: str) -> dict:
+def get_headers(params: dict, endpoint: str) -> dict[str, str]:
     public_key = get_env_var('KRAKEN_TRADING_API_KEY')
     private_key = get_env_var('KRAKEN_TRADING_API_SECRET')
 
@@ -21,13 +21,29 @@ def get_headers(params: str, endpoint: str) -> dict:
     }
 
 
-def get_signature(private_key: str, params: str, nonce: str, endpoint: str) -> str:
+def get_signature(private_key: str, params: dict, nonce: str, endpoint: str) -> str:
+    '''
+    Generate the API signature for request authentication.
+
+    :param private_key: Kraken API private key (base64 encoded).
+    :param params: Request parameters.
+    :param nonce: Request nonce.
+    :param endpoint: API endpoint path.
+    :return: Base64-encoded HMAC-SHA512 signature.
+    '''
     post_params = urllib.parse.urlencode(params)
     message = endpoint.encode() + hashlib.sha256((nonce + post_params).encode()).digest()
     return sign(private_key, message)
 
 
 def sign(private_key: str, message: bytes) -> str:
+    '''
+    Sign a message with HMAC-SHA512.
+
+    :param private_key: Base64-encoded private key.
+    :param message: Message bytes to sign.
+    :return: Base64-encoded signature.
+    '''
     return base64.b64encode(
         hmac.new(
             key=base64.b64decode(private_key),

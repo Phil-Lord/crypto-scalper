@@ -8,6 +8,13 @@ logger = logging.getLogger(__name__)
 
 
 class KrakenService:
+    '''
+    Base service class for Kraken API operations.
+
+    Provides retry logic with exponential backoff for rate-limited requests
+    and common validation methods. All specific services inherit from this.
+    '''
+
     def __init__(self, client: KrakenApiClient):
         self.client = client
 
@@ -19,6 +26,14 @@ class KrakenService:
         after=after_log(logger, logging.INFO)
     )
     def make_request(self, method: str, endpoint: str, params: dict) -> dict:
+        '''
+        Make an API request with automatic retry on rate limiting.
+
+        :param method: HTTP method ('GET' or 'POST').
+        :param endpoint: API endpoint path.
+        :param params: Request parameters.
+        :return: Result data from the API response.
+        '''
         response = self.client.make_request(method, endpoint, params)
         self.client.handle_errors(response)
         return response['result']
