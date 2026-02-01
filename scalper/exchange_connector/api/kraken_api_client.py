@@ -32,13 +32,15 @@ class KrakenApiClient:
                 headers = get_headers(params, endpoint)
                 response = requests.post(url, data=params, headers=headers)
             response.raise_for_status()
-            return response.json()
+            json_response = response.json()
+            self._handle_errors(json_response)
+            return json_response
         except requests.RequestException:
             raise RuntimeError(f'Error making request to {endpoint}.')
         except ValueError:
             raise RuntimeError('Failed to parse JSON response.')
 
-    def handle_errors(self, response: dict[str, Any]) -> None:
+    def _handle_errors(self, response: dict[str, Any]) -> None:
         if 'error' in response and response['error']:
             if response['error'] == ['EGeneral:Too many requests']:
                 raise KrakenTooManyRequestsError()

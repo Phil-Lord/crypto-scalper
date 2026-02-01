@@ -35,7 +35,6 @@ class KrakenService:
         :return: Result data from the API response.
         '''
         response = self.client.make_request(method, endpoint, params)
-        self.client.handle_errors(response)
         return response['result']
 
     def validate_pair(self, pair: str) -> None:

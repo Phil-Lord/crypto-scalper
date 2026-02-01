@@ -77,7 +77,7 @@ class TestKrakenApiClient:
         response = {'result': {'data': 'value'}, 'error': []}
 
         # When / Then (no exception raised)
-        client.handle_errors(response)
+        client._handle_errors(response)
 
     def test_handle_errors_raises_too_many_requests_error(self, client):
         # Given
@@ -85,7 +85,7 @@ class TestKrakenApiClient:
 
         # When / Then
         with pytest.raises(KrakenTooManyRequestsError):
-            client.handle_errors(response)
+            client._handle_errors(response)
 
     def test_handle_errors_raises_runtime_error_for_other_errors(self, client):
         # Given
@@ -93,7 +93,7 @@ class TestKrakenApiClient:
 
         # When / Then
         with pytest.raises(RuntimeError, match='API Error'):
-            client.handle_errors(response)
+            client._handle_errors(response)
 
 
 @pytest.mark.exchange_connector

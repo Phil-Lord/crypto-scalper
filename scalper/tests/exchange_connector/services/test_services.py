@@ -30,24 +30,12 @@ class TestKrakenService:
             'result': {'XXBTZGBP': {'a': ['50000']}},
             'error': []
         }
-        mock_client.handle_errors.return_value = None
 
         # When
         result = service.make_request('GET', '/0/public/Ticker', {'pair': 'XXBTZGBP'})
 
         # Then
         assert result == {'XXBTZGBP': {'a': ['50000']}}
-
-    def test_make_request_calls_handle_errors(self, service, mock_client):
-        # Given
-        response = {'result': {}, 'error': []}
-        mock_client.make_request.return_value = response
-
-        # When
-        service.make_request('GET', '/0/public/Ticker', {'pair': 'XXBTZGBP'})
-
-        # Then
-        mock_client.handle_errors.assert_called_once_with(response)
 
     def test_validate_pair_raises_on_empty_pair(self, service):
         # When / Then
