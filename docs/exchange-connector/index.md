@@ -4,6 +4,34 @@ The exchange connector module provides an abstraction layer for interacting with
 cryptocurrency exchange API. It handles authentication, rate limiting, and converts raw API
 responses into domain objects.
 
+## Quick Start
+
+```python
+from exchange_connector import (
+    TradesConnector,
+    TickerConnector,
+    BalanceConnector,
+    AddOrderConnector
+)
+
+# Fetch historical trades (returns Trade domain objects)
+trades_connector = TradesConnector()
+trades = trades_connector.fetch('XXBTZGBP', since=1704067200000000000, until=1704153600000000000)
+
+# Get current price
+ticker_connector = TickerConnector()
+price_data = ticker_connector.fetch('XXBTZGBP')
+current_price = float(price_data['c'][0])
+
+# Check account balance
+balance_connector = BalanceConnector()
+balances = balance_connector.fetch()
+
+# Place a market order
+order_connector = AddOrderConnector()
+result = order_connector.place('XXBTZGBP', 'buy', 100.0)  # Buy £100 worth
+```
+
 ## Contents
 
 | Page                              | Description                                     |

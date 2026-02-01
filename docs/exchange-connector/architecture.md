@@ -98,10 +98,16 @@ def _to_domain(self, raw_trades: list[list], pair: str) -> list[Trade]:
 │  Connector  │────▶│   Service    │────▶│   API Client  │────▶│  Kraken API │
 │ (interface) │     │ (retry/logic)│     │ (HTTP/auth)   │     │  (external) │
 └─────────────┘     └──────────────┘     └───────────────┘     └─────────────┘
-       │                                                              │
-       │                      Raw JSON Response                       │
-       │◀─────────────────────────────────────────────────────────────│
+       ▲                  ▲                      ▲                      │
+       │                  │                      │                      │
+       │                  │         Raw JSON Response                   │
+       │                  │◀─────────────────────────────────────────────┘
+       │                  │
+       │     Dict (result data)
+       │◀─────────────────┘
        │
+       │ (Optional)
+       │ Conversion
        ▼
 ┌─────────────┐
 │   Domain    │
