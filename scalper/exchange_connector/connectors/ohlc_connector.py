@@ -6,8 +6,8 @@ from exchange_connector.services import OhlcService
 
 
 class OhlcConnector(FetchConnector):
-    def __init__(self):
-        self.client = KrakenApiClient()
+    def __init__(self, client: KrakenApiClient = None):
+        self.client = client or KrakenApiClient()
         self.service = OhlcService(self.client)
 
     def fetch(self, pair: str, interval: int, start: int) -> list[list[Any]]:

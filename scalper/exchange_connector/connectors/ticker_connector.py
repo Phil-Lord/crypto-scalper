@@ -6,8 +6,8 @@ from exchange_connector.services import TickerService
 
 
 class TickerConnector(FetchConnector):
-    def __init__(self):
-        self.client = KrakenApiClient()
+    def __init__(self, client: KrakenApiClient = None):
+        self.client = client or KrakenApiClient()
         self.service = TickerService(self.client)
 
     def fetch(self, pair: str) -> dict[str, Any]:

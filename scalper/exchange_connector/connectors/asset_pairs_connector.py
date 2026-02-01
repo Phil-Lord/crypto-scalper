@@ -6,8 +6,8 @@ from exchange_connector.services import AssetPairsService
 
 
 class AssetPairsConnector(FetchConnector):
-    def __init__(self):
-        self.client = KrakenApiClient()
+    def __init__(self, client: KrakenApiClient = None):
+        self.client = client or KrakenApiClient()
         self.service = AssetPairsService(self.client)
 
     def fetch(self, pair: str) -> dict[str, Any]:

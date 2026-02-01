@@ -4,8 +4,8 @@ from exchange_connector.services import AddOrderService
 
 
 class AddOrderConnector(PlaceConnector):
-    def __init__(self):
-        self.client = KrakenApiClient()
+    def __init__(self, client: KrakenApiClient = None):
+        self.client = client or KrakenApiClient()
         self.service = AddOrderService(self.client)
 
     def place(self, pair: str, signal: str, volume: float) -> dict:
