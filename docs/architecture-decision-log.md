@@ -33,6 +33,17 @@ Record decisions here when future-you might ask _"why did I do it this way?"_.
 
 ---
 
+## Exchange Connector
+
+| Decision                                    | Rationale                                                                                                                                             |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Three-layer architecture (API/Service/Connector) | Separates HTTP concerns from business logic from public interface; enables mocking at each layer for testing                                    |
+| Retry with exponential backoff              | Kraken rate limits are strict; automatic retries with backoff prevent failures during high-volume operations like bulk trade fetching                 |
+| Optional client injection in connectors     | Allows default instantiation for production use while enabling mock injection for tests                                                               |
+| Domain object conversion in connectors      | Connectors are the boundary between external API and internal domain; keeps raw API formats out of business logic                                     |
+
+---
+
 ## Backtesting Engine
 
 | Decision     | Rationale |

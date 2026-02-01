@@ -23,6 +23,10 @@ nav:
       - data-system/module-architecture.md
       - data-system/backends.md
       - data-system/schema-reference.md
+  - Exchange Connector:
+      - exchange-connector/index.md
+      - exchange-connector/architecture.md
+      - exchange-connector/api-reference.md
   - parameter-optimisation.md
   - cloud-architecture.md
   - trade-executor.md
