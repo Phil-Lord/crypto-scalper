@@ -95,11 +95,20 @@ Place a market order (requires authentication).
 
 ```python
 connector = AddOrderConnector()
-result = connector.place('XXBTZGBP', 'buy', 100.0)  # Buy £100 worth
+
+# Place an actual order
+result = connector.place('XXBTZGBP', 'buy', 100.0)
 # Returns: OrderResult(txid=['ORDER-ID'], order_description='buy 100.00000000 XXBTZGBP @ market')
+
+# Validate order without executing (for testing)
+result = connector.place('XXBTZGBP', 'buy', 100.0, validate=True)
+# Returns: OrderResult(txid=None, order_description='buy 100.00000000 XXBTZGBP @ market')
 ```
 
-**Note:** Buy orders use `viqc` flag (volume in quote currency).
+**Notes:**
+
+- Buy orders use `viqc` flag (volume in quote currency)
+- When `validate=True`, the order is validated but not executed, and `txid` will be `None`
 
 ## Rate Limiting
 
