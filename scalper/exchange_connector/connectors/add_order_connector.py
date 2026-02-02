@@ -32,10 +32,10 @@ class AddOrderConnector(PlaceConnector):
         try:
             txid = raw_result.get('txid', [])
             order_description = raw_result.get('descr', {}).get('order', '')
-            
+
             if not txid:
                 raise ValueError('Missing transaction ID in order response')
-            
+
             return OrderResult(
                 txid=txid,
                 order_description=order_description
