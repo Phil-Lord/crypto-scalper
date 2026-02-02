@@ -22,16 +22,30 @@ class TradesConnector(FetchConnector):
         return self._to_domain(raw_trades, pair)
 
     def _to_domain(self, raw_trades: list[list], pair: str) -> list[Trade]:
-        ''' Raw format: [[price, volume, time, buy/sell, market/limit, misc, trade_id], ...] '''
-        return [
-            Trade(
-                trade_id=int(raw[6]),
-                pair=pair,
-                price=float(raw[0]),
-                volume=float(raw[1]),
-                timestamp=float(raw[2]),
-                side=str(raw[3]),
-                order_type=str(raw[4])
-            )
-            for raw in raw_trades
-        ]
+        '''
+        Convert raw Kraken trade arrays to Trade domain objects.
+
+        :param raw_trades: List of raw trade arrays from Kraken API.
+        :param pair: Trading pair identifier.
+        :return: List of Trade domain objects.
+        :raises ValueError: If trade data is malformed.
+        '''
+        trades = []
+        for raw in raw_trades:
+            try:
+                if len(raw) < 7:
+                    raise ValueError(f'Trade data incomplete: expected 7 fields, got {len(raw)}')
+
+                trades.append(Trade(
+                    trade_id=int(raw[6]),
+                    pair=pair,
+                    price=float(raw[0]),
+                    volume=float(raw[1]),
+                    timestamp=float(raw[2]),
+                    side=str(raw[3]),
+                    order_type=str(raw[4])
+                ))
+            except (ValueError, IndexError, TypeError) as e:
+                raise ValueError(f'Failed to parse trade data: {raw}. Error: {e}')
+
+        return trades
