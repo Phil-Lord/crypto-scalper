@@ -42,6 +42,8 @@ Record decisions here when future-you might ask _"why did I do it this way?"_.
 | Optional client injection in connectors     | Allows default instantiation for production use while enabling mock injection for tests                                                               |
 | Domain object conversion in connectors      | Connectors are the boundary between external API and internal domain; keeps raw API formats out of business logic                                     |
 | Keep connector layer despite simple delegation | Connectors provide platform-agnostic interface for future multi-exchange support; even thin wrappers add strategic value by establishing stable public API and natural home for domain logic |
+| Add domain models only when necessary | Not all connectors need domain objects; add them when they provide value (type safety, transformation logic, multi-exchange abstraction, persistence preparation). Balance abstraction with pragmatism. |
+| Exchange models in `exchange_connector/models/` | Domain models representing exchange API responses live in `exchange_connector/models/` as they're exchange-specific concepts, not database entities. Exception: if raw API response exactly matches database schema (like `Trade`), the model can live in `data_system/models/` to avoid duplication. |
 
 ---
 
