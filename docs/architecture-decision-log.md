@@ -41,6 +41,7 @@ Record decisions here when future-you might ask _"why did I do it this way?"_.
 | Retry with exponential backoff              | Kraken rate limits are strict; automatic retries with backoff prevent failures during high-volume operations like bulk trade fetching                 |
 | Optional client injection in connectors     | Allows default instantiation for production use while enabling mock injection for tests                                                               |
 | Domain object conversion in connectors      | Connectors are the boundary between external API and internal domain; keeps raw API formats out of business logic                                     |
+| Keep connector layer despite simple delegation | Connectors provide platform-agnostic interface for future multi-exchange support; even thin wrappers add strategic value by establishing stable public API and natural home for domain logic |
 
 ---
 
