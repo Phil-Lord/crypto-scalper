@@ -135,12 +135,16 @@ Docstrings are required for:
 - **Domain models (dataclasses)** — Document all attributes
 - **Public API functions** — Repository methods, service functions
 - **Complex logic** — Anything non-obvious
+- **Methods with non-obvious parameters** — Document parameter meaning and units (e.g., nanoseconds vs seconds)
 
 Docstrings are NOT required for:
 
 - **Constants and config values** — Self-explanatory by name
 - **Simple utility functions** — If the name and signature are clear
 - **Internal helpers** — Short functions with obvious purpose
+- **Methods that only delegate** — If they just call another method with the same semantics
+
+**Guideline:** Avoid over-explaining self-documenting code or duplicating docstrings from called methods. Focus docstrings on understanding parameters, return types, and non-obvious behavior.
 
 ### Docstring Style
 
@@ -206,6 +210,15 @@ modules, adding strategies), consider creating a prompt file for it.
 - **pytest** with **pytest-mock** for mocking
 - Tests live in `scalper/tests/`, mirroring source structure
 - Python path configured in `pytest.ini`
+
+### Test Coverage Philosophy
+
+**Test behavior, not just code paths:**
+
+- ✅ **Do test:** Retry logic, error propagation, pagination, validation edge cases
+- ✅ **Do test:** Integration points between layers
+- ❌ **Don't just test:** Happy path scenarios with everything mocked
+- ❌ **Don't just test:** Simple delegation (connector calling service)
 
 ### Naming Conventions
 
@@ -396,6 +409,14 @@ class LocalSQLiteConfig:
     SCALPER_DB_URL = f'sqlite:///{LOCAL_STORAGE_PATH / "scalper.db"}'
 ```
 
+### Logging
+
+- **Never** call `logging.basicConfig()` in library/service code
+- Configure logging **only at application entry points** (scripts, main modules)
+- Services should use `logger = logging.getLogger(__name__)` and log without configuration
+
+**Rationale:** Library code shouldn't control application-wide logging config. Multiple calls to `basicConfig()` can cause conflicts.
+
 ---
 
 # Part 2: Architectural Patterns
@@ -503,6 +524,63 @@ class SupabaseClient:
 
 ---
 
+## Layered Architecture (Client/Service/Connector)
+
+**When to use:** Modules that interact with external APIs or services requiring retry logic, authentication, and domain transformation.
+
+**Example:** Exchange Connector uses this pattern for Kraken API integration.
+
+### Three-Layer Structure
+
+1. **Client layer** — Low-level HTTP/network concerns, error parsing, authentication
+2. **Service layer** — Business logic, retry mechanisms, pagination, validation  
+3. **Connector layer** — Public API, domain object transformation, high-level interface
+
+### Key Principles
+
+**Error handling belongs in the layer that can handle it:**
+```python
+# Client handles its own errors
+class KrakenApiClient:
+    def make_request(self, method: str, endpoint: str, params: dict) -> dict:
+        response = self._do_request(method, endpoint, params)
+        self._handle_errors(response)  # Internal responsibility
+        return response
+
+# Service focuses on business logic
+class KrakenService:
+    @retry(...)  # Retry on rate limits
+    def make_request(self, method: str, endpoint: str, params: dict) -> dict:
+        response = self.client.make_request(method, endpoint, params)
+        return response['result']  # Extract result, errors already handled
+```
+
+**Validate at boundaries where external data enters:**
+```python
+class TradesConnector:
+    def _to_domain(self, raw_data: list) -> list[Trade]:
+        '''Convert raw API data to domain objects with validation.'''
+        results = []
+        for item in raw_data:
+            try:
+                if len(item) < 7:
+                    raise ValueError(f'Incomplete data: expected 7 fields')
+                results.append(Trade(...))
+            except (ValueError, IndexError, TypeError) as e:
+                raise ValueError(f'Failed to parse: {item}. Error: {e}')
+        return results
+```
+
+**Add layers only when they provide value:**
+- ✅ Domain transformation (raw API → typed objects)  
+- ✅ Business logic (validation, calculations)  
+- ✅ Retry/resilience patterns  
+- ❌ Simple delegation with no transformation
+
+**Question to ask:** "What does this layer add beyond passing data through?"
+
+---
+
 ## Layered Module Structure
 
 **When to use:** Complex modules with multiple concerns (data, config, logic).
@@ -597,3 +675,7 @@ Apply when working with database schemas or models that map to tables.
 - [ ] Implementation injected with client (dependency injection)
 - [ ] Naming follows `{Backend}{Entity}Repository`
 - [ ] Both interface and implementation exported
+
+---
+
+**Module Auditing:** See `.github/prompts/audit-module.prompt.md` for the comprehensive audit checklist.

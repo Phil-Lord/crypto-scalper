@@ -12,20 +12,63 @@ Audit the specified module against the project's copilot-instructions.md standar
 
 ### Universal Standards (Part 1)
 
-- [ ] **Python style** — Modern syntax, single quotes, type hints, organised imports
-- [ ] **Models** — Frozen dataclasses where appropriate
-- [ ] **Docstrings** — Present for domain models, public APIs, complex logic
-- [ ] **Module docs** — `/docs/{module}/` exists for significant modules
-- [ ] **Test structure** — Classes, Given/When/Then, hierarchical markers
-- [ ] **Markers registered** — All pytest markers in `pytest.ini`
-- [ ] **Makefile targets** — `test/{module}` target exists
-- [ ] **Exports** — Public API in `__init__.py`
+#### Python Style
+- [ ] **Python 3.12+ syntax** — Using `str | None`, `list[Trade]` (not Optional, List)
+- [ ] **Single quotes** — Consistently used for all strings
+- [ ] **Type hints** — Present on all function signatures
+- [ ] **Import organisation** — Standard lib → Third-party → Local (separated by blank lines)
+- [ ] **No unused imports** — All imports are used
+
+#### Models & Data Structures
+- [ ] **Frozen dataclasses** — Domain models are `@dataclass(frozen=True)`
+- [ ] **Field ordering** — Required fields first, optional/defaulted last
+- [ ] **Mutable defaults** — Using `field(default_factory=...)` not bare `[]` or `{}`
+- [ ] **Attribute documentation** — All attributes documented in class docstring
+
+#### Documentation
+- [ ] **Module has docs** — `/docs/{module}/index.md` exists for significant modules
+- [ ] **Docstrings where valuable** — Domain models, public APIs, complex logic, non-obvious parameters
+- [ ] **No over-documentation** — Avoid duplicating self-explanatory code
+- [ ] **reStructuredText style** — Using `:param`, `:return` format
+
+#### Configuration
+- [ ] **No logging.basicConfig()** — Never called in library/service code
+- [ ] **Logging only at entry points** — Scripts/main modules configure logging
+- [ ] **Environment variables** — Using `get_env_var` utility
+- [ ] **Config classes** — Simple containers with class attributes
+
+#### Testing
+- [ ] **Test structure** — Classes named `Test{ClassName}`, methods `test_{action}_{condition}_{expectation}`
+- [ ] **Given/When/Then** — Pattern used with comments
+- [ ] **Hierarchical markers** — Module, category, and class-level markers
+- [ ] **Markers registered** — All markers in `pytest.ini`
+- [ ] **Makefile target** — `test/{module}` exists
+- [ ] **Test coverage depth** — Testing complex behaviors (retry, pagination, errors), not just happy paths
+- [ ] **Fixture quality** — Type-hinted, descriptive names, appropriate scope
+
+#### File & Module Naming
+- [ ] **Naming conventions** — Following module/file/test naming standards
+- [ ] **Public API exports** — `__init__.py` exports the public interface
 
 ### Architectural Patterns (Part 2) — When Applicable
 
-- [ ] **Repository pattern** — If data access with multiple backends
-- [ ] **Dependency injection** — If external service dependencies
-- [ ] **Client abstraction** — If wrapping third-party SDKs
+#### Repository Pattern
+- [ ] **Abstract base** — Interface defines contract
+- [ ] **Dependency injection** — Implementation injected with client
+- [ ] **Naming** — Follows `{Backend}{Entity}Repository`
+- [ ] **Both exported** — Interface and implementations in `__init__.py`
+
+#### Layered Architecture (Client/Service/Connector)
+- [ ] **Layer responsibilities** — Each layer has clear purpose
+- [ ] **Error handling placement** — Errors handled in appropriate layer, not leaked
+- [ ] **Validation at boundaries** — External data validated where it enters
+- [ ] **Layers add value** — Not just simple delegation
+- [ ] **Consistent return types** — Domain objects vs raw responses clearly separated
+
+#### General Architecture
+- [ ] **Dependency injection** — External services injected, not instantiated
+- [ ] **Client abstraction** — Third-party SDKs wrapped appropriately
+- [ ] **Dependencies flow** — One direction, no circular dependencies
 
 ### Architecture Decision Log
 
