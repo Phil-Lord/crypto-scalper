@@ -6,7 +6,7 @@ from .kraken_service import KrakenService
 
 
 class AddOrderService(KrakenService):
-    def add_order(self, pair: str, signal: str, volume: float) -> dict[str, Any]:
+    def add_order(self, pair: str, signal: str, volume: float, validate: bool = False) -> dict[str, Any]:
         self.validate_pair(pair)
         logging.basicConfig(level=logging.INFO)
 
@@ -16,7 +16,8 @@ class AddOrderService(KrakenService):
             'ordertype': 'market',
             'type': signal,
             'pair': pair,
-            'volume': volume
+            'volume': volume,
+            'validate': validate
         }
         if signal == 'buy':
             params['oflags'] = 'viqc'

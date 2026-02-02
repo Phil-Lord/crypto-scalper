@@ -10,12 +10,13 @@ class OrderResult:
     domain object, providing a platform-agnostic abstraction for order results.
 
     Attributes:
-        txid (list[str]): Transaction IDs for the placed order (Kraken may return multiple).
+        txid (list[str] | None): Transaction IDs for the placed order (Kraken may return multiple).
+            None when validate=True as no order is actually placed.
         order_description (str): Human-readable order description from the exchange.
 
     Note:
         This is an exchange domain model, not a database entity. For persisting
         order data, map this to the BotOrder model in data_system/models/.
     '''
-    txid: list[str]
+    txid: list[str] | None
     order_description: str

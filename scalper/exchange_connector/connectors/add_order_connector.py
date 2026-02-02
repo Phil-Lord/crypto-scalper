@@ -9,16 +9,17 @@ class AddOrderConnector(PlaceConnector):
         self.client = client or KrakenApiClient()
         self.service = AddOrderService(self.client)
 
-    def place(self, pair: str, signal: str, volume: float) -> OrderResult:
+    def place(self, pair: str, signal: str, volume: float, validate: bool = False) -> OrderResult:
         '''
         Place a market order.
 
         :param pair: Trading pair in Kraken format, e.g., 'XXBTZGBP'.
         :param signal: Order direction - 'buy' or 'sell'.
         :param volume: Order volume (quote currency for buy, base for sell).
+        :param validate: If True, validate order without executing. Default is False.
         :return: OrderResult domain object containing transaction IDs and order description.
         '''
-        raw_result = self.service.add_order(pair, signal, volume)
+        raw_result = self.service.add_order(pair, signal, volume, validate)
         return self._to_domain(raw_result)
 
     def _to_domain(self, raw_result: dict) -> OrderResult:
@@ -30,11 +31,12 @@ class AddOrderConnector(PlaceConnector):
         :raises ValueError: If response structure is invalid.
         '''
         try:
-            txid = raw_result.get('txid', [])
+            # txid is only present when order is actually placed (validate=False)
+            txid = raw_result.get('txid')
             order_description = raw_result.get('descr', {}).get('order', '')
 
-            if not txid:
-                raise ValueError('Missing transaction ID in order response')
+            if not order_description:
+                raise ValueError('Missing order description in response')
 
             return OrderResult(
                 txid=txid,
