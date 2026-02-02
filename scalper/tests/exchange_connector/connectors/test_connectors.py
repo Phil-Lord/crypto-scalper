@@ -172,7 +172,7 @@ class TestAddOrderConnector:
         result = connector.place('XXBTZGBP', 'buy', 100.0)
 
         # Then
-        connector.service.add_order.assert_called_once_with('XXBTZGBP', 'buy', 100.0)
+        connector.service.add_order.assert_called_once_with('XXBTZGBP', 'buy', 100.0, False)
         assert isinstance(result, OrderResult)
         assert result.txid == ['ORDER-123']
         assert result.order_description == 'buy 100.00000000 XXBTZGBP @ market'
@@ -188,26 +188,14 @@ class TestAddOrderConnector:
         assert result.txid == ['ORDER-123']
         assert result.order_description == 'buy 100.00000000 XXBTZGBP @ market'
 
-    def test_to_domain_raises_on_missing_txid(self, mock_client):
-        # Given
-        connector = AddOrderConnector(client=mock_client)
-        invalid_response = {'descr': {'order': 'test'}}
-
-        # When / Then
-        with pytest.raises(ValueError, match='Missing transaction ID'):
-            connector._to_domain(invalid_response)
-
     def test_to_domain_handles_missing_description(self, mock_client):
         # Given
         connector = AddOrderConnector(client=mock_client)
         response_without_descr = {'txid': ['ORDER-123']}
 
-        # When
-        result = connector._to_domain(response_without_descr)
-
-        # Then
-        assert result.txid == ['ORDER-123']
-        assert result.order_description == ''
+        # When / Then
+        with pytest.raises(ValueError, match='Missing order description'):
+            connector._to_domain(response_without_descr)
 
     def test_to_domain_handles_nested_description(self, mock_client):
         # Given
@@ -238,17 +226,41 @@ class TestAddOrderConnector:
         # Then
         assert result.txid == ['ORDER-001', 'ORDER-002']
 
+    def test_to_domain_handles_validation_response_without_txid(self, mock_client):
+        # Given
+        connector = AddOrderConnector(client=mock_client)
+        validation_response = {'descr': {'order': 'buy 10.00 XBTGBP @ market'}}
+
+        # When
+        result = connector._to_domain(validation_response)
+
+        # Then
+        assert result.txid is None
+        assert result.order_description == 'buy 10.00 XBTGBP @ market'
+
     def test_place_passes_correct_parameters(self, mock_client):
         # Given
         connector = AddOrderConnector(client=mock_client)
         connector.service = Mock()
-        connector.service.add_order.return_value = {'txid': ['ORDER-123']}
+        connector.service.add_order.return_value = {'txid': ['ORDER-123'], 'descr': {'order': 'test'}}
 
         # When
         connector.place('XETHZUSD', 'sell', 5.5)
 
         # Then
-        connector.service.add_order.assert_called_once_with('XETHZUSD', 'sell', 5.5)
+        connector.service.add_order.assert_called_once_with('XETHZUSD', 'sell', 5.5, False)
+
+    def test_place_passes_validate_parameter(self, mock_client):
+        # Given
+        connector = AddOrderConnector(client=mock_client)
+        connector.service = Mock()
+        connector.service.add_order.return_value = {'descr': {'order': 'buy 10.00 XBTGBP @ market'}}
+
+        # When
+        connector.place('XXBTZGBP', 'buy', 10.0, validate=True)
+
+        # Then
+        connector.service.add_order.assert_called_once_with('XXBTZGBP', 'buy', 10.0, True)
 
 
 @pytest.mark.exchange_connector

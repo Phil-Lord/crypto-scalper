@@ -185,6 +185,36 @@ class TestAddOrderService:
             assert call_args[0][0] == 'POST'
             assert call_args[0][1] == '/0/private/AddOrder'
 
+    def test_add_order_includes_validate_false_by_default(self, mock_client):
+        # Given
+        from exchange_connector.services.add_order_service import AddOrderService
+        service = AddOrderService(mock_client)
+        mock_client.make_request.return_value = {'result': {'txid': ['ORDER-123']}, 'error': []}
+
+        with patch('exchange_connector.services.add_order_service.get_nonce', return_value='123456'):
+            # When
+            service.add_order('XXBTZGBP', 'buy', 100.0)
+
+            # Then
+            call_args = mock_client.make_request.call_args
+            params = call_args[0][2]
+            assert params['validate'] is False
+
+    def test_add_order_includes_validate_true_when_specified(self, mock_client):
+        # Given
+        from exchange_connector.services.add_order_service import AddOrderService
+        service = AddOrderService(mock_client)
+        mock_client.make_request.return_value = {'result': {'descr': {'order': 'test'}}, 'error': []}
+
+        with patch('exchange_connector.services.add_order_service.get_nonce', return_value='123456'):
+            # When
+            service.add_order('XXBTZGBP', 'buy', 100.0, validate=True)
+
+            # Then
+            call_args = mock_client.make_request.call_args
+            params = call_args[0][2]
+            assert params['validate'] is True
+
 
 @pytest.mark.exchange_connector
 @pytest.mark.services
