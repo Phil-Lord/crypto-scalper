@@ -536,6 +536,57 @@ class SupabaseClient:
 2. **Service layer** — Business logic, retry mechanisms, pagination, validation  
 3. **Connector layer** — Public API, domain object transformation, high-level interface
 
+### Multi-Exchange Support
+
+The Exchange Connector module is designed for **future multi-exchange support** (Binance, Coinbase, etc.).
+
+**Key architectural decisions:**
+- **Connectors** are the public API and must be platform-agnostic
+- **Services** are platform-specific (Kraken-specific currently)
+- **Consumers** always import connectors, never services directly
+
+**Current structure:**
+```python
+from exchange_connector import TickerConnector  # ✅ Correct (public API)
+from exchange_connector.services import TickerService  # ❌ Wrong (internal)
+```
+
+**Future structure when adding new exchanges:**
+```
+exchange_connector/
+├── __init__.py              # Exports connectors only
+├── connectors/              # Platform-agnostic interfaces (public)
+│   ├── ticker_connector.py  # Routes to platform-specific service
+│   └── ...
+├── api/                     # Platform-specific API clients (internal)
+│   ├── kraken_api_client.py
+│   └── binance_api_client.py
+└── services/                # Platform-specific services (internal)
+    ├── kraken/
+    │   └── ticker_service.py
+    └── binance/
+        └── ticker_service.py
+```
+
+### Layer Responsibilities
+
+**Connector layer (domain logic):**
+- Transform API responses to domain objects (`Trade`, etc.)
+- Validate business rules (order constraints, balance checks)
+- Provide consistent interface across exchanges
+- Handle domain-specific caching or enrichment
+
+**Service layer (platform logic):**
+- Handle platform-specific API details
+- Implement retry/rate-limiting strategies
+- Manage pagination for large datasets
+- Parse platform-specific error codes
+
+**Client layer (network/auth):**
+- Low-level HTTP requests
+- Authentication and signing
+- Parse HTTP-level errors
+
 ### Key Principles
 
 **Error handling belongs in the layer that can handle it:**
@@ -577,7 +628,17 @@ class TradesConnector:
 - ✅ Retry/resilience patterns  
 - ❌ Simple delegation with no transformation
 
+**Connector layer is strategic, not just tactical:**
+- Even if a connector currently only delegates to a service, it provides value by:
+  - Establishing a platform-agnostic interface for future exchanges
+  - Providing a stable public API separate from internal implementation
+  - Creating a natural home for domain logic as it emerges
+- Keep connectors thin but present — they enable future extensibility
+
 **Question to ask:** "What does this layer add beyond passing data through?"
+- For services: Platform-specific logic, retry, pagination
+- For connectors: Domain transformation, multi-exchange abstraction
+
 
 ---
 

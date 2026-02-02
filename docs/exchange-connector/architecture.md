@@ -114,3 +114,81 @@ def _to_domain(self, raw_trades: list[list], pair: str) -> list[Trade]:
 │   Objects   │
 └─────────────┘
 ```
+
+## Multi-Exchange Support
+
+The connector layer provides a **platform-agnostic interface** to enable future support for multiple cryptocurrency exchanges (Binance, Coinbase, etc.).
+
+### Why Connectors Matter for Multi-Exchange
+
+**Connectors abstract platform-specific implementations:**
+
+```python
+# Consumer code remains unchanged regardless of exchange
+from exchange_connector import TickerConnector
+
+connector = TickerConnector()  # Could be Kraken, Binance, etc.
+data = connector.fetch(pair)   # Same interface for all exchanges
+```
+
+Without the connector layer, consumers would need platform-specific imports:
+
+```python
+# Consumer must know which exchange to use
+from exchange_connector.kraken import TickerService
+# or
+from exchange_connector.binance import TickerService
+```
+
+### Planned Architecture for Multiple Exchanges
+
+When additional exchanges are added, the module will be organised by layer, with platform-specific implementations grouped within:
+
+```
+exchange_connector/
+├── __init__.py                     # Exports connectors (public API)
+├── connectors/                     # Platform-agnostic interfaces
+│   ├── base_connectors.py
+│   ├── ticker_connector.py
+│   └── ...
+├── api/                            # Platform-specific API clients
+│   ├── kraken_api_client.py
+│   ├── binance_api_client.py
+│   └── ...
+├── services/                       # Platform-specific services
+│   ├── kraken/
+│   │   ├── kraken_service.py
+│   │   ├── ticker_service.py
+│   │   └── ...
+│   └── binance/
+│       ├── binance_service.py
+│       ├── ticker_service.py
+│       └── ...
+└── kraken_utils/                   # Platform-specific utilities
+    └── kraken_auth_utils.py
+```
+
+**Key principles:**
+
+- **Connectors** are exported as the public API (platform-agnostic)
+- **Services** are platform-specific and internal
+- **Consumers** import from `exchange_connector` module root (connectors only)
+- **Connectors** route to the appropriate platform-specific service
+
+### Separation of Concerns
+
+**Connector responsibilities (domain logic):**
+
+- Transform API responses to domain objects (`Trade`, etc.)
+- Validate business rules (order constraints, balance checks)
+- Provide consistent interface across exchanges
+- Cache or enrich data (e.g., recent price caching)
+
+**Service responsibilities (platform logic):**
+
+- Handle platform-specific API details
+- Implement retry/rate-limiting strategies
+- Manage pagination for large datasets
+- Parse platform-specific error codes
+
+This separation keeps domain logic (what orders are valid) separate from platform logic (how Kraken's API works).
