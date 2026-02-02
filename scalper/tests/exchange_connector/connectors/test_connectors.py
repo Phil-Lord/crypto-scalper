@@ -79,6 +79,66 @@ class TestTradesConnector:
         assert trades[1].side == 's'
         assert trades[1].order_type == 'l'
 
+    def test_to_domain_raises_on_incomplete_trade_data(self, mock_client):
+        # Given
+        connector = TradesConnector(client=mock_client)
+        incomplete_trade = [['50000.0', '0.001', 1704067200.123]]  # Only 3 fields instead of 7
+
+        # When / Then
+        with pytest.raises(ValueError, match='Trade data incomplete'):
+            connector._to_domain(incomplete_trade, 'XXBTZGBP')
+
+    def test_to_domain_raises_on_invalid_price(self, mock_client):
+        # Given
+        connector = TradesConnector(client=mock_client)
+        invalid_trade = [['invalid_price', '0.001', 1704067200.123, 'b', 'm', '', 123456789]]
+
+        # When / Then
+        with pytest.raises(ValueError, match='Failed to parse trade data'):
+            connector._to_domain(invalid_trade, 'XXBTZGBP')
+
+    def test_to_domain_raises_on_invalid_volume(self, mock_client):
+        # Given
+        connector = TradesConnector(client=mock_client)
+        invalid_trade = [['50000.0', 'bad_volume', 1704067200.123, 'b', 'm', '', 123456789]]
+
+        # When / Then
+        with pytest.raises(ValueError, match='Failed to parse trade data'):
+            connector._to_domain(invalid_trade, 'XXBTZGBP')
+
+    def test_to_domain_raises_on_invalid_trade_id(self, mock_client):
+        # Given
+        connector = TradesConnector(client=mock_client)
+        invalid_trade = [['50000.0', '0.001', 1704067200.123, 'b', 'm', '', 'not_a_number']]
+
+        # When / Then
+        with pytest.raises(ValueError, match='Failed to parse trade data'):
+            connector._to_domain(invalid_trade, 'XXBTZGBP')
+
+    def test_to_domain_handles_empty_list(self, mock_client):
+        # Given
+        connector = TradesConnector(client=mock_client)
+
+        # When
+        trades = connector._to_domain([], 'XXBTZGBP')
+
+        # Then
+        assert trades == []
+
+    def test_fetch_passes_parameters_to_service(self, mock_client):
+        # Given
+        connector = TradesConnector(client=mock_client)
+        connector.service = Mock()
+        connector.service.fetch_trades.return_value = []
+        start = 1704067200000000000
+        end = 1704153600000000000
+
+        # When
+        connector.fetch('XXBTZGBP', start, end)
+
+        # Then
+        connector.service.fetch_trades.assert_called_once_with('XXBTZGBP', start, end)
+
 
 @pytest.mark.exchange_connector
 @pytest.mark.connectors
@@ -149,6 +209,47 @@ class TestAddOrderConnector:
         assert result.txid == ['ORDER-123']
         assert result.order_description == ''
 
+    def test_to_domain_handles_nested_description(self, mock_client):
+        # Given
+        connector = AddOrderConnector(client=mock_client)
+        response = {
+            'txid': ['ORDER-456'],
+            'descr': {'order': 'sell 0.50000000 XXBTZGBP @ market'}
+        }
+
+        # When
+        result = connector._to_domain(response)
+
+        # Then
+        assert result.txid == ['ORDER-456']
+        assert result.order_description == 'sell 0.50000000 XXBTZGBP @ market'
+
+    def test_to_domain_handles_multiple_txids(self, mock_client):
+        # Given
+        connector = AddOrderConnector(client=mock_client)
+        response = {
+            'txid': ['ORDER-001', 'ORDER-002'],
+            'descr': {'order': 'buy 100.00000000 XXBTZGBP @ market'}
+        }
+
+        # When
+        result = connector._to_domain(response)
+
+        # Then
+        assert result.txid == ['ORDER-001', 'ORDER-002']
+
+    def test_place_passes_correct_parameters(self, mock_client):
+        # Given
+        connector = AddOrderConnector(client=mock_client)
+        connector.service = Mock()
+        connector.service.add_order.return_value = {'txid': ['ORDER-123']}
+
+        # When
+        connector.place('XETHZUSD', 'sell', 5.5)
+
+        # Then
+        connector.service.add_order.assert_called_once_with('XETHZUSD', 'sell', 5.5)
+
 
 @pytest.mark.exchange_connector
 @pytest.mark.connectors
@@ -165,6 +266,14 @@ class TestBalanceConnector:
         # Then
         assert connector.client == mock_client
 
+    def test_init_creates_default_client(self):
+        # When
+        connector = BalanceConnector()
+
+        # Then
+        assert connector.client is not None
+        assert isinstance(connector.client, KrakenApiClient)
+
     def test_fetch_calls_service_fetch_balances(self, mock_client):
         # Given
         connector = BalanceConnector(client=mock_client)
@@ -177,6 +286,28 @@ class TestBalanceConnector:
         # Then
         connector.service.fetch_balances.assert_called_once()
         assert result == {'XXBT': '1.5', 'ZGBP': '1000.0'}
+
+    def test_fetch_returns_empty_dict_when_no_balances(self, mock_client):
+        # Given
+        connector = BalanceConnector(client=mock_client)
+        connector.service = Mock()
+        connector.service.fetch_balances.return_value = {}
+
+        # When
+        result = connector.fetch()
+
+        # Then
+        assert result == {}
+
+    def test_fetch_propagates_service_errors(self, mock_client):
+        # Given
+        connector = BalanceConnector(client=mock_client)
+        connector.service = Mock()
+        connector.service.fetch_balances.side_effect = RuntimeError('API Error')
+
+        # When / Then
+        with pytest.raises(RuntimeError, match='API Error'):
+            connector.fetch()
 
 
 @pytest.mark.exchange_connector
@@ -194,6 +325,14 @@ class TestTickerConnector:
         # Then
         assert connector.client == mock_client
 
+    def test_init_creates_default_client(self):
+        # When
+        connector = TickerConnector()
+
+        # Then
+        assert connector.client is not None
+        assert isinstance(connector.client, KrakenApiClient)
+
     def test_fetch_calls_service_fetch_ticker(self, mock_client):
         # Given
         connector = TickerConnector(client=mock_client)
@@ -206,6 +345,16 @@ class TestTickerConnector:
         # Then
         connector.service.fetch_ticker.assert_called_once_with('XXBTZGBP')
         assert result == {'a': ['50000.0'], 'b': ['49999.0']}
+
+    def test_fetch_propagates_service_errors(self, mock_client):
+        # Given
+        connector = TickerConnector(client=mock_client)
+        connector.service = Mock()
+        connector.service.fetch_ticker.side_effect = ValueError('Invalid pair')
+
+        # When / Then
+        with pytest.raises(ValueError, match='Invalid pair'):
+            connector.fetch('INVALID')
 
 
 @pytest.mark.exchange_connector
@@ -223,6 +372,28 @@ class TestAssetPairsConnector:
         # Then
         assert connector.client == mock_client
 
+    def test_init_creates_default_client(self):
+        # When
+        connector = AssetPairsConnector()
+
+        # Then
+        assert connector.client is not None
+        assert isinstance(connector.client, KrakenApiClient)
+
+    def test_fetch_calls_service(self, mock_client):
+        # Given
+        connector = AssetPairsConnector(client=mock_client)
+        connector.service = Mock()
+        expected_data = {'XXBTZGBP': {'altname': 'BTCGBP'}}
+        connector.service.fetch_asset_pairs.return_value = expected_data
+
+        # When
+        result = connector.fetch('XXBTZGBP')
+
+        # Then
+        connector.service.fetch_asset_pairs.assert_called_once_with('XXBTZGBP')
+        assert result == expected_data
+
 
 @pytest.mark.exchange_connector
 @pytest.mark.connectors
@@ -239,6 +410,14 @@ class TestOhlcConnector:
         # Then
         assert connector.client == mock_client
 
+    def test_init_creates_default_client(self):
+        # When
+        connector = OhlcConnector()
+
+        # Then
+        assert connector.client is not None
+        assert isinstance(connector.client, KrakenApiClient)
+
     def test_fetch_calls_service_fetch_ohlc(self, mock_client):
         # Given
         connector = OhlcConnector(client=mock_client)
@@ -252,3 +431,25 @@ class TestOhlcConnector:
         # Then
         connector.service.fetch_ohlc.assert_called_once_with('XXBTZGBP', 1, 1704067200)
         assert result == ohlc_data
+
+    def test_fetch_passes_all_parameters(self, mock_client):
+        # Given
+        connector = OhlcConnector(client=mock_client)
+        connector.service = Mock()
+        connector.service.fetch_ohlc.return_value = []
+
+        # When
+        connector.fetch('XETHZUSD', 5, 1704000000)
+
+        # Then
+        connector.service.fetch_ohlc.assert_called_once_with('XETHZUSD', 5, 1704000000)
+
+    def test_fetch_propagates_service_errors(self, mock_client):
+        # Given
+        connector = OhlcConnector(client=mock_client)
+        connector.service = Mock()
+        connector.service.fetch_ohlc.side_effect = ValueError('Invalid interval')
+
+        # When / Then
+        with pytest.raises(ValueError, match='Invalid interval'):
+            connector.fetch('XXBTZGBP', -1, 1704067200)

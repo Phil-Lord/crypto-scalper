@@ -72,6 +72,70 @@ class TestKrakenApiClient:
             with pytest.raises(RuntimeError, match='Failed to parse JSON'):
                 client.make_request('GET', '/0/public/Ticker', {'pair': 'XXBTZGBP'})
 
+    def test_make_request_constructs_correct_url_for_get(self, client, mock_response):
+        # Given
+        with patch('requests.get') as mock_get:
+            mock_get.return_value = Mock(
+                json=Mock(return_value=mock_response),
+                raise_for_status=Mock()
+            )
+
+            # When
+            client.make_request('GET', '/0/public/Time', {})
+
+            # Then
+            expected_url = 'https://api.kraken.com/0/public/Time'
+            assert mock_get.call_args[0][0] == expected_url
+
+    def test_make_request_constructs_correct_url_for_post(self, client, mock_response):
+        # Given
+        with patch('requests.post') as mock_post, \
+                patch('exchange_connector.api.kraken_api_client.get_headers') as mock_headers:
+            mock_post.return_value = Mock(
+                json=Mock(return_value=mock_response),
+                raise_for_status=Mock()
+            )
+            mock_headers.return_value = {'API-Key': 'key', 'API-Sign': 'sign'}
+
+            # When
+            client.make_request('POST', '/0/private/Balance', {'nonce': '123'})
+
+            # Then
+            expected_url = 'https://api.kraken.com/0/private/Balance'
+            assert mock_post.call_args[0][0] == expected_url
+
+    def test_make_request_passes_params_as_query_for_get(self, client, mock_response):
+        # Given
+        with patch('requests.get') as mock_get:
+            mock_get.return_value = Mock(
+                json=Mock(return_value=mock_response),
+                raise_for_status=Mock()
+            )
+            params = {'pair': 'XXBTZGBP', 'since': '123456'}
+
+            # When
+            client.make_request('GET', '/0/public/Ticker', params)
+
+            # Then
+            assert mock_get.call_args[1]['params'] == params
+
+    def test_make_request_passes_params_as_data_for_post(self, client, mock_response):
+        # Given
+        with patch('requests.post') as mock_post, \
+                patch('exchange_connector.api.kraken_api_client.get_headers') as mock_headers:
+            mock_post.return_value = Mock(
+                json=Mock(return_value=mock_response),
+                raise_for_status=Mock()
+            )
+            mock_headers.return_value = {'API-Key': 'key', 'API-Sign': 'sign'}
+            params = {'nonce': '123', 'pair': 'XXBTZGBP'}
+
+            # When
+            client.make_request('POST', '/0/private/AddOrder', params)
+
+            # Then
+            assert mock_post.call_args[1]['data'] == params
+
     def test_handle_errors_does_nothing_on_empty_error_list(self, client):
         # Given
         response = {'result': {'data': 'value'}, 'error': []}
@@ -94,6 +158,36 @@ class TestKrakenApiClient:
         # When / Then
         with pytest.raises(RuntimeError, match='API Error'):
             client._handle_errors(response)
+
+    def test_handle_errors_does_nothing_when_no_error_key(self, client):
+        # Given
+        response = {'result': {'data': 'value'}}
+
+        # When / Then (no exception raised)
+        client._handle_errors(response)
+
+    def test_handle_errors_raises_on_multiple_errors(self, client):
+        # Given
+        response = {'error': ['EOrder:Insufficient funds', 'EGeneral:Invalid nonce']}
+
+        # When / Then
+        with pytest.raises(RuntimeError, match='API Error'):
+            client._handle_errors(response)
+
+    def test_make_request_calls_raise_for_status(self, client, mock_response):
+        # Given
+        with patch('requests.get') as mock_get:
+            mock_status = Mock()
+            mock_get.return_value = Mock(
+                json=Mock(return_value=mock_response),
+                raise_for_status=mock_status
+            )
+
+            # When
+            client.make_request('GET', '/0/public/Ticker', {'pair': 'XXBTZGBP'})
+
+            # Then
+            mock_status.assert_called_once()
 
 
 @pytest.mark.exchange_connector
