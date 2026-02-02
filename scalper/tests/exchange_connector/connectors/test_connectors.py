@@ -1,8 +1,14 @@
 import pytest
 from unittest.mock import Mock
 
-from exchange_connector.connectors.trades_connector import TradesConnector
 from exchange_connector.api.kraken_api_client import KrakenApiClient
+from exchange_connector.connectors.add_order_connector import AddOrderConnector
+from exchange_connector.connectors.asset_pairs_connector import AssetPairsConnector
+from exchange_connector.connectors.balance_connector import BalanceConnector
+from exchange_connector.connectors.ohlc_connector import OhlcConnector
+from exchange_connector.connectors.ticker_connector import TickerConnector
+from exchange_connector.connectors.trades_connector import TradesConnector
+from exchange_connector.models import OrderResult
 from data_system.models.trade_model import Trade
 
 
@@ -82,29 +88,66 @@ class TestAddOrderConnector:
     def mock_client(self):
         return Mock(spec=KrakenApiClient)
 
-    def test_init_with_injected_client(self, mock_client):
-        # Given
-        from exchange_connector.connectors.add_order_connector import AddOrderConnector
+    @pytest.fixture
+    def raw_order_response(self):
+        return {
+            'txid': ['ORDER-123'],
+            'descr': {'order': 'buy 100.00000000 XXBTZGBP @ market'}
+        }
 
+    def test_init_with_injected_client(self, mock_client):
         # When
         connector = AddOrderConnector(client=mock_client)
 
         # Then
         assert connector.client == mock_client
 
-    def test_place_calls_service_add_order(self, mock_client):
+    def test_place_returns_order_result(self, mock_client, raw_order_response):
         # Given
-        from exchange_connector.connectors.add_order_connector import AddOrderConnector
         connector = AddOrderConnector(client=mock_client)
         connector.service = Mock()
-        connector.service.add_order.return_value = {'txid': ['ORDER-123']}
+        connector.service.add_order.return_value = raw_order_response
 
         # When
         result = connector.place('XXBTZGBP', 'buy', 100.0)
 
         # Then
         connector.service.add_order.assert_called_once_with('XXBTZGBP', 'buy', 100.0)
-        assert result == {'txid': ['ORDER-123']}
+        assert isinstance(result, OrderResult)
+        assert result.txid == ['ORDER-123']
+        assert result.order_description == 'buy 100.00000000 XXBTZGBP @ market'
+
+    def test_to_domain_converts_raw_response(self, mock_client, raw_order_response):
+        # Given
+        connector = AddOrderConnector(client=mock_client)
+
+        # When
+        result = connector._to_domain(raw_order_response)
+
+        # Then
+        assert result.txid == ['ORDER-123']
+        assert result.order_description == 'buy 100.00000000 XXBTZGBP @ market'
+
+    def test_to_domain_raises_on_missing_txid(self, mock_client):
+        # Given
+        connector = AddOrderConnector(client=mock_client)
+        invalid_response = {'descr': {'order': 'test'}}
+
+        # When / Then
+        with pytest.raises(ValueError, match='Missing transaction ID'):
+            connector._to_domain(invalid_response)
+
+    def test_to_domain_handles_missing_description(self, mock_client):
+        # Given
+        connector = AddOrderConnector(client=mock_client)
+        response_without_descr = {'txid': ['ORDER-123']}
+
+        # When
+        result = connector._to_domain(response_without_descr)
+
+        # Then
+        assert result.txid == ['ORDER-123']
+        assert result.order_description == ''
 
 
 @pytest.mark.exchange_connector
@@ -116,9 +159,6 @@ class TestBalanceConnector:
         return Mock(spec=KrakenApiClient)
 
     def test_init_with_injected_client(self, mock_client):
-        # Given
-        from exchange_connector.connectors.balance_connector import BalanceConnector
-
         # When
         connector = BalanceConnector(client=mock_client)
 
@@ -127,7 +167,6 @@ class TestBalanceConnector:
 
     def test_fetch_calls_service_fetch_balances(self, mock_client):
         # Given
-        from exchange_connector.connectors.balance_connector import BalanceConnector
         connector = BalanceConnector(client=mock_client)
         connector.service = Mock()
         connector.service.fetch_balances.return_value = {'XXBT': '1.5', 'ZGBP': '1000.0'}
@@ -149,9 +188,6 @@ class TestTickerConnector:
         return Mock(spec=KrakenApiClient)
 
     def test_init_with_injected_client(self, mock_client):
-        # Given
-        from exchange_connector.connectors.ticker_connector import TickerConnector
-
         # When
         connector = TickerConnector(client=mock_client)
 
@@ -160,7 +196,6 @@ class TestTickerConnector:
 
     def test_fetch_calls_service_fetch_ticker(self, mock_client):
         # Given
-        from exchange_connector.connectors.ticker_connector import TickerConnector
         connector = TickerConnector(client=mock_client)
         connector.service = Mock()
         connector.service.fetch_ticker.return_value = {'a': ['50000.0'], 'b': ['49999.0']}
@@ -182,9 +217,6 @@ class TestAssetPairsConnector:
         return Mock(spec=KrakenApiClient)
 
     def test_init_with_injected_client(self, mock_client):
-        # Given
-        from exchange_connector.connectors.asset_pairs_connector import AssetPairsConnector
-
         # When
         connector = AssetPairsConnector(client=mock_client)
 
@@ -201,9 +233,6 @@ class TestOhlcConnector:
         return Mock(spec=KrakenApiClient)
 
     def test_init_with_injected_client(self, mock_client):
-        # Given
-        from exchange_connector.connectors.ohlc_connector import OhlcConnector
-
         # When
         connector = OhlcConnector(client=mock_client)
 
@@ -212,7 +241,6 @@ class TestOhlcConnector:
 
     def test_fetch_calls_service_fetch_ohlc(self, mock_client):
         # Given
-        from exchange_connector.connectors.ohlc_connector import OhlcConnector
         connector = OhlcConnector(client=mock_client)
         connector.service = Mock()
         ohlc_data = [[1704067200, '50000', '50100', '49900', '50050', '100', '5000000', 10]]

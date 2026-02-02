@@ -96,7 +96,7 @@ Place a market order (requires authentication).
 ```python
 connector = AddOrderConnector()
 result = connector.place('XXBTZGBP', 'buy', 100.0)  # Buy £100 worth
-# Returns: {'txid': ['ORDER-ID'], ...}
+# Returns: OrderResult(txid=['ORDER-ID'], order_description='buy 100.00000000 XXBTZGBP @ market')
 ```
 
 **Note:** Buy orders use `viqc` flag (volume in quote currency).

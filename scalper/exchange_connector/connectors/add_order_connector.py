@@ -1,5 +1,6 @@
 from .base_connectors import PlaceConnector
 from exchange_connector.api import KrakenApiClient
+from exchange_connector.models import OrderResult
 from exchange_connector.services import AddOrderService
 
 
@@ -8,13 +9,36 @@ class AddOrderConnector(PlaceConnector):
         self.client = client or KrakenApiClient()
         self.service = AddOrderService(self.client)
 
-    def place(self, pair: str, signal: str, volume: float) -> dict:
+    def place(self, pair: str, signal: str, volume: float) -> OrderResult:
         '''
         Place a market order.
 
         :param pair: Trading pair in Kraken format, e.g., 'XXBTZGBP'.
         :param signal: Order direction - 'buy' or 'sell'.
         :param volume: Order volume (quote currency for buy, base for sell).
-        :return: Order result from Kraken API.
+        :return: OrderResult domain object containing transaction IDs and order description.
         '''
-        return self.service.add_order(pair, signal, volume)
+        raw_result = self.service.add_order(pair, signal, volume)
+        return self._to_domain(raw_result)
+
+    def _to_domain(self, raw_result: dict) -> OrderResult:
+        '''
+        Convert raw Kraken AddOrder response to OrderResult domain object.
+
+        :param raw_result: Raw API response from Kraken.
+        :return: OrderResult domain object.
+        :raises ValueError: If response structure is invalid.
+        '''
+        try:
+            txid = raw_result.get('txid', [])
+            order_description = raw_result.get('descr', {}).get('order', '')
+            
+            if not txid:
+                raise ValueError('Missing transaction ID in order response')
+            
+            return OrderResult(
+                txid=txid,
+                order_description=order_description
+            )
+        except (AttributeError, TypeError) as e:
+            raise ValueError(f'Failed to parse order result: {raw_result}. Error: {e}')

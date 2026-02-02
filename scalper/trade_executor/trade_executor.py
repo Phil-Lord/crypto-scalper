@@ -55,9 +55,8 @@ class TradeExecutor:
         try:
             logger.info(f'Placing {signal.upper()} order: volume={volume}')
             order_result = self.add_order_connector.place(self.pair, signal, volume)
-            order_id = order_result.get('txid')
-            order_descr = order_result.get('descr', {}).get('order')
-            logger.info(f'Trade executed: id={order_id}, order={order_descr}')
+            logger.info(
+                f'Trade executed: id={order_result.txid[0]}, order={order_result.order_description}')
             # TODO: Log execution price, volume, and fee.
         except Exception as e:
             logger.error(f'Trade execution failed: {e}', exc_info=True)

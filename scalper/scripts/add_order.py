@@ -16,7 +16,8 @@ def add_order(pair: str, signal: str, volume: float) -> None:
 
     add_order_connector = AddOrderConnector()
     result = add_order_connector.place(kraken_pair, signal, volume)
-    print(result)
+    print(f'Order placed: {result.txid}')
+    print(f'Description: {result.order_description}')
 
 
 def get_wallet_volume(signal: str, kraken_pair: str) -> float:

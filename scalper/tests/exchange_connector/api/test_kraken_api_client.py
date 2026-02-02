@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import Mock, patch
 
-from exchange_connector.api.kraken_api_client import KrakenApiClient
 from exchange_connector.api.exceptions import KrakenTooManyRequestsError
+from exchange_connector.api.kraken_api_client import KrakenApiClient
 
 
 @pytest.mark.exchange_connector
