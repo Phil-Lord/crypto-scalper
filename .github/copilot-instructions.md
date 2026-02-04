@@ -303,6 +303,64 @@ def sample_trade(self) -> Trade:
     )
 ```
 
+### Integration Tests
+
+Integration tests verify that multiple layers work together correctly by mocking only at system boundaries.
+
+**Location:** `scalper/tests/integration/`
+
+**Key principles:**
+- Mock external systems (HTTP requests, database connections), not internal layers
+- Let all our code run (connectors, services, clients, transformations)
+- Use realistic mock data that matches actual external responses
+- Test error propagation through the full stack
+
+**Markers:**
+- `@pytest.mark.integration` — Module-level marker
+- `@pytest.mark.{module}_integration` — Specific integration test suite
+
+**When to write integration tests:**
+- Testing interactions between multiple layers (connector → service → client)
+- Verifying domain transformation with realistic data
+- Testing parameter handling through the stack
+- Validating error propagation across layers
+
+**When NOT to write integration tests:**
+- Simple unit-level functionality (use unit tests)
+- Testing individual methods in isolation
+
+**Common patterns:**
+
+```python
+@pytest.mark.integration
+@pytest.mark.exchange_connector_integration
+class TestExchangeConnectorIntegration:
+    '''Integration tests for the connector -> service -> client stack.'''
+
+    def test_full_stack_integration(self, mock_api_response):
+        # Given
+        connector = SomeConnector()
+        
+        # When - Mock HTTP, let everything else run
+        with patch('time.sleep'), patch('requests.Session.request') as mock_request:
+            mock_response = Mock()
+            mock_response.json.return_value = mock_api_response
+            mock_response.raise_for_status.return_value = None
+            mock_request.return_value = mock_response
+            
+            result = connector.fetch(params)
+        
+        # Then
+        assert result is not None
+        # Verify transformation, parameter handling, etc.
+```
+
+**Critical considerations:**
+- Mock `time.sleep` to prevent retry delays
+- Ensure mock data won't trigger infinite loops (e.g., pagination 'last' values)
+- Use `isinstance(obj, list)` not `isinstance(obj, list[Type])` (parameterized generics fail)
+- Account for service-level transformations (e.g., `[:-1]` slicing)
+
 ---
 
 ## File & Module Naming
