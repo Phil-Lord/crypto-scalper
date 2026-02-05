@@ -1,4 +1,5 @@
 import logging
+import re
 
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_log, after_log
 
@@ -38,7 +39,19 @@ class KrakenService:
         return response['result']
 
     def validate_pair(self, pair: str) -> None:
+        '''
+        Validate Kraken trading pair format.
+        6-12 uppercase alphanumeric characters, e.g. XXBTZGBP, ADAUSD, ADA2USD.
+
+        :param pair: Trading pair to validate.
+        :raises ValueError: If pair is invalid.
+        '''
         if not pair:
             raise ValueError('Trading pair cannot be empty.')
-        if not isinstance(pair, str) or len(pair) < 6:
-            raise ValueError(f'Invalid trading pair: {pair}.')
+        if not isinstance(pair, str):
+            raise ValueError(f'Trading pair must be a string, got {type(pair).__name__}.')
+        if not re.match(r'^[A-Z0-9]{6,12}$', pair):
+            raise ValueError(
+                f'Invalid trading pair format: {pair}. '
+                f'Must be 6-12 uppercase alphanumeric characters (e.g., XXBTZGBP, ADAUSD).'
+            )
