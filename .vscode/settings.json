@@ -17,4 +17,8 @@
         "editor.formatOnPaste": false,
         "diffEditor.ignoreTrimWhitespace": false,
     },
+
+    // GitHub Copilot settings
+    "github.copilot.chat.askQuestions.enabled": true,
+    "inlineChat.renderMode": "hover"
 }

@@ -142,9 +142,10 @@ Docstrings are NOT required for:
 - **Constants and config values** — Self-explanatory by name
 - **Simple utility functions** — If the name and signature are clear
 - **Internal helpers** — Short functions with obvious purpose
+- **Simple exception classes** — If the class name is self-documenting (e.g., `KrakenTooManyRequestsError`)
 - **Methods that only delegate** — If they just call another method with the same semantics
 
-**Guideline:** Avoid over-explaining self-documenting code or duplicating docstrings from called methods. Focus docstrings on understanding parameters, return types, and non-obvious behavior.
+**Guideline:** Avoid over-explaining self-documenting code or duplicating docstrings from called methods. Focus docstrings on understanding parameters, return types, and non-obvious behavior. If reading a docstring would be slower than reading the code itself, skip the docstring.
 
 ### Docstring Style
 
@@ -305,29 +306,31 @@ def sample_trade(self) -> Trade:
 
 ### Integration Tests
 
-Integration tests verify that multiple layers work together correctly by mocking only at system boundaries.
+Integration tests verify that **multiple layers work together** correctly by mocking only at system boundaries.
+
+**Purpose:** Catch issues in layer interactions, data transformations, and parameter passing that unit tests miss.
 
 **Location:** `scalper/tests/integration/`
 
-**Key principles:**
-- Mock external systems (HTTP requests, database connections), not internal layers
-- Let all our code run (connectors, services, clients, transformations)
-- Use realistic mock data that matches actual external responses
-- Test error propagation through the full stack
+**What makes a test an integration test:**
+- Mocks **only external systems** (HTTP, database connections, file I/O)
+- Lets **all our code run** (connectors, services, clients, transformations)
+- Tests **realistic end-to-end scenarios** with actual data flows
 
 **Markers:**
 - `@pytest.mark.integration` — Module-level marker
 - `@pytest.mark.{module}_integration` — Specific integration test suite
 
 **When to write integration tests:**
-- Testing interactions between multiple layers (connector → service → client)
-- Verifying domain transformation with realistic data
-- Testing parameter handling through the stack
-- Validating error propagation across layers
+- Testing **multi-layer interactions** (connector → service → client stack)
+- Verifying **domain transformations** with realistic API data
+- Testing **parameter handling** through multiple function calls
+- Validating **error propagation** from low-level errors to high-level handlers
 
 **When NOT to write integration tests:**
-- Simple unit-level functionality (use unit tests)
-- Testing individual methods in isolation
+- Simple unit-level functionality (use unit tests instead)
+- Testing individual methods in isolation (use unit tests instead)
+- Complex business logic that doesn't involve layer interactions (use unit tests instead)
 
 **Common patterns:**
 
@@ -376,12 +379,26 @@ class TestExchangeConnectorIntegration:
 
 ### Module Exports (`__init__.py`)
 
-Export the public API explicitly:
+Export the public API explicitly. Only export what external consumers need:
 
 ```python
+# ✅ Correct - Export public domain models and interfaces
 from .models.bot_model import Bot
 from .models.trade_model import Trade
+from .repositories.bot_repository import BotRepository
 ```
+
+**What NOT to export:**
+- Internal utilities used only within the module
+- Implementation details (e.g., services in a connector/service/client architecture)
+- Helper functions that are module-internal
+
+```python
+# ❌ Wrong - Don't export internal utilities
+from .internal_utils import get_nonce, sign_request  # Only used internally
+```
+
+**Rule of thumb:** If it's imported by code outside this module, it should be in `__init__.py`. If it's only used internally, don't export it.
 
 ### Scripts (`scalper/scripts/`)
 

@@ -28,7 +28,7 @@ Audit the specified module against the project's copilot-instructions.md standar
 #### Documentation
 - [ ] **Module has docs** — `/docs/{module}/index.md` exists for significant modules
 - [ ] **Docstrings where valuable** — Domain models, public APIs, complex logic, non-obvious parameters
-- [ ] **No over-documentation** — Avoid duplicating self-explanatory code
+- [ ] **No over-documentation** — Avoid duplicating self-explanatory code (includes simple exception classes with clear names, internal utilities)
 - [ ] **reStructuredText style** — Using `:param`, `:return` format
 
 #### Configuration
@@ -44,11 +44,12 @@ Audit the specified module against the project's copilot-instructions.md standar
 - [ ] **Markers registered** — All markers in `pytest.ini`
 - [ ] **Makefile target** — `test/{module}` exists
 - [ ] **Test coverage depth** — Testing complex behaviors (retry, pagination, errors), not just happy paths
+- [ ] **Integration tests** — Mock only system boundaries (HTTP, DB), let all our code run, test multi-layer interactions
 - [ ] **Fixture quality** — Type-hinted, descriptive names, appropriate scope
 
 #### File & Module Naming
 - [ ] **Naming conventions** — Following module/file/test naming standards
-- [ ] **Public API exports** — `__init__.py` exports the public interface
+- [ ] **Public API exports** — `__init__.py` exports only the public interface (excludes internal utilities)
 
 ### Architectural Patterns (Part 2) — When Applicable
 
