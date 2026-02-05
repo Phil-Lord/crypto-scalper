@@ -91,17 +91,49 @@ class TestKrakenService:
 
     def test_validate_pair_raises_on_short_pair(self, service):
         # When / Then
-        with pytest.raises(ValueError, match='Invalid trading pair'):
+        with pytest.raises(ValueError, match='Invalid trading pair format'):
             service.validate_pair('BTC')
 
     def test_validate_pair_raises_on_non_string_pair(self, service):
         # When / Then
-        with pytest.raises(ValueError, match='Invalid trading pair'):
+        with pytest.raises(ValueError, match='must be a string'):
             service.validate_pair(12345)
+
+    def test_validate_pair_raises_on_lowercase_pair(self, service):
+        # When / Then
+        with pytest.raises(ValueError, match='Invalid trading pair format'):
+            service.validate_pair('xxbtzgbp')
+
+    def test_validate_pair_raises_on_mixed_case_pair(self, service):
+        # When / Then
+        with pytest.raises(ValueError, match='Invalid trading pair format'):
+            service.validate_pair('XxBtZgBp')
+
+    def test_validate_pair_raises_on_special_characters(self, service):
+        # When / Then
+        with pytest.raises(ValueError, match='Invalid trading pair format'):
+            service.validate_pair('XBT-GBP')
+
+    def test_validate_pair_raises_on_too_long_pair(self, service):
+        # When / Then
+        with pytest.raises(ValueError, match='Invalid trading pair format'):
+            service.validate_pair('XXBTZGBPEXTRA')
 
     def test_validate_pair_accepts_valid_pair(self, service):
         # When / Then (no exception raised)
         service.validate_pair('XXBTZGBP')
+
+    def test_validate_pair_accepts_six_char_pair(self, service):
+        # When / Then
+        service.validate_pair('ADAUSD')
+
+    def test_validate_pair_accepts_pair_with_numbers(self, service):
+        # When / Then
+        service.validate_pair('ADA2USD')
+
+    def test_validate_pair_accepts_twelve_char_pair(self, service):
+        # When / Then
+        service.validate_pair('XXBTZGBPLONG')
 
 
 @pytest.mark.exchange_connector
