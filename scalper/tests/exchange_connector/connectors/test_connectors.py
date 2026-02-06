@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import Mock
 
 from exchange_connector.api.kraken_api_client import KrakenApiClient
+from exchange_connector.api.exceptions import KrakenApiResponseError
 from exchange_connector.connectors.add_order_connector import AddOrderConnector
 from exchange_connector.connectors.asset_pairs_connector import AssetPairsConnector
 from exchange_connector.connectors.balance_connector import BalanceConnector
@@ -315,10 +316,10 @@ class TestBalanceConnector:
         # Given
         connector = BalanceConnector(client=mock_client)
         connector.service = Mock()
-        connector.service.fetch_balances.side_effect = RuntimeError('API Error')
+        connector.service.fetch_balances.side_effect = KrakenApiResponseError('API Error')
 
         # When / Then
-        with pytest.raises(RuntimeError, match='API Error'):
+        with pytest.raises(KrakenApiResponseError, match='API Error'):
             connector.fetch()
 
 

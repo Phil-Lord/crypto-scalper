@@ -5,7 +5,10 @@ from tenacity import RetryError
 
 from exchange_connector.services.kraken_service import KrakenService
 from exchange_connector.api.kraken_api_client import KrakenApiClient
-from exchange_connector.api.exceptions import KrakenTooManyRequestsError
+from exchange_connector.api.exceptions import (
+    KrakenTooManyRequestsError,
+    KrakenApiResponseError,
+)
 
 
 @pytest.mark.exchange_connector
@@ -70,10 +73,10 @@ class TestKrakenService:
 
     def test_make_request_does_not_retry_on_other_errors(self, service, mock_client):
         # Given
-        mock_client.make_request.side_effect = RuntimeError('API Error')
+        mock_client.make_request.side_effect = KrakenApiResponseError('API Error')
 
         # When / Then
-        with pytest.raises(RuntimeError, match='API Error'):
+        with pytest.raises(KrakenApiResponseError, match='API Error'):
             service.make_request('GET', '/0/public/Ticker', {'pair': 'XXBTZGBP'})
 
         # Should not retry on non-rate-limit errors
@@ -236,7 +239,8 @@ class TestAddOrderService:
         # Given
         from exchange_connector.services.add_order_service import AddOrderService
         service = AddOrderService(mock_client)
-        mock_client.make_request.return_value = {'result': {'descr': {'order': 'test'}}, 'error': []}
+        mock_client.make_request.return_value = {
+            'result': {'descr': {'order': 'test'}}, 'error': []}
 
         with patch('exchange_connector.services.add_order_service.get_nonce', return_value='123456'):
             # When

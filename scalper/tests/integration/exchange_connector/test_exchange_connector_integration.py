@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import Mock, patch
 
+from exchange_connector.api.exceptions import KrakenApiResponseError
 from exchange_connector.connectors.ticker_connector import TickerConnector
 from exchange_connector.connectors.trades_connector import TradesConnector
 from exchange_connector.connectors.asset_pairs_connector import AssetPairsConnector
@@ -256,7 +257,7 @@ class TestExchangeConnectorIntegration:
             mock_response.raise_for_status.return_value = None
             mock_request.return_value = mock_response
 
-            with pytest.raises(RuntimeError) as exc_info:
+            with pytest.raises(KrakenApiResponseError) as exc_info:
                 connector.fetch(pair)
             assert 'EQuery:Unknown asset pair' in str(exc_info.value)
 

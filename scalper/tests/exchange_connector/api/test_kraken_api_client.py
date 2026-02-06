@@ -1,7 +1,12 @@
 import pytest
 from unittest.mock import Mock, patch
 
-from exchange_connector.api.exceptions import KrakenTooManyRequestsError
+from exchange_connector.api.exceptions import (
+    KrakenTooManyRequestsError,
+    KrakenApiResponseError,
+    KrakenNetworkError,
+    KrakenParseError,
+)
 from exchange_connector.api.kraken_api_client import KrakenApiClient
 
 
@@ -50,17 +55,17 @@ class TestKrakenApiClient:
             assert result == mock_response
             mock_headers.assert_called_once_with(params, '/0/private/Balance')
 
-    def test_make_request_raises_runtime_error_on_request_failure(self, client):
+    def test_make_request_raises_network_error_on_request_failure(self, client):
         # Given
         import requests
         with patch('requests.get') as mock_get:
             mock_get.side_effect = requests.RequestException('Connection failed')
 
             # When / Then
-            with pytest.raises(RuntimeError, match='Error making request'):
+            with pytest.raises(KrakenNetworkError, match='Error making request'):
                 client.make_request('GET', '/0/public/Ticker', {'pair': 'XXBTZGBP'})
 
-    def test_make_request_raises_runtime_error_on_json_parse_failure(self, client):
+    def test_make_request_raises_parse_error_on_json_parse_failure(self, client):
         # Given
         with patch('requests.get') as mock_get:
             mock_get.return_value = Mock(
@@ -69,7 +74,7 @@ class TestKrakenApiClient:
             )
 
             # When / Then
-            with pytest.raises(RuntimeError, match='Failed to parse JSON'):
+            with pytest.raises(KrakenParseError, match='Failed to parse JSON'):
                 client.make_request('GET', '/0/public/Ticker', {'pair': 'XXBTZGBP'})
 
     def test_make_request_constructs_correct_url_for_get(self, client, mock_response):
@@ -151,12 +156,12 @@ class TestKrakenApiClient:
         with pytest.raises(KrakenTooManyRequestsError):
             client._handle_errors(response)
 
-    def test_handle_errors_raises_runtime_error_for_other_errors(self, client):
+    def test_handle_errors_raises_api_response_error_for_other_errors(self, client):
         # Given
         response = {'error': ['EOrder:Insufficient funds']}
 
         # When / Then
-        with pytest.raises(RuntimeError, match='API Error'):
+        with pytest.raises(KrakenApiResponseError, match='API Error'):
             client._handle_errors(response)
 
     def test_handle_errors_does_nothing_when_no_error_key(self, client):
@@ -171,7 +176,7 @@ class TestKrakenApiClient:
         response = {'error': ['EOrder:Insufficient funds', 'EGeneral:Invalid nonce']}
 
         # When / Then
-        with pytest.raises(RuntimeError, match='API Error'):
+        with pytest.raises(KrakenApiResponseError, match='API Error'):
             client._handle_errors(response)
 
     def test_make_request_calls_raise_for_status(self, client, mock_response):
@@ -207,3 +212,59 @@ class TestKrakenTooManyRequestsError:
 
         # Then
         assert isinstance(error, Exception)
+
+
+@pytest.mark.exchange_connector
+@pytest.mark.api
+class TestKrakenApiErrorHierarchy:
+    def test_all_kraken_errors_inherit_from_base(self):
+        # Given
+        from exchange_connector.api.exceptions import KrakenApiError
+
+        # When / Then
+        assert issubclass(KrakenTooManyRequestsError, KrakenApiError)
+        assert issubclass(KrakenApiResponseError, KrakenApiError)
+        assert issubclass(KrakenNetworkError, KrakenApiError)
+        assert issubclass(KrakenParseError, KrakenApiError)
+
+    def test_can_catch_all_kraken_errors_with_base_class(self):
+        # Given
+        from exchange_connector.api.exceptions import KrakenApiError
+
+        # When / Then - Rate limit error
+        try:
+            raise KrakenTooManyRequestsError()
+        except KrakenApiError:
+            pass  # Successfully caught
+
+        # When / Then - API response error
+        try:
+            raise KrakenApiResponseError('Test error')
+        except KrakenApiError:
+            pass  # Successfully caught
+
+        # When / Then - Network error
+        try:
+            raise KrakenNetworkError('Network failed')
+        except KrakenApiError:
+            pass  # Successfully caught
+
+        # When / Then - Parse error
+        try:
+            raise KrakenParseError('Parse failed')
+        except KrakenApiError:
+            pass  # Successfully caught
+
+    def test_can_catch_specific_error_types(self):
+        # When / Then
+        with pytest.raises(KrakenTooManyRequestsError):
+            raise KrakenTooManyRequestsError()
+
+        with pytest.raises(KrakenApiResponseError):
+            raise KrakenApiResponseError('API error')
+
+        with pytest.raises(KrakenNetworkError):
+            raise KrakenNetworkError('Network error')
+
+        with pytest.raises(KrakenParseError):
+            raise KrakenParseError('Parse error')

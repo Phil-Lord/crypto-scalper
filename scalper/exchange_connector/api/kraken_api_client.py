@@ -1,7 +1,12 @@
 import requests
 from typing import Any
 
-from .exceptions import KrakenTooManyRequestsError
+from .exceptions import (
+    KrakenTooManyRequestsError,
+    KrakenApiResponseError,
+    KrakenNetworkError,
+    KrakenParseError,
+)
 from exchange_connector.kraken_utils import get_headers
 
 
@@ -22,7 +27,10 @@ class KrakenApiClient:
         :param endpoint: API endpoint path, e.g., '/0/public/Ticker'.
         :param params: Request parameters.
         :return: Parsed JSON response.
-        :raises RuntimeError: If request fails or response cannot be parsed.
+        :raises KrakenNetworkError: If network request fails.
+        :raises KrakenParseError: If response cannot be parsed as JSON.
+        :raises KrakenTooManyRequestsError: If API rate limit is exceeded.
+        :raises KrakenApiResponseError: If API returns an error response.
         '''
         try:
             url = self.BASE_URL + endpoint
@@ -35,14 +43,14 @@ class KrakenApiClient:
             json_response = response.json()
             self._handle_errors(json_response)
             return json_response
-        except requests.RequestException:
-            raise RuntimeError(f'Error making request to {endpoint}.')
-        except ValueError:
-            raise RuntimeError('Failed to parse JSON response.')
+        except requests.RequestException as e:
+            raise KrakenNetworkError(f'Error making request to {endpoint}: {e}')
+        except ValueError as e:
+            raise KrakenParseError(f'Failed to parse JSON response: {e}')
 
     def _handle_errors(self, response: dict[str, Any]) -> None:
         if 'error' in response and response['error']:
             if response['error'] == ['EGeneral:Too many requests']:
                 raise KrakenTooManyRequestsError()
             else:
-                raise RuntimeError(f"API Error: {response['error']}.")
+                raise KrakenApiResponseError(f"API Error: {response['error']}")
