@@ -120,9 +120,37 @@ Kraken enforces rate limits. The module handles this with:
 
 ## Error Handling
 
-| Error            | Exception                    | Handling   |
-| ---------------- | ---------------------------- | ---------- |
-| Rate limited     | `KrakenTooManyRequestsError` | Auto-retry |
-| Other API errors | `RuntimeError`               | Propagated |
-| Network errors   | `RuntimeError`               | Propagated |
-| Invalid pair     | `ValueError`                 | Propagated |
+All Kraken-specific errors inherit from `KrakenApiError`, allowing you to catch all API errors with a single exception handler or handle specific error types:
+
+```python
+from exchange_connector import (
+    TickerConnector,
+    KrakenApiError,
+    KrakenTooManyRequestsError,
+    KrakenNetworkError,
+)
+
+try:
+    connector = TickerConnector()
+    data = connector.fetch('XXBTZGBP')
+except KrakenTooManyRequestsError:
+    # Rate limit hit - already auto-retried 5 times
+    print('Rate limit exceeded after retries')
+except KrakenNetworkError:
+    # Network connectivity issue
+    print('Network unavailable')
+except KrakenApiError as e:
+    # Catch any other Kraken API error
+    print(f'API error: {e}')
+```
+
+### Exception Types
+
+| Exception                    | Raised When                                                | Handling   |
+| ---------------------------- | ---------------------------------------------------------- | ---------- |
+| `KrakenApiError`             | Base class for all Kraken errors                           | N/A        |
+| `KrakenTooManyRequestsError` | Rate limit exceeded                                        | Auto-retry |
+| `KrakenApiResponseError`     | API returns error (e.g., invalid pair, insufficient funds) | Propagated |
+| `KrakenNetworkError`         | Network/HTTP request fails                                 | Propagated |
+| `KrakenParseError`           | Response cannot be parsed as JSON                          | Propagated |
+| `ValueError`                 | Invalid parameter (e.g., bad pair format)                  | Propagated |

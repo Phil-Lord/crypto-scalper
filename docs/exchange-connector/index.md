@@ -11,7 +11,8 @@ from exchange_connector import (
     TradesConnector,
     TickerConnector,
     BalanceConnector,
-    AddOrderConnector
+    AddOrderConnector,
+    KrakenApiError,  # Base exception for error handling
 )
 
 # Fetch historical trades (returns Trade domain objects)
@@ -27,9 +28,12 @@ current_price = float(price_data['c'][0])
 balance_connector = BalanceConnector()
 balances = balance_connector.fetch()
 
-# Place a market order
+# Place a market order with error handling
 order_connector = AddOrderConnector()
-result = order_connector.place('XXBTZGBP', 'buy', 100.0)  # Buy £100 worth
+try:
+    result = order_connector.place('XXBTZGBP', 'buy', 100.0)  # Buy £100 worth
+except KrakenApiError as e:
+    print(f'API error: {e}')
 ```
 
 ## Contents
