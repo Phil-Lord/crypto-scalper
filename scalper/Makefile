@@ -1,4 +1,4 @@
-.PHONY: test test/utils test/data_system test/data_system/models test/data_system/repositories test/data_system/config test/data_system/clients test/exchange_connector test/exchange_connector/api test/exchange_connector/connectors test/exchange_connector/services test/exchange_connector/kraken_utils test/integration test/integration/data_system test/integration/exchange_connector
+.PHONY: test test/utils test/data_system test/data_system/models test/data_system/repositories test/data_system/config test/data_system/clients test/exchange_connector test/exchange_connector/api test/exchange_connector/connectors test/exchange_connector/services test/exchange_connector/kraken_utils test/integration test/integration/data_system test/integration/exchange_connector test/integration/exchange_connector_data_system
 
 # Run all tests
 test:
@@ -51,3 +51,6 @@ test/integration/data_system:
 
 test/integration/exchange_connector:
 	pytest -m exchange_connector_integration
+
+test/integration/exchange_connector_data_system:
+	pytest -m exchange_connector_data_system_integration
