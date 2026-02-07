@@ -15,16 +15,17 @@ class TestPlotPositionProfits:
         # When / Then (no exception)
         plot_position_profits(df)
 
-    def test_handles_empty_dataframe(self, monkeypatch, capsys):
+    def test_handles_empty_dataframe(self, monkeypatch, caplog):
         # Given
         monkeypatch.setattr('matplotlib.pyplot.show', lambda: None)
 
         # When
+        import logging
+        caplog.set_level(logging.WARNING)
         plot_position_profits(pd.DataFrame())
 
         # Then
-        captured = capsys.readouterr()
-        assert 'No positions to plot' in captured.out
+        assert 'No positions to plot' in caplog.text
 
 
 @pytest.mark.utils
@@ -61,13 +62,14 @@ class TestPlotTradeDataFromDb:
         # When / Then (no exception)
         plot_trade_data_from_db(trades)
 
-    def test_handles_empty_list(self, monkeypatch, capsys):
+    def test_handles_empty_list(self, monkeypatch, caplog):
         # Given
         monkeypatch.setattr('matplotlib.pyplot.show', lambda: None)
 
         # When
+        import logging
+        caplog.set_level(logging.WARNING)
         plot_trade_data_from_db([])
 
         # Then
-        captured = capsys.readouterr()
-        assert 'No trades to plot' in captured.out
+        assert 'No trades to plot' in caplog.text

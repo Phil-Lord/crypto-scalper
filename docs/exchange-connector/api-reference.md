@@ -135,13 +135,13 @@ try:
     data = connector.fetch('XXBTZGBP')
 except KrakenTooManyRequestsError:
     # Rate limit hit - already auto-retried 5 times
-    print('Rate limit exceeded after retries')
+    logger.error('Rate limit exceeded after retries')
 except KrakenNetworkError:
     # Network connectivity issue
-    print('Network unavailable')
+    logger.error('Network unavailable')
 except KrakenApiError as e:
     # Catch any other Kraken API error
-    print(f'API error: {e}')
+    logger.error(f'API error: {e}')
 ```
 
 ### Exception Types

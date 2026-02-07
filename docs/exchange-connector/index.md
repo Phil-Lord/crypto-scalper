@@ -33,7 +33,7 @@ order_connector = AddOrderConnector()
 try:
     result = order_connector.place('XXBTZGBP', 'buy', 100.0)  # Buy £100 worth
 except KrakenApiError as e:
-    print(f'API error: {e}')
+    logger.error(f'API error: {e}')
 ```
 
 ## Contents

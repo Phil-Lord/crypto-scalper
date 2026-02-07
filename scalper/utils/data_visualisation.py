@@ -1,10 +1,14 @@
+import logging
+
 import matplotlib.pyplot as plt
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def plot_position_profits(position_profits: pd.DataFrame) -> None:
     if position_profits.empty:
-        print("No positions to plot.")
+        logger.warning("No positions to plot.")
         return
 
     plt.figure(figsize=(10, 5))
@@ -63,7 +67,7 @@ def plot_trade_data_from_db(trades: list) -> None:
     :param trades: List of objects with .timestamp, .price, .volume, .side attributes.
     '''
     if not trades:
-        print("No trades to plot.")
+        logger.warning("No trades to plot.")
         return
 
     trades_df = pd.DataFrame([

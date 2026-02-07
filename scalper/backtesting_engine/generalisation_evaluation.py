@@ -1,10 +1,9 @@
+import logging
+
 import optuna
 import pandas as pd
 from tqdm import tqdm
 
-from .backtesting_engine import BacktestingEngine
-from .objective import run_strategy_on_window
-from .parameter_optimisation import create_windows
 from data_system import (
     GeneralisationEvaluation,
     GeneralisationEvaluationRepository,
@@ -14,6 +13,12 @@ from data_system import (
 )
 from strategy_manager import StrategyManager
 from utils import OPTUNA_DB_URL
+
+from .backtesting_engine import BacktestingEngine
+from .objective import run_strategy_on_window
+from .parameter_optimisation import create_windows
+
+logger = logging.getLogger(__name__)
 
 
 INITIAL_BALANCE = 1000
@@ -48,7 +53,7 @@ def find_params(study_name: str, num_sets: int, start: float, end: float) -> Non
 
 
 def load_study(study_name: str) -> optuna.Study:
-    print(f'Loading study: {study_name}')
+    logger.info(f'Loading study: {study_name}')
     storage = optuna.storages.RDBStorage(
         url=OPTUNA_DB_URL,
         engine_kwargs={
@@ -63,12 +68,12 @@ def load_study(study_name: str) -> optuna.Study:
 
 
 def get_top_param_sets(study: optuna.Study, n: int, evaluated_trials: set[int]) -> list[dict]:
-    print(f'Extracting top {n} parameter sets from study...')
+    logger.info(f'Extracting top {n} parameter sets from study...')
     completed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
     reverse = study.direction == optuna.study.StudyDirection.MAXIMIZE
     top_trials = sorted(completed_trials, key=lambda t: t.value, reverse=reverse)[:n]
     top_trials = [t for t in top_trials if t.number not in evaluated_trials]
-    print(f'Selected {len(top_trials)} new parameter sets for evaluation.')
+    logger.info(f'Selected {len(top_trials)} new parameter sets for evaluation.')
 
     top_param_sets = [
         {

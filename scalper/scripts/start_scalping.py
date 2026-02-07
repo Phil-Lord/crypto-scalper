@@ -7,6 +7,7 @@ from trade_executor import TradeExecutor
 from utils import LOG_FORMAT, get_kraken_pair, SMA_CONFIG, PRECISION_TREND_CONFIG
 
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+logger = logging.getLogger(__name__)
 
 
 @click.command()
@@ -26,7 +27,7 @@ def get_params_for_strategy(strategy_name: str) -> dict[str, Any]:
         return SMA_CONFIG
     elif strategy_name == 'PrecisionTrendStrategy':
         return PRECISION_TREND_CONFIG
-    print(f'Unknown strategy name: {strategy_name}')
+    logger.error(f'Unknown strategy name: {strategy_name}')
     return None
 
 

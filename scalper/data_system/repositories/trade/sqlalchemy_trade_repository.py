@@ -1,3 +1,4 @@
+import logging
 from dataclasses import asdict
 
 from sqlalchemy import text
@@ -5,6 +6,8 @@ from sqlalchemy import text
 from data_system.clients import SQLAlchemyClient
 from data_system.models import Trade
 from .trade_repository import TradeRepository
+
+logger = logging.getLogger(__name__)
 
 
 class SQLAlchemyTradeRepository(TradeRepository):
@@ -15,7 +18,7 @@ class SQLAlchemyTradeRepository(TradeRepository):
         if not trades:
             return
 
-        print(f'Inserting {len(trades)} trades for {trades[0].pair}.')
+        logger.info(f'Inserting {len(trades)} trades for {trades[0].pair}.')
         with self.client.session() as session:
             records = [asdict(t) for t in trades]
 
@@ -41,7 +44,7 @@ class SQLAlchemyTradeRepository(TradeRepository):
                     {"pair": pair}
                 ).scalar()
 
-            print(f'Fetching {pair} trades from {start} to {end}.')
+            logger.info(f'Fetching {pair} trades from {start} to {end}.')
 
             query = text("""
                 SELECT trade_id, pair, price, volume, timestamp, side, order_type

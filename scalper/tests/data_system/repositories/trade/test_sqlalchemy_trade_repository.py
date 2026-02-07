@@ -50,17 +50,18 @@ class TestSQLAlchemyTradeRepository:
         # Then
         mock_client.session.assert_not_called()
 
-    def test_add_inserts_trades(self, mock_client, mock_session, sample_trade: Trade, capsys):
+    def test_add_inserts_trades(self, mock_client, mock_session, sample_trade: Trade, caplog):
         # Given
         repository = SQLAlchemyTradeRepository(mock_client)
 
         # When
+        import logging
+        caplog.set_level(logging.INFO)
         repository.add([sample_trade])
 
         # Then
         mock_session.execute.assert_called_once()
-        captured = capsys.readouterr()
-        assert 'Inserting 1 trades for XXBTZGBP' in captured.out
+        assert 'Inserting 1 trades for XXBTZGBP' in caplog.text
 
     def test_add_passes_correct_records_to_execute(self, mock_client, mock_session, sample_trade: Trade):
         # Given
