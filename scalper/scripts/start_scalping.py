@@ -4,12 +4,9 @@ from typing import Any
 import click
 
 from trade_executor import TradeExecutor
-from utils import get_kraken_pair, SMA_CONFIG, PRECISION_TREND_CONFIG
+from utils import LOG_FORMAT, get_kraken_pair, SMA_CONFIG, PRECISION_TREND_CONFIG
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 
 @click.command()

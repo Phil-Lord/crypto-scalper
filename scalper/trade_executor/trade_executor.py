@@ -2,10 +2,10 @@ import logging
 
 from exchange_connector import AddOrderConnector, BalanceConnector, TickerConnector
 from strategy_manager import StrategyManager
-from utils import get_kraken_pair_symbols
+from utils import LOG_FORMAT, get_kraken_pair_symbols
 
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
 

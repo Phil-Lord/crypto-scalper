@@ -1,11 +1,9 @@
 import logging
 
 from exchange_connector import BalanceConnector
+from utils import LOG_FORMAT
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 
 def get_balances() -> None:

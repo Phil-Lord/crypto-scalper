@@ -3,12 +3,9 @@ import logging
 import optuna
 from questionary import checkbox, confirm
 
-from utils import get_study_choices, OPTUNA_DB_URL
+from utils import LOG_FORMAT, get_study_choices, OPTUNA_DB_URL
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 
 def delete_study():

@@ -7,11 +7,9 @@ from data_system import (
     Bot, BotOrder, BotRun, BotTick, SupabaseBotOrderRepository, SupabaseBotRepository,
     SupabaseBotRunRepository, SupabaseBotTickRepository, SupabaseClient
 )
+from utils import LOG_FORMAT
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 
 def query_supabase():

@@ -3,11 +3,9 @@ import logging
 import click
 
 from exchange_connector import AssetPairsConnector
+from utils import LOG_FORMAT
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 
 @click.command()
