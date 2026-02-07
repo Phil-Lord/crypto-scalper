@@ -209,7 +209,8 @@ modules, adding strategies), consider creating a prompt file for it.
 ### Framework & Configuration
 
 - **pytest** with **pytest-mock** for mocking
-- Tests live in `scalper/tests/`, mirroring source structure
+- **Unit tests** live in `scalper/tests/unit/`, mirroring source module structure
+- **Integration tests** live in `scalper/tests/integration/` as flat files
 - Python path configured in `pytest.ini`
 
 ### Test Coverage Philosophy

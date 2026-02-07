@@ -5,7 +5,7 @@ Audit the specified module against the project's copilot-instructions.md standar
 ## Instructions
 
 1. **Read the module** — All source files in the module directory
-2. **Read the tests** — Corresponding test files in `scalper/tests/`
+2. **Read the tests** — Corresponding unit test files in `scalper/tests/unit/{module}/`
 3. **Compare against standards** — Check alignment with copilot-instructions.md
 
 ## Checklist
