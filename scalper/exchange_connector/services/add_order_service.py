@@ -8,8 +8,6 @@ from .kraken_service import KrakenService
 class AddOrderService(KrakenService):
     def add_order(self, pair: str, signal: str, volume: float, validate: bool = False) -> dict[str, Any]:
         self.validate_pair(pair)
-        logging.basicConfig(level=logging.INFO)
-
         endpoint = '/0/private/AddOrder'
         params = {
             'nonce': get_nonce(),

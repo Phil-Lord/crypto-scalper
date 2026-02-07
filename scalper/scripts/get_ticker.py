@@ -1,6 +1,14 @@
+import logging
+
 import click
+
 from exchange_connector import TickerConnector
 from utils import get_kraken_pair
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s'
+)
 
 
 @click.command()

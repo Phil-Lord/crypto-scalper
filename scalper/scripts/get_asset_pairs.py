@@ -1,5 +1,13 @@
+import logging
+
 import click
+
 from exchange_connector import AssetPairsConnector
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s'
+)
 
 
 @click.command()

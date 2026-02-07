@@ -1,8 +1,15 @@
+import logging
+
 import click
 
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
 from exchange_connector import TradesConnector
 from utils import get_kraken_pair, get_nano_timestamp, parse_datetime
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s'
+)
 
 
 @click.command()

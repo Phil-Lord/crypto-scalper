@@ -1,7 +1,14 @@
+import logging
+
 import click
 
 from exchange_connector import AddOrderConnector, BalanceConnector
 from utils import get_kraken_pair, get_kraken_pair_symbols
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s'
+)
 
 
 @click.command()

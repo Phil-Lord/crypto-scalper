@@ -1,7 +1,14 @@
+import logging
+
 import click
 
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
 from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_trade_data_from_db
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s'
+)
 
 
 @click.command()

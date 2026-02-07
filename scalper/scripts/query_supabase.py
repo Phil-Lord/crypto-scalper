@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 import questionary
@@ -5,6 +6,11 @@ import questionary
 from data_system import (
     Bot, BotOrder, BotRun, BotTick, SupabaseBotOrderRepository, SupabaseBotRepository,
     SupabaseBotRunRepository, SupabaseBotTickRepository, SupabaseClient
+)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s'
 )
 
 

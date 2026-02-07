@@ -1,9 +1,16 @@
+import logging
+
 import click
 import pandas as pd
 
 from backtesting_engine import BacktestingEngine
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
 from utils import get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_results, SMA_CONFIG, SMA_GRID, PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s'
+)
 
 USE_DEFAULT_STRATEGY_CONFIGS = True
 PARAMS = PRECISION_TREND_CONFIG

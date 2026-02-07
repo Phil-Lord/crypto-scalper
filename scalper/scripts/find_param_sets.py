@@ -1,8 +1,15 @@
+import logging
+
 import click
 import questionary
 
 from backtesting_engine import find_params
 from utils import get_study_choices, get_second_timestamp, parse_datetime
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s'
+)
 
 
 @click.command()

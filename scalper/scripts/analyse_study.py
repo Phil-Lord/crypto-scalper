@@ -1,3 +1,4 @@
+import logging
 import subprocess
 
 import click
@@ -5,6 +6,11 @@ import questionary
 
 from study_analyser import StudyAnalyser
 from utils import get_study_choices, OPTUNA_DB_URL
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s'
+)
 
 
 @click.command()
