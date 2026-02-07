@@ -1,10 +1,9 @@
 import base64
 import hashlib
 import hmac
+import os
 import time
 import urllib
-
-from utils import get_env_var
 
 
 def get_nonce() -> str:
@@ -12,8 +11,8 @@ def get_nonce() -> str:
 
 
 def get_headers(params: dict, endpoint: str) -> dict[str, str]:
-    public_key = get_env_var('KRAKEN_TRADING_API_KEY')
-    private_key = get_env_var('KRAKEN_TRADING_API_SECRET')
+    public_key = os.getenv('KRAKEN_TRADING_API_KEY')
+    private_key = os.getenv('KRAKEN_TRADING_API_SECRET')
 
     return {
         'API-Key': public_key,

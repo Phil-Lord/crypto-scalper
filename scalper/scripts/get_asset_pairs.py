@@ -3,8 +3,9 @@ import logging
 import click
 
 from exchange_connector import AssetPairsConnector
-from utils import LOG_FORMAT
+from utils import load_env, LOG_FORMAT
 
+load_env()
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 

@@ -4,8 +4,9 @@ from typing import Any
 import click
 
 from trade_executor import TradeExecutor
-from utils import LOG_FORMAT, get_kraken_pair, SMA_CONFIG, PRECISION_TREND_CONFIG
+from utils import load_env, LOG_FORMAT, get_kraken_pair, SMA_CONFIG, PRECISION_TREND_CONFIG
 
+load_env()
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
 

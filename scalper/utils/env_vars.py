@@ -5,6 +5,11 @@ from dotenv import load_dotenv
 from .constants import ROOT_DIR
 
 
-def get_env_var(env_var_name: str) -> str:
+def load_env() -> None:
+    '''
+    Load environment variables from .env file.
+
+    Call this once at application entry points (scripts, main.py).
+    In production (AWS), this is a no-op since env vars come from the platform.
+    '''
     load_dotenv(dotenv_path=ROOT_DIR / '.env', override=False)
-    return os.getenv(env_var_name)

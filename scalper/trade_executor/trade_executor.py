@@ -1,11 +1,14 @@
 import logging
+import os
 
 from exchange_connector import AddOrderConnector, BalanceConnector, TickerConnector
 from strategy_manager import StrategyManager
-from utils import LOG_FORMAT, get_kraken_pair_symbols
+from utils import load_env, LOG_FORMAT, get_kraken_pair_symbols
 
 
-logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+load_env()
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+logging.basicConfig(level=getattr(logging, LOG_LEVEL), format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
 

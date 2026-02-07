@@ -12,8 +12,8 @@ class TestSupabaseConfig:
         # Given
         sys.modules.pop('data_system.config.supabase_config', None)
         mocker.patch(
-            'utils.get_env_var',
-            side_effect=lambda key: 'https://test.supabase.co' if key == 'SUPABASE_URL' else None
+            'os.getenv',
+            side_effect=lambda key, default=None: 'https://test.supabase.co' if key == 'SUPABASE_URL' else default
         )
 
         # When
@@ -27,8 +27,8 @@ class TestSupabaseConfig:
         # Given
         sys.modules.pop('data_system.config.supabase_config', None)
         mocker.patch(
-            'utils.get_env_var',
-            side_effect=lambda key: 'test-api-key' if key == 'SUPABASE_KEY' else None
+            'os.getenv',
+            side_effect=lambda key, default=None: 'test-api-key' if key == 'SUPABASE_KEY' else default
         )
 
         # When

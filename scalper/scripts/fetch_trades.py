@@ -4,8 +4,9 @@ import click
 
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
 from exchange_connector import TradesConnector
-from utils import LOG_FORMAT, get_kraken_pair, get_nano_timestamp, parse_datetime
+from utils import load_env, LOG_FORMAT, get_kraken_pair, get_nano_timestamp, parse_datetime
 
+load_env()
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 

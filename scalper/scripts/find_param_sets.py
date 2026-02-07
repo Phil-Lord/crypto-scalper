@@ -4,8 +4,9 @@ import click
 import questionary
 
 from backtesting_engine import find_params
-from utils import LOG_FORMAT, get_study_choices, get_second_timestamp, parse_datetime
+from utils import load_env, LOG_FORMAT, get_study_choices, get_second_timestamp, parse_datetime
 
+load_env()
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 

@@ -464,15 +464,31 @@ def output_results(results: pd.DataFrame) -> None:
 
 ### Environment Variables
 
-Use the `get_env_var` utility from `utils`:
+**Application entry points** load `.env` once:
 
 ```python
-from utils import get_env_var
+from utils import load_env, LOG_FORMAT
+
+load_env()  # MUST be called before importing modules that use env vars
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+
+# Import modules that depend on env vars AFTER load_env()
+from data_system import SupabaseClient
+```
+
+**⚠️ Critical:** Call `load_env()` **before** importing modules that read env vars at import time (e.g., `SupabaseConfig`). Otherwise env vars won't be loaded yet!
+
+**Library code** uses `os.getenv()` directly:
+
+```python
+import os
 
 class SupabaseConfig:
-    URL = get_env_var('SUPABASE_URL')
-    KEY = get_env_var('SUPABASE_KEY')
+    URL = os.getenv('SUPABASE_URL')
+    KEY = os.getenv('SUPABASE_KEY')
 ```
+
+**Production:** Environment variables come from AWS/platform, no `.env` file needed.
 
 ### Config Classes
 

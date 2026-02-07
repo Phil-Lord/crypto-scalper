@@ -33,7 +33,7 @@ class TestKrakenAuthUtils:
 
     def test_get_headers_includes_api_key(self):
         # Given
-        with patch('exchange_connector.kraken_utils.kraken_auth_utils.get_env_var') as mock_env:
+        with patch('exchange_connector.kraken_utils.kraken_auth_utils.os.getenv') as mock_env:
             mock_env.side_effect = lambda key: {
                 'KRAKEN_TRADING_API_KEY': 'test_public_key',
                 'KRAKEN_TRADING_API_SECRET': 'dGVzdF9wcml2YXRlX2tleQ=='  # base64 encoded
@@ -51,7 +51,7 @@ class TestKrakenAuthUtils:
 
     def test_get_headers_includes_api_sign(self):
         # Given
-        with patch('exchange_connector.kraken_utils.kraken_auth_utils.get_env_var') as mock_env:
+        with patch('exchange_connector.kraken_utils.kraken_auth_utils.os.getenv') as mock_env:
             mock_env.side_effect = lambda key: {
                 'KRAKEN_TRADING_API_KEY': 'test_public_key',
                 'KRAKEN_TRADING_API_SECRET': 'dGVzdF9wcml2YXRlX2tleQ=='  # base64 encoded

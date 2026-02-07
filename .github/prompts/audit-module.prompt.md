@@ -34,7 +34,7 @@ Audit the specified module against the project's copilot-instructions.md standar
 #### Configuration
 - [ ] **No logging.basicConfig()** — Never called in library/service code
 - [ ] **Logging only at entry points** — Scripts/main modules configure logging
-- [ ] **Environment variables** — Using `get_env_var` utility
+- [ ] **Environment variables** — Using `os.getenv()` in library code, `load_env()` at entry points
 - [ ] **Config classes** — Simple containers with class attributes
 
 #### Testing

@@ -3,8 +3,9 @@ import logging
 import click
 
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
-from utils import LOG_FORMAT, get_kraken_pair, get_second_timestamp, parse_datetime, plot_trade_data_from_db
+from utils import load_env, LOG_FORMAT, get_kraken_pair, get_second_timestamp, parse_datetime, plot_trade_data_from_db
 
+load_env()
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 

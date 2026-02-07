@@ -3,8 +3,9 @@ import logging
 import optuna
 from questionary import checkbox, confirm
 
-from utils import LOG_FORMAT, get_study_choices, OPTUNA_DB_URL
+from utils import load_env, LOG_FORMAT, get_study_choices, OPTUNA_DB_URL
 
+load_env()
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 

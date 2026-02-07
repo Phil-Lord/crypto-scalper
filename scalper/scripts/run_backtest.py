@@ -5,8 +5,9 @@ import pandas as pd
 
 from backtesting_engine import BacktestingEngine
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
-from utils import LOG_FORMAT, get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_results, SMA_CONFIG, SMA_GRID, PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
+from utils import load_env, LOG_FORMAT, get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_results, SMA_CONFIG, SMA_GRID, PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
 
+load_env()
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 USE_DEFAULT_STRATEGY_CONFIGS = True

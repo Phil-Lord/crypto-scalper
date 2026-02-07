@@ -1,31 +1,35 @@
+import os
+
 import pytest
 
-from utils import get_env_var
+from utils import load_env
 
 
 @pytest.mark.utils
 @pytest.mark.env_vars
-class TestGetEnvVar:
-    def test_returns_value_from_env_file(self, monkeypatch, tmp_path):
+class TestLoadEnv:
+    def test_loads_vars_from_env_file(self, monkeypatch, tmp_path):
         # Given
         env_file = tmp_path / '.env'
         env_file.write_text('FOO=bar\n')
         monkeypatch.setattr('utils.env_vars.ROOT_DIR', tmp_path)
+        monkeypatch.delenv('FOO', raising=False)  # Ensure not in actual env
 
         # When
-        result = get_env_var('FOO')
+        load_env()
 
         # Then
-        assert result == 'bar'
+        assert os.getenv('FOO') == 'bar'
 
-    def test_returns_none_for_missing_var(self, monkeypatch, tmp_path):
+    def test_does_not_override_existing_env_vars(self, monkeypatch, tmp_path):
         # Given
         env_file = tmp_path / '.env'
-        env_file.write_text('')
+        env_file.write_text('FOO=from_file\n')
         monkeypatch.setattr('utils.env_vars.ROOT_DIR', tmp_path)
+        monkeypatch.setenv('FOO', 'from_env')
 
         # When
-        result = get_env_var('NONEXISTENT')
+        load_env()
 
         # Then
-        assert result is None
+        assert os.getenv('FOO') == 'from_env'  # Should not override

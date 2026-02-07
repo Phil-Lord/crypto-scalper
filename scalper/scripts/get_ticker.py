@@ -3,8 +3,9 @@ import logging
 import click
 
 from exchange_connector import TickerConnector
-from utils import LOG_FORMAT, get_kraken_pair
+from utils import load_env, LOG_FORMAT, get_kraken_pair
 
+load_env()
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 

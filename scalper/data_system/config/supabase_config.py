@@ -1,6 +1,6 @@
-from utils import get_env_var
+import os
 
 
 class SupabaseConfig:
-    URL = get_env_var("SUPABASE_URL")
-    KEY = get_env_var("SUPABASE_KEY")
+    URL = os.getenv('SUPABASE_URL')
+    KEY = os.getenv('SUPABASE_KEY')
