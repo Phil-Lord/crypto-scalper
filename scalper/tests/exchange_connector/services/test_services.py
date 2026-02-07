@@ -92,13 +92,13 @@ class TestKrakenService:
         # When
         with patch('time.sleep'):
             import logging
-            caplog.set_level(logging.INFO)
+            caplog.set_level(logging.DEBUG)
             result = service.make_request('GET', '/0/public/Ticker', {'pair': 'XXBTZGBP'})
 
         # Then
         assert result == {'data': 'success'}
 
-        # Should log before and after retry attempts
+        # Should log before and after retry attempts at DEBUG level
         log_messages = [record.message for record in caplog.records]
         assert any('Starting call' in message for message in log_messages)
         assert any('Finished call' in message for message in log_messages)

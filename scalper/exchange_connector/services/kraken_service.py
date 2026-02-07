@@ -23,8 +23,8 @@ class KrakenService:
         stop=stop_after_attempt(5),
         wait=wait_exponential(multiplier=1, min=1, max=30),  # Exponential backoff: 1s, 2s, 4s, ...
         retry=retry_if_exception_type(KrakenTooManyRequestsError),
-        before=before_log(logger, logging.INFO),
-        after=after_log(logger, logging.INFO)
+        before=before_log(logger, logging.DEBUG),
+        after=after_log(logger, logging.DEBUG)
     )
     def make_request(self, method: str, endpoint: str, params: dict) -> dict:
         '''
