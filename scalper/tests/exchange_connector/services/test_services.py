@@ -82,6 +82,27 @@ class TestKrakenService:
         # Should not retry on non-rate-limit errors
         assert mock_client.make_request.call_count == 1
 
+    def test_make_request_logs_retry_attempts(self, service, mock_client, caplog):
+        # Given
+        mock_client.make_request.side_effect = [
+            KrakenTooManyRequestsError(),
+            {'result': {'data': 'success'}, 'error': []}
+        ]
+
+        # When
+        with patch('time.sleep'):
+            import logging
+            caplog.set_level(logging.INFO)
+            result = service.make_request('GET', '/0/public/Ticker', {'pair': 'XXBTZGBP'})
+
+        # Then
+        assert result == {'data': 'success'}
+
+        # Should log before and after retry attempts
+        log_messages = [record.message for record in caplog.records]
+        assert any('Starting call' in message for message in log_messages)
+        assert any('Finished call' in message for message in log_messages)
+
     def test_validate_pair_raises_on_empty_pair(self, service):
         # When / Then
         with pytest.raises(ValueError, match='cannot be empty'):
