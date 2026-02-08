@@ -14,10 +14,10 @@ from utils import OPTUNA_DB_URL
 def optimise_parameters(engine, param_grid: dict[str, list[Any]], n_trials: int = 100,
                         constraints: list[callable] = None) -> dict[str, Any]:
     warnings.filterwarnings('ignore', category=ExperimentalWarning)
+    windows = create_windows(engine.start, engine.end)
     study_name = create_study_name(engine)
     storage = create_storage()
     study = create_study(storage, study_name, n_trials)
-    windows = create_windows(engine.start, engine.end)
     optimise(n_trials, study, engine, windows, param_grid, constraints)
     return {'best_params': study.best_params, 'best_profit': study.best_value, 'study': study}
 
