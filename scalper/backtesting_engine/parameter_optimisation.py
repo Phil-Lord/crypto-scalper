@@ -82,6 +82,9 @@ def create_windows(start: float, end: float) -> list[tuple[pd.Timestamp, pd.Time
     start_ts = pd.Timestamp(start, unit='s').round('ms')
     end_ts = pd.Timestamp(end, unit='s').round('ms')
 
+    if end_ts < (start_ts + pd.DateOffset(months=months_in_window)):
+        raise ValueError(f'Time range must be at least {months_in_window} months for optimisation.')
+
     windows = []
 
     i = 0
