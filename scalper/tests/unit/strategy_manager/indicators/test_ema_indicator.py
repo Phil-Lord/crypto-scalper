@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from strategy_manager.indicators import EmaIndicator
+from strategy_manager.indicators.ema_indicator import EmaIndicator
 
 
 def test_vectorised_matches_update():

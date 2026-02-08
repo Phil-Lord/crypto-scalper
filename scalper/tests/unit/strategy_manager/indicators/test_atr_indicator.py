@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from strategy_manager.indicators import AtrIndicator
+from strategy_manager.indicators.atr_indicator import AtrIndicator
 
 
 def test_atr_update_returns_none_initially():

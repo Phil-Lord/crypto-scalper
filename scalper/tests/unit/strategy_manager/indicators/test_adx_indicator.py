@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from strategy_manager.indicators import AdxIndicator
+from strategy_manager.indicators.adx_indicator import AdxIndicator
 
 
 def test_adx_update_returns_none_first():

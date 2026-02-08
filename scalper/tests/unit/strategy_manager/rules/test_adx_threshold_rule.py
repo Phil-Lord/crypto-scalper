@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from strategy_manager.rules import AdxThresholdRule
+from strategy_manager.rules.adx_threshold_rule import AdxThresholdRule
 
 
 def test_check_returns_hold_when_adx_is_none():

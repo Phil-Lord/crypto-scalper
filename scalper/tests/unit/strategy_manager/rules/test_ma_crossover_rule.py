@@ -1,5 +1,5 @@
 import pandas as pd
-from strategy_manager.rules import MaCrossoverRule
+from strategy_manager.rules.ma_crossover_rule import MaCrossoverRule
 
 
 def test_check_triggers_buy_on_crossover():

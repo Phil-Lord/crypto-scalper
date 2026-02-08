@@ -1,6 +1,6 @@
 import pandas as pd
 
-from strategy_manager.rules import RsiThresholdRule
+from strategy_manager.rules.rsi_threshold_rule import RsiThresholdRule
 
 
 def test_check_triggers_buy_on_cross_above_oversold():

@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from strategy_manager.indicators import SmaIndicator
+from strategy_manager.indicators.sma_indicator import SmaIndicator
 
 
 def test_sma_vectorised_matches_update():

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from strategy_manager.indicators import RsiIndicator
+from strategy_manager.indicators.rsi_indicator import RsiIndicator
 
 
 def test_rsi_vectorised_matches_update():
