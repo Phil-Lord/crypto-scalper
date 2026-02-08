@@ -1,2 +1,0 @@
-from .sma_strategy_legacy import SmaStrategyLegacy
-from .ema_strategy_legacy import EmaStrategyLegacy
