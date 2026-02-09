@@ -35,6 +35,7 @@ class PrecisionTrendStrategy(Strategy):
         self.register_rule('atr_threshold', AtrThresholdRule('atr', atr_threshold))
         self.weight_atr = weight_atr / total_weight
 
+    @staticmethod
     def constraints() -> list[callable]:
         ''' Constraints for parameter optimisation. '''
         return [
