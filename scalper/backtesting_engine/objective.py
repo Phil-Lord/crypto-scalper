@@ -40,10 +40,10 @@ def suggest_parameters(trial: optuna.Trial, param_grid: dict[str, list[Any]]) ->
     ''' Suggest a value for each parameter in the grid. '''
     params = {}
     for name, (low, high) in param_grid.items():
-        if isinstance(low, int):
+        if isinstance(low, int) and isinstance(high, int):
             params[name] = trial.suggest_int(name, low, high)
-        elif isinstance(low, float):
-            params[name] = trial.suggest_float(name, low, high)
+        elif isinstance(low, float) or isinstance(high, float):
+            params[name] = trial.suggest_float(name, float(low), float(high))
         else:
             raise ValueError(f'Unsupported parameter type for {name}')
     return params
