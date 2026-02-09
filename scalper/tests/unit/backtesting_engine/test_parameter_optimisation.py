@@ -202,9 +202,11 @@ def test_minimum_window_size():
     start = pd.Timestamp('2021-01-01').timestamp()
     end = pd.Timestamp('2021-02-15').timestamp()
 
-    windows = create_windows(start, end)
-
-    assert len(windows) == 0  # Period is less than 3 months, should return no windows
+    try:
+        create_windows(start, end)
+        assert False, "Expected ValueError for insufficient time range"
+    except ValueError as e:
+        assert str(e) == 'Time range must be at least 3 months for optimisation.'
 
 
 def test_window_start_and_end_at_specific_second():
