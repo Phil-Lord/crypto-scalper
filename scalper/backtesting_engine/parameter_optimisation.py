@@ -20,11 +20,6 @@ def optimise_parameters(engine, param_grid: dict[str, list[Any]], n_trials: int 
     study = create_study(storage, study_name, n_trials)
     optimise(n_trials, study, engine, windows, param_grid, constraints)
 
-    completed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
-    if not completed_trials:
-        raise RuntimeError('No completed trials found in study.')
-    return {'best_params': study.best_params, 'best_profit': study.best_value, 'study': study}
-
 
 def create_study_name(engine) -> str:
     return (
