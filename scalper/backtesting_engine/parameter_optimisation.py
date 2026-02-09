@@ -18,6 +18,7 @@ def optimise_parameters(engine, param_grid: dict[str, list[Any]], n_trials: int 
     study_name = create_study_name(engine)
     storage = create_storage()
     study = create_study(storage, study_name, n_trials)
+    validate_search_space(study, param_grid)
     optimise(n_trials, study, engine, windows, param_grid, constraints)
 
 
@@ -62,6 +63,23 @@ def create_study(storage, study_name: str, n_trials: int) -> optuna.study.Study:
     except optuna.exceptions.DuplicatedStudyError:
         # Handle concurrent study creation.
         return optuna.load_study(study_name=study_name, storage=storage)
+
+
+def validate_search_space(study: optuna.study.Study, param_grid: dict[str, list[Any]]) -> None:
+    ''' Validate param_grid matches existing study search space. '''
+    trials = study.get_trials(deepcopy=False)
+    if not trials:
+        return
+
+    param_dists = trials[-1].distributions
+    if set(param_grid.keys()) != set(param_dists.keys()):
+        raise ValueError('Parameter names conflict with existing study search space.')
+
+    for name, (low, high) in param_grid.items():
+        expected_low = low if isinstance(low, int) and isinstance(high, int) else float(low)
+        expected_high = high if isinstance(low, int) and isinstance(high, int) else float(high)
+        if param_dists[name].low != expected_low or param_dists[name].high != expected_high:
+            raise ValueError('Parameter ranges conflict with existing study search space.')
 
 
 def create_windows(start: float, end: float) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
