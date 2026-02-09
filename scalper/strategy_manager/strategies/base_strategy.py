@@ -61,11 +61,11 @@ class Strategy:
 
     def _generate_signal(self, rule_results: dict) -> str:
         ''' Generate a signal based on the rule results of a training run interval. '''
-        pass
+        raise NotImplementedError("Subclasses must implement _generate_signal method")
 
     def _generate_signals(self, results: pd.DataFrame) -> pd.Series:
         ''' Generate signals based on the results of a vectorised trading run. '''
-        pass
+        raise NotImplementedError("Subclasses must implement _generate_signals method")
 
     def _suppress_consecutive_signals(self, signals: pd.Series) -> pd.Series:
         ''' Replace consecutive buy or sell signals with hold. '''
