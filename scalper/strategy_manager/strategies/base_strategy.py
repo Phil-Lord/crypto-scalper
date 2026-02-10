@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from data_system import Signal
+
 from strategy_manager.indicators import Indicator
 from strategy_manager.rules import Rule
 
@@ -9,7 +11,7 @@ class Strategy:
     def __init__(self):
         self.indicators: dict[str, Indicator] = {}
         self.rules: dict[str, Rule] = {}
-        self.last_action = 'sell'
+        self.last_action = Signal.SELL
         self.prev_indicator_values = {}
 
     def register_indicator(self, name: str, indicator: Indicator):
@@ -36,10 +38,10 @@ class Strategy:
         }
 
         signal = self._generate_signal(rule_results)
-        if signal == self.last_action and signal != 'hold':
-            signal = 'hold'
+        if signal == self.last_action and signal != Signal.HOLD:
+            signal = Signal.HOLD
         else:
-            if signal in ['buy', 'sell']:
+            if signal in (Signal.BUY, Signal.SELL):
                 self.last_action = signal
 
         return {'price': ohlc['price'], **indicator_results, **rule_results, 'signal': signal}
@@ -59,25 +61,25 @@ class Strategy:
         results['signal'] = self._suppress_consecutive_signals(signals)
         return results
 
-    def _generate_signal(self, rule_results: dict) -> str:
+    def _generate_signal(self, rule_results: dict) -> Signal:
         ''' Generate a signal based on the rule results of a training run interval. '''
-        raise NotImplementedError("Subclasses must implement _generate_signal method")
+        raise NotImplementedError('Subclasses must implement _generate_signal method')
 
     def _generate_signals(self, results: pd.DataFrame) -> pd.Series:
         ''' Generate signals based on the results of a vectorised trading run. '''
-        raise NotImplementedError("Subclasses must implement _generate_signals method")
+        raise NotImplementedError('Subclasses must implement _generate_signals method')
 
     def _suppress_consecutive_signals(self, signals: pd.Series) -> pd.Series:
         ''' Replace consecutive buy or sell signals with hold. '''
         signals_arr = signals.to_numpy()
         suppressed = np.empty_like(signals_arr, dtype=object)
-        last_action = 'sell'
+        last_action = Signal.SELL
 
         for i, signal in enumerate(signals_arr):
-            if signal == 'hold':
-                suppressed[i] = 'hold'
+            if signal == Signal.HOLD:
+                suppressed[i] = Signal.HOLD
             elif signal == last_action:
-                suppressed[i] = 'hold'
+                suppressed[i] = Signal.HOLD
             else:
                 suppressed[i] = signal
                 last_action = signal

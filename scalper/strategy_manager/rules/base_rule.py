@@ -3,10 +3,12 @@ from typing import Any
 
 import pandas as pd
 
+from data_system import Signal
+
 
 class Rule(ABC):
     @abstractmethod
-    def check(self, current_state: dict[str, Any]) -> str:
+    def check(self, current_state: dict[str, Any]) -> Signal:
         ''' Check rule against current state during live trading. '''
         pass
 

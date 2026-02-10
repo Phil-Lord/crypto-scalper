@@ -1,5 +1,7 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+
+from data_system import Signal
 
 from .base_strategy import Strategy
 from strategy_manager.indicators import AdxIndicator, AtrIndicator, EmaIndicator, RsiIndicator
@@ -43,27 +45,27 @@ class PrecisionTrendStrategy(Strategy):
             lambda x: x['rsi_oversold'] < x['rsi_overbought']
         ]
 
-    def _generate_signal(self, rule_results: dict) -> str:
+    def _generate_signal(self, rule_results: dict) -> Signal:
         crossover_signal = rule_results['crossover']
         rsi_threshold_signal = rule_results['rsi_threshold']
         adx_threshold_signal = rule_results['adx_threshold']
         atr_threshold_signal = rule_results['atr_threshold']
 
-        signal_map = {'buy': 1, 'hold': 0, 'sell': -1}
+        signal_map = {Signal.BUY: 1, Signal.HOLD: 0, Signal.SELL: -1}
         score = (self.weight_crossover * signal_map[crossover_signal] +
                  self.weight_rsi * signal_map[rsi_threshold_signal] +
                  self.weight_adx * signal_map[adx_threshold_signal] +
                  self.weight_atr * signal_map[atr_threshold_signal])
 
         if score > self.buy_threshold:
-            return 'buy'
+            return Signal.BUY
         elif score < self.sell_threshold:
-            return 'sell'
+            return Signal.SELL
         else:
-            return 'hold'
+            return Signal.HOLD
 
     def _generate_signals(self, results: pd.DataFrame) -> pd.Series:
-        signal_map = {'buy': 1, 'hold': 0, 'sell': -1}
+        signal_map = {Signal.BUY: 1, Signal.HOLD: 0, Signal.SELL: -1}
         indicators = {
             'crossover': self.weight_crossover,
             'rsi_threshold': self.weight_rsi,
@@ -76,6 +78,6 @@ class PrecisionTrendStrategy(Strategy):
         )
 
         conditions = [total_scores > self.buy_threshold, total_scores < self.sell_threshold]
-        choices = ['buy', 'sell']
-        result = np.select(conditions, choices, default='hold')
+        choices = [Signal.BUY, Signal.SELL]
+        result = np.select(conditions, choices, default=Signal.HOLD)
         return pd.Series(result, index=results.index)

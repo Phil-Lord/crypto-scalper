@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from data_system import Signal
+
 from .base_rule import Rule
 
 
@@ -9,11 +11,11 @@ class AdxThresholdRule(Rule):
         self.adx_name = adx_name
         self.threshold = threshold
 
-    def check(self, current_state: dict) -> str:
+    def check(self, current_state: dict) -> Signal:
         adx = current_state[self.adx_name]
         if adx is None:
-            return 'hold'
-        return 'buy' if adx >= self.threshold else 'hold'
+            return Signal.HOLD
+        return Signal.BUY if adx >= self.threshold else Signal.HOLD
 
     def compute_vectorised(self, results: pd.DataFrame) -> pd.Series:
         return np.where(results[self.adx_name] >= self.threshold, 'buy', 'hold')
