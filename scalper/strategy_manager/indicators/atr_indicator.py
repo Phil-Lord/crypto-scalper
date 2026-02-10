@@ -9,7 +9,7 @@ class AtrIndicator(Indicator):
         self.prev_close = None
         self.smoothed_tr = None
 
-    def update(self, ohlc: pd.Series) -> float:
+    def update(self, ohlc: pd.Series) -> float | None:
         high = ohlc['high']
         low = ohlc['low']
         close = ohlc['price']

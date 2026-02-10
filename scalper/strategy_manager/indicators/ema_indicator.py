@@ -9,7 +9,7 @@ class EmaIndicator(Indicator):
         self.ema = None
         self.alpha = 2 / (window + 1)
 
-    def update(self, ohlc: pd.Series) -> float:
+    def update(self, ohlc: pd.Series) -> float | None:
         if self.ema is None:
             self.ema = ohlc['price']  # Initialise EMA with the first price.
         else:

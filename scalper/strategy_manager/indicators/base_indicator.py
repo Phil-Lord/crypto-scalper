@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Any
 
 import pandas as pd
 
 
 class Indicator(ABC):
     @abstractmethod
-    def update(self, ohlc: pd.Series) -> Any:
+    def update(self, ohlc: pd.Series) -> float | None:
         ''' Update indicator with new ohlc for live trading. '''
         pass
 

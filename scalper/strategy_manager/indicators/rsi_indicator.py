@@ -10,7 +10,7 @@ class RsiIndicator(Indicator):
         self.prices = []
         self.avg_gain, self.avg_loss, self.prev_price = None, None, None
 
-    def update(self, ohlc: pd.Series) -> float:
+    def update(self, ohlc: pd.Series) -> float | None:
         if self.prev_price is None:
             self.prev_price = ohlc['price']
             return None

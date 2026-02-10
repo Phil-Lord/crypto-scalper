@@ -16,7 +16,7 @@ class AdxIndicator(Indicator):
         self.smoothed_minus_dm = None
         self.adx = None
 
-    def update(self, ohlc: pd.Series) -> float:
+    def update(self, ohlc: pd.Series) -> float | None:
         high = ohlc['high']
         low = ohlc['low']
         close = ohlc['price']  # Assuming 'price' is close

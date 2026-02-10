@@ -15,5 +15,5 @@ class SmaStrategy(Strategy):
     def _generate_signal(self, rule_results: dict) -> str:
         return rule_results['crossover']
 
-    def _generate_signals(self, results: pd.DataFrame) -> pd.DataFrame:
+    def _generate_signals(self, results: pd.DataFrame) -> pd.Series:
         return results['crossover']
