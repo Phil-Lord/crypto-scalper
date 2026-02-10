@@ -27,6 +27,10 @@ nav:
       - exchange-connector/index.md
       - exchange-connector/architecture.md
       - exchange-connector/api-reference.md
+  - Strategy Manager:
+      - strategy-manager/index.md
+      - strategy-manager/creating-components.md
+      - strategy-manager/reference.md
   - parameter-optimisation.md
   - cloud-architecture.md
   - trade-executor.md
