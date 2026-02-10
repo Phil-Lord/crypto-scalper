@@ -64,6 +64,32 @@ Always use type hints for function signatures:
 def get(self, pair: str, start: float = None, end: float = None) -> list[Trade]:
 ```
 
+**Use enums in type hints instead of `str`:**
+
+```python
+# ✅ Good - type safe
+def check(self, current_state: dict) -> Signal:
+    return Signal.BUY
+
+# ❌ Bad - too permissive
+def check(self, current_state: dict) -> str:
+    return 'buy'  # Typo not caught by type checker
+```
+
+**Use `float | None` for optional return values:**
+
+```python
+# ✅ Modern Python 3.12+ syntax
+def update(self, ohlc: pd.Series) -> float | None:
+    if not self.ready:
+        return None
+    return self.calculate()
+
+# ❌ Old syntax
+from typing import Optional
+def update(self, ohlc: pd.Series) -> Optional[float]:
+```
+
 ---
 
 ## Models & Data Structures
@@ -103,7 +129,7 @@ Key patterns:
 
 ### Enums
 
-Use `str, Enum` for string-compatible enums:
+**String-compatible enums** for backward compatibility:
 
 ```python
 class Signal(str, Enum):
@@ -111,6 +137,17 @@ class Signal(str, Enum):
     HOLD = 'hold'
     SELL = 'sell'
 ```
+
+**Benefits:**
+- Type safety (IDE autocomplete, mypy checking)
+- String compatibility (`Signal.BUY == 'buy'` returns `True`)
+- Allows gradual migration from string literals
+- Centralized definition prevents typos
+
+**When to use:**
+- Domain concepts with fixed set of values (signals, order sides, statuses)
+- Replacing magic strings in comparisons
+- Values that need to be serialized/deserialized (JSON, database)
 
 ### Type Choices
 
@@ -185,8 +222,19 @@ class Trade:
 
 Create markdown docs in `/docs/` for significant modules:
 
-- `index.md` — Overview and contents table
-- Additional pages as needed for architecture, schemas, etc.
+**Single-page structure** (for simple modules):
+- `index.md` — Overview, architecture, and reference
+
+**Multi-page structure** (for complex modules):
+- `index.md` — Overview, core concepts, architecture
+- `creating-components.md` or similar — How-to guides
+- `reference.md` — Built-in components, API reference, integration
+
+**Guidelines:**
+- Split docs when `index.md` exceeds ~200 lines
+- Follow pattern: Overview → Guides → Reference
+- Keep `index.md` focused on "what and why", move "how" to separate pages
+- Add navigation links at bottom of index pointing to other pages
 
 ### Architecture Decision Log
 
@@ -458,6 +506,56 @@ def output_results(results: pd.DataFrame) -> None:
     '''Display and plot backtest results.'''
     # Output logic...
 ```
+
+---
+
+## Memory Management
+
+**For long-running processes** (24/7 live trading, continuous streams):
+
+### Bounded State Collections
+
+Use `collections.deque` with `maxlen` to prevent unbounded memory growth:
+
+```python
+from collections import deque
+
+class SmaIndicator:
+    def __init__(self, window: int):
+        self.window = window
+        self.prices = deque(maxlen=window)  # ✅ Bounded
+    
+    def update(self, price: float) -> float | None:
+        self.prices.append(price)  # Automatically drops oldest when full
+        if len(self.prices) < self.window:
+            return None
+        return sum(self.prices) / self.window
+```
+
+**Anti-pattern:**
+
+```python
+# ❌ Unbounded growth - memory leak in 24/7 operation
+class SmaIndicator:
+    def __init__(self, window: int):
+        self.window = window
+        self.prices = []  # Grows forever
+    
+    def update(self, price: float) -> float | None:
+        self.prices.append(price)
+        return sum(self.prices[-self.window:]) / self.window  # Only uses last N
+```
+
+### State Management Guidelines
+
+**Store only what you need:**
+- Use running averages instead of full history
+- Keep only window-sized buffers for rolling calculations
+- Clear intermediate state after processing
+
+**Document memory footprint:**
+- For production classes handling state, note expected memory usage
+- Example: "~400 bytes for window=50 (50 floats @ 8 bytes each)"
 
 ---
 

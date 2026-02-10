@@ -24,12 +24,15 @@ Audit the specified module against the project's copilot-instructions.md standar
 - [ ] **Field ordering** — Required fields first, optional/defaulted last
 - [ ] **Mutable defaults** — Using `field(default_factory=...)` not bare `[]` or `{}`
 - [ ] **Attribute documentation** — All attributes documented in class docstring
+- [ ] **String-compatible enums** — Using `class MyEnum(str, Enum)` for backward compatibility
+- [ ] **Enums in type hints** — Using enum types instead of `str` where applicable
 
 #### Documentation
 - [ ] **Module has docs** — `/docs/{module}/index.md` exists for significant modules
 - [ ] **Docstrings where valuable** — Domain models, public APIs, complex logic, non-obvious parameters
 - [ ] **No over-documentation** — Avoid duplicating self-explanatory code (includes simple exception classes with clear names, internal utilities)
 - [ ] **reStructuredText style** — Using `:param`, `:return` format
+- [ ] **Multi-page structure** — Large docs (>200 lines) split into index/guides/reference pages
 
 #### Configuration
 - [ ] **No logging.basicConfig()** — Never called in library/service code
@@ -51,7 +54,17 @@ Audit the specified module against the project's copilot-instructions.md standar
 - [ ] **Naming conventions** — Following module/file/test naming standards
 - [ ] **Public API exports** — `__init__.py` exports only the public interface (excludes internal utilities)
 
+#### Memory Management (For Long-Running Processes)
+- [ ] **Bounded state collections** — Using `deque(maxlen=N)` instead of unbounded lists for rolling windows
+- [ ] **Minimal state storage** — Storing only what's needed (running averages vs full history)
+- [ ] **Memory footprint documented** — Production classes note expected memory usage
+
 ### Architectural Patterns (Part 2) — When Applicable
+
+#### Abstract Classes & Interfaces
+- [ ] **Abstract base classes** — Using `ABC` and `@abstractmethod` for interfaces
+- [ ] **NotImplementedError in abstract methods** — Abstract methods in non-ABCs raise `NotImplementedError` with clear message
+- [ ] **Static/class method decorators** — Constraint methods and factories properly decorated
 
 #### Repository Pattern
 - [ ] **Abstract base** — Interface defines contract
@@ -70,6 +83,12 @@ Audit the specified module against the project's copilot-instructions.md standar
 - [ ] **Dependency injection** — External services injected, not instantiated
 - [ ] **Client abstraction** — Third-party SDKs wrapped appropriately
 - [ ] **Dependencies flow** — One direction, no circular dependencies
+
+#### Dual Implementation Patterns (When Applicable)
+- [ ] **Consistent interfaces** — Both implementations (e.g., live/vectorised) follow same contract
+- [ ] **Test parity** — Tests verify both implementations produce identical results
+- [ ] **Clear separation** — Each mode optimized for its use case without compromises
+- [ ] **Documentation** — Performance trade-offs and use cases documented
 
 ### Architecture Decision Log
 
