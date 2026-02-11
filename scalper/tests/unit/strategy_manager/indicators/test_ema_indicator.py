@@ -1,49 +1,77 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from strategy_manager.indicators.ema_indicator import EmaIndicator
 
 
-def test_vectorised_matches_update():
-    np.random.seed(0)
-    prices = np.random.uniform(10, 20, 100)
-    ohlc = pd.DataFrame({'price': prices})
+@pytest.mark.strategy_manager
+@pytest.mark.indicators
+@pytest.mark.ema_indicator
+class TestEmaIndicator:
+    @pytest.fixture
+    def sample_prices(self) -> pd.DataFrame:
+        np.random.seed(0)
+        prices = np.random.uniform(10, 20, 100)
+        return pd.DataFrame({'price': prices})
 
-    window = 10
-    indicator = EmaIndicator(window)
-    ema_live = [indicator.update(row) for _, row in ohlc.iterrows()]
+    def test_update_returns_initial_value_on_first_call(self):
+        # Given
+        indicator = EmaIndicator(window=10)
+        ohlc = pd.Series({'price': 100.0})
 
-    indicator_vect = EmaIndicator(window)
-    ema_vect = indicator_vect.compute_vectorised(ohlc)
+        # When
+        result = indicator.update(ohlc)
 
-    for i in range(len(ohlc)):
-        live_val = ema_live[i]
-        vect_val = ema_vect.iloc[i]
-        assert abs(live_val - vect_val) < 1e-6, f"Mismatch at {i}: {live_val} != {vect_val}"
+        # Then
+        assert result == 100.0
 
+    def test_vectorised_matches_update(self, sample_prices: pd.DataFrame):
+        # Given
+        window = 10
+        indicator_update = EmaIndicator(window)
+        indicator_vectorised = EmaIndicator(window)
 
-def test_ema_flat_price():
-    ohlc = pd.DataFrame({'price': [100] * 50})
-    ema = EmaIndicator(window=10).compute_vectorised(ohlc)
+        # When
+        ema_live = [indicator_update.update(row) for _, row in sample_prices.iterrows()]
+        ema_vect = indicator_vectorised.compute_vectorised(sample_prices)
 
-    assert all(abs(val - 100) < 1e-8 for val in ema), "EMA should be flat at 100 for constant price"
+        # Then
+        for i in range(len(sample_prices)):
+            live_val = ema_live[i]
+            vect_val = ema_vect.iloc[i]
+            assert abs(live_val - vect_val) < 1e-6, f'Mismatch at {i}: {live_val} != {vect_val}'
 
+    def test_compute_vectorised_flat_price(self):
+        # Given
+        ohlc = pd.DataFrame({'price': [100] * 50})
 
-def test_ema_increasing_price():
-    prices = np.arange(1, 101)
-    ohlc = pd.DataFrame({'price': prices})
-    ema = EmaIndicator(window=10).compute_vectorised(ohlc)
+        # When
+        ema = EmaIndicator(window=10).compute_vectorised(ohlc)
 
-    # EMA should also be strictly increasing
-    assert ema.is_monotonic_increasing, "EMA should increase with increasing prices"
+        # Then - EMA of a flat price should equal the price
+        assert all(abs(val - 100) < 1e-8 for val in ema)
 
+    def test_compute_vectorised_increasing_price(self):
+        # Given
+        prices = np.arange(1, 101)
+        ohlc = pd.DataFrame({'price': prices})
 
-def test_ema_handles_nan_gracefully():
-    prices = [100, 101, np.nan, 103, 104]
-    ohlc = pd.DataFrame({'price': prices})
-    ema = EmaIndicator(window=3).compute_vectorised(ohlc)
+        # When
+        ema = EmaIndicator(window=10).compute_vectorised(ohlc)
 
-    # Check that NaNs are skipped, not propagated
-    assert not pd.isna(ema.iloc[2]), "EMA should not be NaN; ewm skips NaNs by default"
-    assert pd.isna(ohlc['price'].iloc[2]), "Original price at index 2 should still be NaN"
-    assert not pd.isna(ema.iloc[4]), "EMA should continue even after a NaN input"
+        # Then - EMA should be monotonically increasing for increasing prices
+        assert ema.is_monotonic_increasing
+
+    def test_compute_vectorised_handles_nan_gracefully(self):
+        # Given
+        prices = [100, 101, np.nan, 103, 104]
+        ohlc = pd.DataFrame({'price': prices})
+
+        # When
+        ema = EmaIndicator(window=3).compute_vectorised(ohlc)
+
+        # Then
+        assert not pd.isna(ema.iloc[2])
+        assert pd.isna(ohlc['price'].iloc[2])
+        assert not pd.isna(ema.iloc[4])

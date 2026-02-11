@@ -1,4 +1,4 @@
-.PHONY: test test/utils test/data_system test/data_system/models test/data_system/repositories test/data_system/config test/data_system/clients test/exchange_connector test/exchange_connector/api test/exchange_connector/connectors test/exchange_connector/services test/exchange_connector/kraken_utils test/integration test/integration/data_system test/integration/exchange_connector test/integration/exchange_connector_data_system
+.PHONY: test test/utils test/data_system test/data_system/models test/data_system/repositories test/data_system/config test/data_system/clients test/exchange_connector test/exchange_connector/api test/exchange_connector/connectors test/exchange_connector/services test/exchange_connector/kraken_utils test/strategy_manager test/strategy_manager/indicators test/strategy_manager/rules test/strategy_manager/strategies test/integration test/integration/data_system test/integration/exchange_connector test/integration/exchange_connector_data_system test/integration/strategy_manager
 
 # Run all tests
 test:
@@ -42,6 +42,20 @@ test/exchange_connector/services:
 test/exchange_connector/kraken_utils:
 	pytest -m "exchange_connector and kraken_utils"
 
+# Run all strategy_manager tests
+test/strategy_manager:
+	pytest -m strategy_manager
+
+# Run strategy_manager category tests
+test/strategy_manager/indicators:
+	pytest -m "strategy_manager and indicators"
+
+test/strategy_manager/rules:
+	pytest -m "strategy_manager and rules"
+
+test/strategy_manager/strategies:
+	pytest -m "strategy_manager and strategies"
+
 # Run integration tests
 test/integration:
 	pytest -m integration
@@ -54,3 +68,6 @@ test/integration/exchange_connector:
 
 test/integration/exchange_connector_data_system:
 	pytest -m exchange_connector_data_system_integration
+
+test/integration/strategy_manager:
+	pytest -m strategy_manager_integration
