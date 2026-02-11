@@ -2,13 +2,22 @@ from typing import Any
 
 import pandas as pd
 
+from strategy_manager import StrategyManager
 from data_system import TradeRepository
+
 from .profit_calculation import calculate_position_profits, get_final_quote_balance
 from .parameter_optimisation import optimise_parameters
-from strategy_manager import StrategyManager
 
 
 class BacktestingEngine:
+    '''
+    Backtesting engine for evaluating trading strategies on historical data.
+
+    Loads trade data from a repository, resamples into OHLC windows, and runs
+    a strategy to generate trading signals. Supports both vectorised (fast batch
+    processing for optimisation) and iterative (row-by-row) execution modes.
+    '''
+
     def __init__(self, pair: str, strategy_name: str, repository: TradeRepository,
                  start: float = None, end: float = None, interval: int = None,
                  vectorised: bool = None, **strategy_params):
@@ -24,7 +33,7 @@ class BacktestingEngine:
         self._load_ohlc_data(repository)
 
     def run(self) -> pd.DataFrame:
-        ''' Load trades from the database and generate a strategy signal for each interval. '''
+        ''' Execute the strategy on the loaded OHLC data to generate trading signals. '''
         if self.vectorised:
             self.results = self.strategy.vectorised_compute(self.ohlc_window)
         else:
@@ -41,7 +50,7 @@ class BacktestingEngine:
         strategy_constraints = getattr(self.strategy.__class__, 'constraints', lambda: [])()
         optimise_parameters(self, param_grid, n_trials, strategy_constraints)
 
-    def calculate_position_profits(self, initial_quote_balance: float = 1000) -> float:
+    def calculate_position_profits(self, initial_quote_balance: float = 1000) -> pd.DataFrame:
         if self.results is None:
             raise ValueError('Backtest yet to be ran, call run() first.')
         return calculate_position_profits(self.results, initial_quote_balance)
@@ -71,8 +80,8 @@ class BacktestingEngine:
             {'timestamp': t.timestamp, 'price': t.price}
             for t in trade_list
         ])
-        trades["timestamp"] = pd.to_datetime(trades["timestamp"], unit="s")
-        trades.set_index("timestamp", inplace=True)
+        trades['timestamp'] = pd.to_datetime(trades['timestamp'], unit='s')
+        trades.set_index('timestamp', inplace=True)
 
         ohlc = trades['price'].resample(f'{self.interval}min').ohlc()
         ohlc = ohlc.bfill()

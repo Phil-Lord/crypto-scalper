@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable
 
 import optuna
 import pandas as pd
@@ -9,8 +9,8 @@ from strategy_manager import StrategyManager
 INITIAL_BALANCE = 1000
 
 
-def get_objective(engine, param_grid: dict[str, list[Any]], constraints: list[callable] = None,
-                  windows: list[tuple[pd.Timestamp, pd.Timestamp]] = None) -> callable:
+def get_objective(engine, param_grid: dict[str, list[Any]], constraints: list[Callable] = None,
+                  windows: list[tuple[pd.Timestamp, pd.Timestamp]] = None) -> Callable:
     def objective(trial: optuna.Trial) -> float:
         ''' Optimisation Objective: Maximise geometric mean of per-window return ratios. '''
         params = suggest_parameters(trial, param_grid)
@@ -49,7 +49,7 @@ def suggest_parameters(trial: optuna.Trial, param_grid: dict[str, list[Any]]) ->
     return params
 
 
-def parameters_violate_constraints(constraints: list[callable], params: dict[str, list[Any]]) -> bool:
+def parameters_violate_constraints(constraints: list[Callable], params: dict[str, list[Any]]) -> bool:
     ''' Check if parameters violate constraints. '''
     if constraints:
         for constraint in constraints:
@@ -80,7 +80,7 @@ def calculate_penalty(trade_count: int, start: pd.Timestamp, end: pd.Timestamp) 
 
 def log_window_trial_count(trial: optuna.Trial, start: pd.Timestamp, end: pd.Timestamp, count: int) -> None:
     ''' Log window trade count as user attribute. '''
-    trial.set_user_attr(f"trades_{start.date()}_{end.date()}", int(count))
+    trial.set_user_attr(f'trades_{start.date()}_{end.date()}', int(count))
 
 
 def calculate_adjusted_return(final_balance: float, penalty: float) -> float:

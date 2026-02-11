@@ -25,6 +25,12 @@ INITIAL_BALANCE = 1000
 
 
 def find_params(study_name: str, num_sets: int, start: float, end: float) -> None:
+    '''
+    Evaluate top parameter sets from an optimisation study on a new time period.
+
+    Tests how well optimised parameters generalise to unseen data by running
+    them on a different time range and computing performance metrics.
+    '''
     study = load_study(study_name)
 
     client = SQLAlchemyClient()
@@ -77,9 +83,9 @@ def get_top_param_sets(study: optuna.Study, n: int, evaluated_trials: set[int]) 
 
     top_param_sets = [
         {
-            "trial_number": t.number,
-            "value": t.value,
-            "params": t.params
+            'trial_number': t.number,
+            'value': t.value,
+            'params': t.params
         }
         for t in top_trials
     ]

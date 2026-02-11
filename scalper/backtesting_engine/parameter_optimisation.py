@@ -1,5 +1,5 @@
 import os
-from typing import Any
+from typing import Any, Callable
 import warnings
 
 import optuna
@@ -12,7 +12,7 @@ from utils import OPTUNA_DB_URL
 
 
 def optimise_parameters(engine, param_grid: dict[str, list[Any]], n_trials: int = 100,
-                        constraints: list[callable] = None) -> dict[str, Any]:
+                        constraints: list[callable] = None) -> None:
     warnings.filterwarnings('ignore', category=ExperimentalWarning)
     windows = create_windows(engine.start, engine.end)
     study_name = create_study_name(engine)
@@ -83,7 +83,7 @@ def validate_search_space(study: optuna.study.Study, param_grid: dict[str, list[
 
 
 def create_windows(start: float, end: float) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
-    ''' 
+    '''
     Generate a list of rolling 3-month windows between two timestamps. 
 
     - Each window spans exactly 3 calendar months. 
@@ -127,7 +127,7 @@ def create_windows(start: float, end: float) -> list[tuple[pd.Timestamp, pd.Time
 
 def optimise(n_trials: int, study: optuna.study.Study, engine,
              windows: list[tuple[pd.Timestamp, pd.Timestamp]], param_grid: dict[str, list[Any]],
-             constraints: list[callable] = None) -> None:
+             constraints: list[Callable] = None) -> None:
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     progress_callback = TqdmProgressCallback(n_trials)
     try:
