@@ -78,6 +78,9 @@ class PrecisionTrendStrategy(Strategy):
         )
 
         conditions = [total_scores > self.buy_threshold, total_scores < self.sell_threshold]
-        choices = [Signal.BUY, Signal.SELL]
-        result = np.select(conditions, choices, default=Signal.HOLD)
-        return pd.Series(result, index=results.index)
+        choices = ['buy', 'sell']  # Use strings as np.select truncates enums
+        result_str = np.select(conditions, choices, default='hold')
+
+        signal_map_reverse = {'buy': Signal.BUY, 'hold': Signal.HOLD, 'sell': Signal.SELL}
+        result = pd.Series([signal_map_reverse[s] for s in result_str], index=results.index)
+        return result
