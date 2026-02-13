@@ -61,7 +61,7 @@ def test_indicator_modes_match():
 
 - **Warmup period** — Returns `None` until enough data
 - **NaN handling** — Gracefully handles missing values
-- **Constant prices** — Correct behavior on flat markets
+- **Constant prices** — Correct behaviour on flat markets
 - **Extreme values** — Division by zero, overflow protection
 
 ---

@@ -15,6 +15,7 @@ Audit the specified module against the project's copilot-instructions.md standar
 #### Python Style
 - [ ] **Python 3.12+ syntax** — Using `str | None`, `list[Trade]` (not Optional, List)
 - [ ] **Single quotes** — Consistently used for all strings
+- [ ] **British English** — UK spellings used throughout (optimise, analyse, serialise, centralise, penalise)
 - [ ] **Type hints** — Present on all function signatures
 - [ ] **Import organisation** — Standard lib → Third-party → Local (separated by blank lines)
 - [ ] **No unused imports** — All imports are used
@@ -46,7 +47,7 @@ Audit the specified module against the project's copilot-instructions.md standar
 - [ ] **Hierarchical markers** — Module, category, and class-level markers
 - [ ] **Markers registered** — All markers in `pytest.ini`
 - [ ] **Makefile target** — `test/{module}` exists
-- [ ] **Test coverage depth** — Testing complex behaviors (retry, pagination, errors), not just happy paths
+- [ ] **Test coverage depth** — Testing complex behaviours (retry, pagination, errors), not just happy paths
 - [ ] **Integration tests** — Mock only system boundaries (HTTP, DB), let all our code run, test multi-layer interactions
 - [ ] **Fixture quality** — Type-hinted, descriptive names, appropriate scope
 
@@ -87,7 +88,7 @@ Audit the specified module against the project's copilot-instructions.md standar
 #### Dual Implementation Patterns (When Applicable)
 - [ ] **Consistent interfaces** — Both implementations (e.g., live/vectorised) follow same contract
 - [ ] **Test parity** — Tests verify both implementations produce identical results
-- [ ] **Clear separation** — Each mode optimized for its use case without compromises
+- [ ] **Clear separation** — Each mode optimised for its use case without compromises
 - [ ] **Documentation** — Performance trade-offs and use cases documented
 
 ### Architecture Decision Log

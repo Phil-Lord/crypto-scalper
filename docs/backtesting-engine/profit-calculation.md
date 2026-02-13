@@ -47,7 +47,7 @@ Get ending balance after all trades:
 final_balance = engine.get_final_quote_balance(initial_quote_balance=1000)
 ```
 
-**Behavior:**
+**Behaviour:**
 
 - If holding position at end: Values at final market price
 - If no trades: Returns initial balance

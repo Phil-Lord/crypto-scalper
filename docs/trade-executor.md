@@ -24,6 +24,6 @@ This allows the TradeExecutor to accept a context instance and avoid maintaining
 - Error handling: “Insufficient funds”, “Invalid order size”, “Rate limit exceeded”, coding bugs,
   network errors, etc.
 - Terraform & Deployment Improvements: Define environment variables in Terraform, referencing AWS
-  Secrets Manager ARNs. Use Lambda container image size optimization (e.g.,
+  Secrets Manager ARNs. Use Lambda container image size optimisation (e.g.,
   base image public.ecr.aws/lambda/python:3.11). Keep Supabase credentials encrypted via Secrets
   Manager, not plaintext env vars.

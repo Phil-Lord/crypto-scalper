@@ -38,6 +38,11 @@ These standards apply to **all code** in the project.
 - **Trailing commas** in multi-line collections
 - **No unused imports** — Keep imports minimal and organised
 
+### Language
+
+- **British English** — Use UK spellings throughout (optimise not optimize, analyse not analyze, serialise not serialize, centralise not centralize, penalise not penalize)
+- Applies to code comments, docstrings, documentation, variable names, and all written content
+
 ### Imports
 
 Organise imports in this order, separated by blank lines:
@@ -142,12 +147,12 @@ class Signal(str, Enum):
 - Type safety (IDE autocomplete, mypy checking)
 - String compatibility (`Signal.BUY == 'buy'` returns `True`)
 - Allows gradual migration from string literals
-- Centralized definition prevents typos
+- Centralised definition prevents typos
 
 **When to use:**
 - Domain concepts with fixed set of values (signals, order sides, statuses)
 - Replacing magic strings in comparisons
-- Values that need to be serialized/deserialized (JSON, database)
+- Values that need to be serialised/deserialised (JSON, database)
 
 ### Type Choices
 
@@ -182,7 +187,7 @@ Docstrings are NOT required for:
 - **Simple exception classes** — If the class name is self-documenting (e.g., `KrakenTooManyRequestsError`)
 - **Methods that only delegate** — If they just call another method with the same semantics
 
-**Guideline:** Avoid over-explaining self-documenting code or duplicating docstrings from called methods. Focus docstrings on understanding parameters, return types, and non-obvious behavior. If reading a docstring would be slower than reading the code itself, skip the docstring.
+**Guideline:** Avoid over-explaining self-documenting code or duplicating docstrings from called methods. Focus docstrings on understanding parameters, return types, and non-obvious behaviour. If reading a docstring would be slower than reading the code itself, skip the docstring.
 
 ### Docstring Style
 
@@ -263,7 +268,7 @@ modules, adding strategies), consider creating a prompt file for it.
 
 ### Test Coverage Philosophy
 
-**Test behavior, not just code paths:**
+**Test behaviour, not just code paths:**
 
 - ✅ **Do test:** Retry logic, error propagation, pagination, validation edge cases
 - ✅ **Do test:** Integration points between layers
