@@ -31,6 +31,11 @@ nav:
       - strategy-manager/index.md
       - strategy-manager/creating-components.md
       - strategy-manager/reference.md
+  - Backtesting Engine:
+      - backtesting-engine/index.md
+      - backtesting-engine/parameter-optimisation.md
+      - backtesting-engine/profit-calculation.md
+      - backtesting-engine/generalisation-evaluation.md
   - parameter-optimisation.md
   - cloud-architecture.md
   - trade-executor.md

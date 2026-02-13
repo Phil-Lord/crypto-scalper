@@ -49,9 +49,17 @@ Record decisions here when future-you might ask _"why did I do it this way?"_.
 
 ## Backtesting Engine
 
-| Decision     | Rationale |
-| ------------ | --------- |
-| _(None yet)_ |           |
+| Decision                                         | Rationale                                                                                                                                                                                                                         |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Use Optuna for parameter optimisation            | TPE sampler provides efficient Bayesian optimisation; built-in parallelization via PostgreSQL storage; pruning reduces wasted trials; proven in ML hyperparameter tuning with similar search spaces                               |
+| Rolling 3-month windows with 1-month steps       | 3 months provides sufficient data for diverse market conditions; 1-month overlap increases sample density; warmup day allows indicators to initialize; longer windows reduce noise, shorter steps increase generalisation testing |
+| Geometric mean for multi-window aggregation      | Accounts for compounding effects (returns multiply, not add); penalizes inconsistency more than arithmetic mean; one bad window significantly impacts score, encouraging robust strategies                                        |
+| Logistic activity penalty (0.3 trades/day ideal) | Empirical finding: ~1 trade per 3 days balances opportunity vs fees; logistic curve provides smooth gradients for Optuna; avoids hard thresholds that create optimization cliffs; caps at 1.0 to avoid penalizing high activity   |
+| Concurrent Optuna with constant_liar sampler     | Enables parallel trial execution without lock contention; constant_liar prevents trials from exploring duplicate regions; multivariate=True captures parameter correlations; group=True improves convergence speed                |
+| Two-phase evaluation (optimise → generalise)     | Optimization on one period, evaluation on another prevents overfitting; separate phases allow analyzing which parameter sets generalize vs which merely fit training data; supports walk-forward analysis workflow                |
+| Dual computation modes (vectorised + iterative)  | Iterative mode tests the same code path used in live trading (row-by-row with stateful indicators), ensuring strategies behave identically in production; vectorised mode uses pandas operations for 10-100x speedup during optimisation; debugging step-through is a secondary benefit |
+| Store studies in PostgreSQL not SQLite           | PostgreSQL supports concurrent writes from parallel workers; row-level locking prevents conflicts; connection pooling improves throughput; SQLite would serialize all trial writes                                                |
+| 0.04% fee on both sides                          | Matches Kraken maker fees at time of implementation; conservative (actual fees may be lower with volume); applied symmetrically to buy and sell for simplicity                                                                    |
 
 ---
 
@@ -59,7 +67,7 @@ Record decisions here when future-you might ask _"why did I do it this way?"_.
 
 | Decision                                       | Rationale                                                                                                                                                                                           |
 | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dual computation modes (live + vectorised)     | Live mode optimised for latency with stateful indicators; vectorised mode optimised for throughput with pandas operations; same logic, different execution paths for 10-100x speedup in backtesting |
+| Dual computation modes (live + vectorised)     | Live mode (row-by-row) is what runs in production, so backtesting must support it to verify identical behavior; vectorised mode uses pandas operations for 10-100x speedup during parameter optimisation; debugging step-through is a secondary benefit |
 | Indicators/Rules/Strategies as mutable classes | Live trading requires maintaining state between updates (EMA values, price windows); immutable dataclasses inappropriate for evolving state                                                         |
 | Accept code duplication between modes          | Each algorithm implemented twice (stateful vs vectorised); maintenance burden accepted for performance benefits; comprehensive tests ensure parity                                                  |
 | Use `Signal` enum from `data_system`           | Type safety across modules; IDE autocomplete; string-compatible for backward compatibility; centralised definition prevents drift                                                                   |
