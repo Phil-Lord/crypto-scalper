@@ -47,8 +47,14 @@ engine.optimise_parameters(param_grid, n_trials=100)
 - Warmup: From 2nd window onward, start 1 day earlier for indicator preparation
 - Incomplete windows: Discarded if < 3 months remain
 
+**Reasoning:**
+
+- 3-month length provides sufficient data to capture multiple market conditions
+- 1-month step ensures overlapping windows and higher sample density
+- More robust than fixed disjoint periods, which may miss certain behaviours
+
 **Example:**  
-Period: `2021-01-10` → `2021-07-10`
+Period: `2021-01-10` → `2022-01-03`
 
 | Window | Start (local)       | End (exclusive)     | Warmup |
 | ------ | ------------------- | ------------------- | ------ |
@@ -56,12 +62,21 @@ Period: `2021-01-10` → `2021-07-10`
 | 2      | 2021-02-09 00:00:00 | 2021-05-09 23:59:59 | 1 day  |
 | 3      | 2021-03-09 00:00:00 | 2021-06-09 23:59:59 | 1 day  |
 | 4      | 2021-04-09 00:00:00 | 2021-07-09 23:59:59 | 1 day  |
+| 5      | 2021-05-09 00:00:00 | 2021-08-09 23:59:59 | 1 day  |
+| 6      | 2021-06-09 00:00:00 | 2021-09-09 23:59:59 | 1 day  |
+| 7      | 2021-07-09 00:00:00 | 2021-10-09 23:59:59 | 1 day  |
+| 8      | 2021-08-09 00:00:00 | 2021-11-09 23:59:59 | 1 day  |
+| 9      | 2021-09-09 00:00:00 | 2021-12-09 23:59:59 | 1 day  |
+
+Remaining time (2021-10-09 → 2022-01-03) is discarded as it's < 3 months.
 
 ---
 
 ## Activity Penalty
 
-**Purpose:** Discourage overtrading (too many signals reduce profitability in practice)
+**Purpose:** Incentivise active trading to prevent buy-and-hold strategies while discouraging excessive overtrading
+
+Early optimisation runs favoured inactive "buy-and-hold" strategies that simply held positions for the entire backtest period rather than actively scalping to catch highs and lows. The activity penalty ensures strategies demonstrate genuine trading activity.
 
 **Mechanism:** Logistic penalty curve based on trade count vs ideal rate
 
@@ -71,7 +86,7 @@ Period: `2021-01-10` → `2021-07-10`
 
 **Effect:**
 
-- Too few trades → Lower penalty multiplier → Reduced score
+- Too few trades → Lower penalty multiplier → Reduced score (prevents buy-and-hold)
 - Ideal trade count → Penalty = 1.0 → No reduction
 - Excessive trades → Capped at 1.0 (no additional penalty beyond ideal)
 
@@ -90,11 +105,18 @@ adjusted_return = window_return * activity_penalty
 score = (product of all adjusted_returns) ** (1 / num_windows)
 ```
 
+**Example:**
+
+If three windows yield return ratios of 1.1, 0.9, and 1.2, the geometric mean is:
+
+`(1.1 × 0.9 × 1.2)^(1/3) ≈ 1.06` (≈ 6% compounded growth per window)
+
 **Why geometric mean?**
 
-- Accounts for compounding effects
+- Reflects compounding more realistically than arithmetic mean
 - Penalises inconsistency (one bad window hurts overall score)
-- More robust than arithmetic mean for return ratios
+- Prevents domination by one or two extremely strong windows
+- Keeps results consistent across variable-length test periods
 
 ---
 

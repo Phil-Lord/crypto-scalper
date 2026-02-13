@@ -36,9 +36,8 @@ nav:
       - backtesting-engine/parameter-optimisation.md
       - backtesting-engine/profit-calculation.md
       - backtesting-engine/generalisation-evaluation.md
-  - parameter-optimisation.md
-  - cloud-architecture.md
   - trade-executor.md
+  - cloud-architecture.md
   - architecture-decision-log.md
 markdown_extensions:
   - admonition
