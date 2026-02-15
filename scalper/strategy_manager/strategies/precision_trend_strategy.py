@@ -4,6 +4,7 @@ import pandas as pd
 from data_system import Signal
 
 from .base_strategy import Strategy
+from .precision_trend_strategy_config import PrecisionTrendStrategyConfig
 from strategy_manager.indicators import AdxIndicator, AtrIndicator, EmaIndicator, RsiIndicator
 from strategy_manager.rules import AdxThresholdRule, AtrThresholdRule, MaCrossoverRule, RsiThresholdRule
 
@@ -11,31 +12,31 @@ from strategy_manager.rules import AdxThresholdRule, AtrThresholdRule, MaCrossov
 class PrecisionTrendStrategy(Strategy):
     ''' EMA crossover, RSI, ADX, ATR '''
 
-    def __init__(self, short_ema: int, long_ema: int, rsi_window: int, rsi_oversold: float,
-                 rsi_overbought: float, adx_window: int, adx_threshold: int, atr_window: int,
-                 atr_threshold: float, weight_crossover: float, weight_rsi: float,
-                 weight_adx: float, weight_atr: float, buy_threshold: float, sell_threshold: float):
+    def __init__(self, config: PrecisionTrendStrategyConfig):
         super().__init__()
-        total_weight = weight_crossover + weight_rsi + weight_adx + weight_atr
-        self.buy_threshold = buy_threshold
-        self.sell_threshold = sell_threshold
+        self.config = config
+        total_weight = (config.weight_crossover + config.weight_rsi +
+                        config.weight_adx + config.weight_atr)
+        self.buy_threshold = config.buy_threshold
+        self.sell_threshold = config.sell_threshold
 
-        self.register_indicator('short_ema', EmaIndicator(short_ema))
-        self.register_indicator('long_ema', EmaIndicator(long_ema))
+        self.register_indicator('short_ema', EmaIndicator(config.short_ema))
+        self.register_indicator('long_ema', EmaIndicator(config.long_ema))
         self.register_rule('crossover', MaCrossoverRule('short_ema', 'long_ema'))
-        self.weight_crossover = weight_crossover / total_weight
+        self.weight_crossover = config.weight_crossover / total_weight
 
-        self.register_indicator('rsi', RsiIndicator(rsi_window))
-        self.register_rule('rsi_threshold', RsiThresholdRule('rsi', rsi_oversold, rsi_overbought))
-        self.weight_rsi = weight_rsi / total_weight
+        self.register_indicator('rsi', RsiIndicator(config.rsi_window))
+        self.register_rule('rsi_threshold', RsiThresholdRule(
+            'rsi', config.rsi_oversold, config.rsi_overbought))
+        self.weight_rsi = config.weight_rsi / total_weight
 
-        self.register_indicator('adx', AdxIndicator(adx_window))
-        self.register_rule('adx_threshold', AdxThresholdRule('adx', adx_threshold))
-        self.weight_adx = weight_adx / total_weight
+        self.register_indicator('adx', AdxIndicator(config.adx_window))
+        self.register_rule('adx_threshold', AdxThresholdRule('adx', config.adx_threshold))
+        self.weight_adx = config.weight_adx / total_weight
 
-        self.register_indicator('atr', AtrIndicator(atr_window))
-        self.register_rule('atr_threshold', AtrThresholdRule('atr', atr_threshold))
-        self.weight_atr = weight_atr / total_weight
+        self.register_indicator('atr', AtrIndicator(config.atr_window))
+        self.register_rule('atr_threshold', AtrThresholdRule('atr', config.atr_threshold))
+        self.weight_atr = config.weight_atr / total_weight
 
     @staticmethod
     def constraints() -> list[callable]:

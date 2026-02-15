@@ -4,8 +4,6 @@ import optuna
 import pandas as pd
 import numpy as np
 
-from strategy_manager import StrategyManager
-
 INITIAL_BALANCE = 1000
 
 
@@ -60,7 +58,10 @@ def parameters_violate_constraints(constraints: list[Callable], params: dict[str
 
 def run_strategy_on_window(engine, params: dict[str, Any], start: pd.Timestamp, end: pd.Timestamp) -> None:
     ''' Configure and run the strategy on an OHLC window. '''
-    engine.strategy = StrategyManager().get_strategy(engine.strategy.__class__.__name__, **params)
+    config_cls = type(engine.strategy.config)
+    strategy_cls = type(engine.strategy)
+    new_config = config_cls(**params)
+    engine.strategy = strategy_cls(new_config)
     engine.set_ohlc_window(start, end)
     engine.run()
 

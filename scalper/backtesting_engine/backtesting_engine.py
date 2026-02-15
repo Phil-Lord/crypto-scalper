@@ -2,7 +2,7 @@ from typing import Any
 
 import pandas as pd
 
-from strategy_manager import StrategyManager
+from strategy_manager import Strategy
 from data_system import TradeRepository
 
 from .profit_calculation import calculate_position_profits, get_final_quote_balance
@@ -18,15 +18,16 @@ class BacktestingEngine:
     processing for optimisation) and iterative (row-by-row) execution modes.
     '''
 
-    def __init__(self, pair: str, strategy_name: str, repository: TradeRepository,
-                 start: float = None, end: float = None, interval: int = None,
-                 vectorised: bool = None, **strategy_params):
+    def __init__(
+            self, pair: str, strategy: Strategy, repository: TradeRepository, start: float = None,
+            end: float = None, interval: int = None, vectorised: bool = None
+    ):
         self.pair = pair
         self.start = start
         self.end = end
         self.interval = interval if interval is not None else 1
         self.vectorised = vectorised if vectorised is not None else True
-        self.strategy = StrategyManager().get_strategy(strategy_name, **strategy_params)
+        self.strategy = strategy
         self.ohlc_full = None
         self.ohlc_window = None
         self.results = None

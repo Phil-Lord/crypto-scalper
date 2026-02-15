@@ -4,6 +4,7 @@ from typing import Any
 import click
 
 from trade_executor import TradeExecutor
+from strategy_manager import create_strategy
 from utils import load_env, LOG_FORMAT, get_kraken_pair, SMA_CONFIG, PRECISION_TREND_CONFIG
 
 load_env()
@@ -19,7 +20,8 @@ def start_scalping(pair: str, interval: int, strategy_name: str) -> None:
     params = get_params_for_strategy(strategy_name)
     if params is None:
         return
-    executor = TradeExecutor(get_kraken_pair(pair), interval, strategy_name, **params)
+    strategy = create_strategy(strategy_name, params)
+    executor = TradeExecutor(get_kraken_pair(pair), interval, strategy)
     executor.execute_interval()
 
 

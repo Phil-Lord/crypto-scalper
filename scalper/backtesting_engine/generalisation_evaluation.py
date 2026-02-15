@@ -11,7 +11,7 @@ from data_system import (
     SQLAlchemyGeneralisationEvaluationRepository,
     SQLAlchemyTradeRepository
 )
-from strategy_manager import StrategyManager
+from strategy_manager import create_strategy
 from utils import OPTUNA_DB_URL
 
 from .backtesting_engine import BacktestingEngine
@@ -42,15 +42,15 @@ def find_params(study_name: str, num_sets: int, start: float, end: float) -> Non
     if len(top_param_sets) == 0:
         return
 
+    strategy = create_strategy('PrecisionTrendStrategy', top_param_sets[0]['params'])
     engine = BacktestingEngine(
         pair='XXBTZGBP',
-        strategy_name='PrecisionTrendStrategy',
+        strategy=strategy,
         repository=trade_repo,
         start=start,
         end=end,
         interval=1,
-        vectorised=True,
-        **top_param_sets[0]['params']
+        vectorised=True
     )
 
     windows = create_windows(start, end)
@@ -98,8 +98,10 @@ def run_evaluation(engine: BacktestingEngine, top_param_sets: list[dict], window
         for param_set in top_param_sets:
             # Run on full period first
             engine.set_ohlc_window()
-            engine.strategy = StrategyManager().get_strategy(
-                engine.strategy.__class__.__name__, **param_set['params'])
+            config_cls = type(engine.strategy.config)
+            strategy_cls = type(engine.strategy)
+            new_config = config_cls(**param_set['params'])
+            engine.strategy = strategy_cls(new_config)
             engine.run()
             final_quote_balance = engine.get_final_quote_balance(INITIAL_BALANCE)
 

@@ -5,6 +5,7 @@ import pandas as pd
 
 from backtesting_engine import BacktestingEngine
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
+from strategy_manager import create_strategy
 from utils import load_env, LOG_FORMAT, get_kraken_pair, get_second_timestamp, parse_datetime, plot_position_profits, plot_results, SMA_CONFIG, SMA_GRID, PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
 
 load_env()
@@ -52,6 +53,7 @@ def get_params_for_strategy(strategy_name: str) -> tuple:
 def create_engine(pair: str, strategy_name: str, start: str, end: str, interval: int, vectorised: bool, **params) -> BacktestingEngine:
     ''' Create a backtesting engine with the specified parameters. '''
     kraken_pair = get_kraken_pair(pair)
+    strategy = create_strategy(strategy_name, params)
     client = SQLAlchemyClient()
     repository = SQLAlchemyTradeRepository(client)
 
@@ -60,12 +62,10 @@ def create_engine(pair: str, strategy_name: str, start: str, end: str, interval:
     if end is not None:
         end = get_second_timestamp(*parse_datetime(end))
 
-    return BacktestingEngine(kraken_pair, strategy_name, repository, start, end,
-                             interval, vectorised, **params)
+    return BacktestingEngine(kraken_pair, strategy, repository, start, end, interval, vectorised)
 
 
 def output_results(engine: BacktestingEngine, results: pd.DataFrame, pair: str) -> None:
-    ''' Output the results of the backtest. '''
     print(f'Final Quote Balance: {engine.get_final_quote_balance(INITIAL_QUOTE_BALANCE)}')
     if PLOT_RESULTS:
         print('No. trades:', results['signal'].ne('hold').sum())

@@ -2,7 +2,7 @@ import logging
 import os
 
 from exchange_connector import AddOrderConnector, BalanceConnector, TickerConnector
-from strategy_manager import StrategyManager
+from strategy_manager import Strategy
 from utils import load_env, LOG_FORMAT, get_kraken_pair_symbols
 
 
@@ -13,15 +13,15 @@ logger = logging.getLogger(__name__)
 
 
 class TradeExecutor:
-    def __init__(self, pair: str, interval: int, strategy_name: str, **strategy_params):
+    def __init__(self, pair: str, interval: int, strategy: Strategy):
         self.pair = pair
         self.symbols = get_kraken_pair_symbols(pair)
         self.interval = interval
         self.ticker_connector = TickerConnector()
         self.balance_connector = BalanceConnector()
         self.add_order_connector = AddOrderConnector()
-        self.strategy = StrategyManager().get_strategy(strategy_name, **strategy_params)
-        logger.info(f'Initialised TradeExecutor: {pair} - {strategy_name} - {strategy_params}')
+        self.strategy = strategy
+        logger.info(f'Initialised TradeExecutor: {pair} - {strategy.__class__.__name__}')
 
     def execute_interval(self) -> None:
         ''' Runs one trade decision cycle. '''
