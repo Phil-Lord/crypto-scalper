@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 from data_system.models.bot_tick_model import Signal
 from strategy_manager.strategies.precision_trend_strategy import PrecisionTrendStrategy
+from strategy_manager.strategies.precision_trend_strategy_config import PrecisionTrendStrategyConfig
 
 
 @pytest.mark.strategy_manager
@@ -13,7 +14,7 @@ from strategy_manager.strategies.precision_trend_strategy import PrecisionTrendS
 class TestPrecisionTrendStrategy:
     @pytest.fixture
     def strategy(self) -> PrecisionTrendStrategy:
-        return PrecisionTrendStrategy(
+        config = PrecisionTrendStrategyConfig(
             short_ema=5,
             long_ema=10,
             rsi_window=14,
@@ -30,6 +31,7 @@ class TestPrecisionTrendStrategy:
             buy_threshold=0.5,
             sell_threshold=-0.5
         )
+        return PrecisionTrendStrategy(config)
 
     def test_initialisation_registers_all_indicators_and_rules(self, strategy: PrecisionTrendStrategy):
         assert 'short_ema' in strategy.indicators
@@ -45,12 +47,13 @@ class TestPrecisionTrendStrategy:
 
     def test_initialisation_normalises_weights(self):
         # Given
-        strategy = PrecisionTrendStrategy(
+        config = PrecisionTrendStrategyConfig(
             short_ema=5, long_ema=10, rsi_window=14, rsi_oversold=30, rsi_overbought=70,
             adx_window=14, adx_threshold=25, atr_window=14, atr_threshold=0.01,
             weight_crossover=2.0, weight_rsi=2.0, weight_adx=2.0, weight_atr=2.0,
             buy_threshold=0.5, sell_threshold=-0.5
         )
+        strategy = PrecisionTrendStrategy(config)
 
         # When / Then - Total should sum to 1.0
         total = (strategy.weight_crossover + strategy.weight_rsi +
@@ -126,7 +129,7 @@ class TestPrecisionTrendStrategy:
 
     def test_generate_signal_with_weighted_scoring(self):
         # Given - Strategy with unequal weights
-        strategy = PrecisionTrendStrategy(
+        config = PrecisionTrendStrategyConfig(
             short_ema=5, long_ema=10, rsi_window=14, rsi_oversold=30, rsi_overbought=70,
             adx_window=14, adx_threshold=25, atr_window=14, atr_threshold=0.01,
             weight_crossover=4.0,  # Higher weight
@@ -136,6 +139,7 @@ class TestPrecisionTrendStrategy:
             buy_threshold=0.5,
             sell_threshold=-0.5
         )
+        strategy = PrecisionTrendStrategy(config)
 
         # Crossover is BUY (weighted heavily), others are SELL
         rule_results = {
@@ -174,12 +178,13 @@ class TestPrecisionTrendStrategy:
 
     def test_vectorised_compute_with_simple_data(self):
         # Given
-        strategy = PrecisionTrendStrategy(
+        config = PrecisionTrendStrategyConfig(
             short_ema=3, long_ema=5, rsi_window=5, rsi_oversold=30, rsi_overbought=70,
             adx_window=5, adx_threshold=25, atr_window=5, atr_threshold=0.01,
             weight_crossover=1.0, weight_rsi=1.0, weight_adx=1.0, weight_atr=1.0,
             buy_threshold=0.5, sell_threshold=-0.5
         )
+        strategy = PrecisionTrendStrategy(config)
 
         np.random.seed(42)
         n = 50
@@ -210,12 +215,13 @@ class TestPrecisionTrendStrategy:
 
     def test_generate_signal_with_mocked_rules(self):
         # Given
-        strategy = PrecisionTrendStrategy(
+        config = PrecisionTrendStrategyConfig(
             short_ema=5, long_ema=10, rsi_window=14, rsi_oversold=30, rsi_overbought=70,
             adx_window=14, adx_threshold=25, atr_window=14, atr_threshold=0.01,
             weight_crossover=1.0, weight_rsi=1.0, weight_adx=1.0, weight_atr=1.0,
             buy_threshold=0.5, sell_threshold=-0.5
         )
+        strategy = PrecisionTrendStrategy(config)
 
         # Mock all indicators
         for indicator_name in ['short_ema', 'long_ema', 'rsi', 'adx', 'atr']:

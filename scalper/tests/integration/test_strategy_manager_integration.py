@@ -3,8 +3,12 @@ import pandas as pd
 import pytest
 
 from data_system import Signal
-from strategy_manager import StrategyManager
-from strategy_manager.strategies import SmaStrategy, PrecisionTrendStrategy
+from strategy_manager import (
+    SmaStrategy,
+    SmaStrategyConfig,
+    PrecisionTrendStrategy,
+    PrecisionTrendStrategyConfig
+)
 
 
 @pytest.mark.integration
@@ -15,7 +19,7 @@ class TestStrategyManagerIntegration:
 
     These tests verify that the full strategy stack works correctly
     without mocking indicators or rules. Tests cover:
-    - Strategy creation through StrategyManager
+    - Strategy creation with config objects
     - Indicator computation (update and vectorised)
     - Rule evaluation
     - Signal generation
@@ -89,8 +93,8 @@ class TestStrategyManagerIntegration:
         Verifies indicators compute, rules evaluate, and signals generate correctly.
         '''
         # Given
-        manager = StrategyManager()
-        strategy = manager.get_strategy('SmaStrategy', short_window=5, long_window=10)
+        config = SmaStrategyConfig(short_window=5, long_window=10)
+        strategy = SmaStrategy(config)
 
         # When
         result = strategy.vectorised_compute(uptrend_data)
@@ -118,8 +122,8 @@ class TestStrategyManagerIntegration:
     def test_sma_strategy_full_stack_with_downtrend(self, downtrend_data: pd.DataFrame):
         '''Test SmaStrategy with downtrending data - should generate SELL signals.'''
         # Given
-        manager = StrategyManager()
-        strategy = manager.get_strategy('SmaStrategy', short_window=5, long_window=10)
+        config = SmaStrategyConfig(short_window=5, long_window=10)
+        strategy = SmaStrategy(config)
 
         # When
         result = strategy.vectorised_compute(downtrend_data)
@@ -134,9 +138,9 @@ class TestStrategyManagerIntegration:
         This ensures consistency between backtesting and live trading.
         '''
         # Given
-        manager = StrategyManager()
-        strategy_update = manager.get_strategy('SmaStrategy', short_window=5, long_window=10)
-        strategy_vectorised = manager.get_strategy('SmaStrategy', short_window=5, long_window=10)
+        config = SmaStrategyConfig(short_window=5, long_window=10)
+        strategy_update = SmaStrategy(config)
+        strategy_vectorised = SmaStrategy(config)
 
         # When - Generate signals using update mode
         update_signals = []
@@ -161,9 +165,7 @@ class TestStrategyManagerIntegration:
         Verifies all 4 indicators and 4 rules work together correctly.
         '''
         # Given
-        manager = StrategyManager()
-        strategy = manager.get_strategy(
-            'PrecisionTrendStrategy',
+        config = PrecisionTrendStrategyConfig(
             short_ema=5,
             long_ema=10,
             rsi_window=14,
@@ -180,6 +182,7 @@ class TestStrategyManagerIntegration:
             buy_threshold=0.3,
             sell_threshold=-0.3
         )
+        strategy = PrecisionTrendStrategy(config)
 
         # When
         result = strategy.vectorised_compute(uptrend_data)
@@ -224,9 +227,7 @@ class TestStrategyManagerIntegration:
         })
 
         # Strategy with crossover heavily weighted
-        manager = StrategyManager()
-        strategy = manager.get_strategy(
-            'PrecisionTrendStrategy',
+        config = PrecisionTrendStrategyConfig(
             short_ema=3,
             long_ema=5,
             rsi_window=5,
@@ -243,6 +244,7 @@ class TestStrategyManagerIntegration:
             buy_threshold=0.5,
             sell_threshold=-0.5
         )
+        strategy = PrecisionTrendStrategy(config)
 
         # When
         result = strategy.vectorised_compute(data)
@@ -256,27 +258,26 @@ class TestStrategyManagerIntegration:
         Uses simple data to ensure the test focuses on mode consistency rather than signal generation.
         '''
         # Given
-        manager = StrategyManager()
-        params = {
-            'short_ema': 5,
-            'long_ema': 10,
-            'rsi_window': 14,
-            'rsi_oversold': 30,
-            'rsi_overbought': 70,
-            'adx_window': 14,
-            'adx_threshold': 25,
-            'atr_window': 14,
-            'atr_threshold': 0.01,
-            'weight_crossover': 1.0,
-            'weight_rsi': 1.0,
-            'weight_adx': 1.0,
-            'weight_atr': 1.0,
-            'buy_threshold': 0.5,
-            'sell_threshold': -0.5
-        }
+        config = PrecisionTrendStrategyConfig(
+            short_ema=5,
+            long_ema=10,
+            rsi_window=14,
+            rsi_oversold=30,
+            rsi_overbought=70,
+            adx_window=14,
+            adx_threshold=25,
+            atr_window=14,
+            atr_threshold=0.01,
+            weight_crossover=1.0,
+            weight_rsi=1.0,
+            weight_adx=1.0,
+            weight_atr=1.0,
+            buy_threshold=0.5,
+            sell_threshold=-0.5
+        )
 
-        strategy_update = manager.get_strategy('PrecisionTrendStrategy', **params)
-        strategy_vectorised = manager.get_strategy('PrecisionTrendStrategy', **params)
+        strategy_update = PrecisionTrendStrategy(config)
+        strategy_vectorised = PrecisionTrendStrategy(config)
 
         # Use simple trending data
         np.random.seed(42)
@@ -303,20 +304,19 @@ class TestStrategyManagerIntegration:
 
     # ==================== StrategyManager Integration Tests ====================
 
-    def test_strategy_manager_creates_working_strategies(self):
-        '''Test that StrategyManager creates functional strategy instances.'''
-        # Given
-        manager = StrategyManager()
+    def test_config_validation_creates_working_strategies(self):
+        ''' Test that config objects create functional strategy instances. '''
+        # Given / When
+        sma_config = SmaStrategyConfig(short_window=5, long_window=10)
+        sma_strategy = SmaStrategy(sma_config)
 
-        # When
-        sma_strategy = manager.get_strategy('SmaStrategy', short_window=5, long_window=10)
-        precision_strategy = manager.get_strategy(
-            'PrecisionTrendStrategy',
+        precision_config = PrecisionTrendStrategyConfig(
             short_ema=5, long_ema=10, rsi_window=14, rsi_oversold=30, rsi_overbought=70,
             adx_window=14, adx_threshold=25, atr_window=14, atr_threshold=0.01,
             weight_crossover=1.0, weight_rsi=1.0, weight_adx=1.0, weight_atr=1.0,
             buy_threshold=0.5, sell_threshold=-0.5
         )
+        precision_strategy = PrecisionTrendStrategy(precision_config)
 
         # Then - Both strategies should be functional
         test_data = pd.DataFrame({
@@ -333,12 +333,12 @@ class TestStrategyManagerIntegration:
 
     def test_multiple_strategy_instances_are_independent(self):
         '''
-        Test that multiple strategy instances from the same manager are independent.
+        Test that multiple strategy instances with the same config are independent.
         '''
         # Given
-        manager = StrategyManager()
-        strategy1 = manager.get_strategy('SmaStrategy', short_window=5, long_window=10)
-        strategy2 = manager.get_strategy('SmaStrategy', short_window=5, long_window=10)
+        config = SmaStrategyConfig(short_window=5, long_window=10)
+        strategy1 = SmaStrategy(config)
+        strategy2 = SmaStrategy(config)
 
         # When - Generate signal on strategy1
         ohlc = pd.Series({'price': 100.0})

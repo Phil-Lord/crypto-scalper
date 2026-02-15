@@ -15,13 +15,43 @@ from backtesting_engine.objective import (
 class TestGetObjective:
     @pytest.fixture
     def engine_patch(self, mocker):
-        return mocker.patch('backtesting_engine.BacktestingEngine')
+        ''' Mock engine with strategy and config setup. '''
+        # Create simple callable mocks that don't try to use args as spec
+        mock_config_instance = mocker.MagicMock(name='config_instance')
+        mock_config_class = mocker.MagicMock(name='ConfigClass', return_value=mock_config_instance)
 
-    @pytest.fixture
-    def strategy_manager_patch(self, mocker):
-        return mocker.patch('backtesting_engine.objective.StrategyManager')
+        mock_new_strategy = mocker.MagicMock(name='new_strategy')
+        mock_strategy_class = mocker.MagicMock(name='StrategyClass', return_value=mock_new_strategy)
 
-    def test_get_objective_returns_callable(self, engine_patch, strategy_manager_patch):
+        # Create the engine
+        engine = mocker.patch('backtesting_engine.BacktestingEngine')
+
+        # Set up current strategy and config
+        mock_current_config = mocker.MagicMock(name='current_config')
+        mock_current_strategy = mocker.MagicMock(name='current_strategy')
+        mock_current_strategy.config = mock_current_config
+        engine.strategy = mock_current_strategy
+
+        # Mock type() to return our mock classes when called on the mocks
+        original_type = type
+
+        def mock_type(obj):
+            if obj is mock_current_config:
+                return mock_config_class
+            elif obj is mock_current_strategy:
+                return mock_strategy_class
+            return original_type(obj)
+
+        mocker.patch('backtesting_engine.objective.type', side_effect=mock_type)
+
+        # Store references for assertions
+        engine._mock_config_class = mock_config_class
+        engine._mock_strategy_class = mock_strategy_class
+        engine._mock_new_strategy = mock_new_strategy
+
+        return engine
+
+    def test_get_objective_returns_callable(self, engine_patch):
         # Given
         param_grid = {'short_ema': [1, 10], 'long_ema': [20, 30]}
         windows = [(pd.Timestamp('2021-01-01'), pd.Timestamp('2021-03-31'))]
@@ -32,10 +62,11 @@ class TestGetObjective:
         # Then
         assert callable(objective)
 
-    def test_get_objective(self, engine_patch, strategy_manager_patch):
+    def test_get_objective(self, engine_patch):
         # Given
-        engine_patch.strategy.__class__.__name__ = 'TestStrategyName'
-        strategy_manager_patch.return_value.get_strategy.return_value = None
+        config_class = engine_patch._mock_config_class
+        strategy_class = engine_patch._mock_strategy_class
+
         engine_patch.set_ohlc_window.return_value = None
         engine_patch.run.return_value = None
         engine_patch.get_final_quote_balance.return_value = 1500
@@ -56,8 +87,11 @@ class TestGetObjective:
         # Then
         assert isinstance(avg_return, float)
 
-        strategy_manager_patch().get_strategy.assert_called_once_with(
-            'TestStrategyName', short_ema=9, long_ema=25)
+        # Verify config was created with the right parameters
+        config_class.assert_called_with(short_ema=9, long_ema=25)
+
+        # Verify strategy was created with new config
+        assert strategy_class.call_count == 1
 
         engine_patch.set_ohlc_window.assert_called_once_with(
             pd.Timestamp('2021-01-01 00:00:00'),
@@ -66,7 +100,7 @@ class TestGetObjective:
         engine_patch.run.assert_called_once()
         engine_patch.get_final_quote_balance.assert_called_once_with(1000)
 
-    def test_get_objective_prunes_when_constraints_violated(self, engine_patch, strategy_manager_patch):
+    def test_get_objective_prunes_when_constraints_violated(self, engine_patch):
         # Given
         param_grid = {'short_ema': [1, 25], 'long_ema': [10, 30]}
         windows = [(pd.Timestamp('2021-01-01'), pd.Timestamp('2021-03-31'))]

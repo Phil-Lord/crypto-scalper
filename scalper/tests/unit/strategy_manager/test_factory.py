@@ -1,40 +1,34 @@
 import pytest
 
-from strategy_manager.strategy_manager import StrategyManager
+from strategy_manager.factory import create_strategy, STRATEGIES
 from strategy_manager.strategies.sma_strategy import SmaStrategy
 from strategy_manager.strategies.precision_trend_strategy import PrecisionTrendStrategy
 
 
 @pytest.mark.strategy_manager
-@pytest.mark.strategy_manager_class
-class TestStrategyManager:
-    @pytest.fixture
-    def manager(self) -> StrategyManager:
-        '''Create a StrategyManager instance.'''
-        return StrategyManager()
+@pytest.mark.factory
+class TestStrategyFactory:
+    def test_strategies_registry_contains_expected_strategies(self):
+        assert 'SmaStrategy' in STRATEGIES
+        assert 'PrecisionTrendStrategy' in STRATEGIES
 
-    def test_initialisation_registers_strategies(self, manager: StrategyManager):
-        # Given / When / Then
-        assert 'SmaStrategy' in manager.strategies
-        assert 'PrecisionTrendStrategy' in manager.strategies
-
-    def test_get_strategy_returns_sma_strategy(self, manager: StrategyManager):
+    def test_create_strategy_returns_sma_strategy(self):
         # Given
         strategy_name = 'SmaStrategy'
-        kwargs = {'short_window': 5, 'long_window': 10}
+        params = {'short_window': 5, 'long_window': 10}
 
         # When
-        strategy = manager.get_strategy(strategy_name, **kwargs)
+        strategy = create_strategy(strategy_name, params)
 
         # Then
         assert isinstance(strategy, SmaStrategy)
         assert 'short_sma' in strategy.indicators
         assert 'long_sma' in strategy.indicators
 
-    def test_get_strategy_returns_precision_trend_strategy(self, manager: StrategyManager):
+    def test_create_strategy_returns_precision_trend_strategy(self):
         # Given
         strategy_name = 'PrecisionTrendStrategy'
-        kwargs = {
+        params = {
             'short_ema': 5,
             'long_ema': 10,
             'rsi_window': 14,
@@ -53,33 +47,40 @@ class TestStrategyManager:
         }
 
         # When
-        strategy = manager.get_strategy(strategy_name, **kwargs)
+        strategy = create_strategy(strategy_name, params)
 
         # Then
         assert isinstance(strategy, PrecisionTrendStrategy)
         assert 'short_ema' in strategy.indicators
         assert 'rsi' in strategy.indicators
 
-    def test_get_strategy_raises_error_for_unknown_strategy(self, manager: StrategyManager):
+    def test_create_strategy_raises_error_for_unknown_strategy(self):
         # Given
         strategy_name = 'UnknownStrategy'
+        params = {}
 
         # When / Then
-        with pytest.raises(ValueError, match='Strategy UnknownStrategy does not exist'):
-            manager.get_strategy(strategy_name)
+        with pytest.raises(ValueError, match='Unknown strategy'):
+            create_strategy(strategy_name, params)
 
-    def test_get_strategy_passes_kwargs_to_strategy(self, manager: StrategyManager):
+    def test_create_strategy_validates_config_parameters(self):
+        # Given - Invalid params (short_window >= long_window)
+        strategy_name = 'SmaStrategy'
+        params = {'short_window': 10, 'long_window': 5}
+
+        # When / Then
+        with pytest.raises(ValueError, match='short_window.*must be.*long_window'):
+            create_strategy(strategy_name, params)
+
+    def test_create_strategy_passes_params_to_config(self):
         # Given
         strategy_name = 'SmaStrategy'
         short_window = 7
         long_window = 21
+        params = {'short_window': short_window, 'long_window': long_window}
 
         # When
-        strategy = manager.get_strategy(
-            strategy_name,
-            short_window=short_window,
-            long_window=long_window
-        )
+        strategy = create_strategy(strategy_name, params)
 
         # Then
         assert isinstance(strategy, SmaStrategy)

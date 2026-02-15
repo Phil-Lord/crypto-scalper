@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 from data_system.models.bot_tick_model import Signal
 from strategy_manager.strategies.sma_strategy import SmaStrategy
+from strategy_manager.strategies.sma_strategy_config import SmaStrategyConfig
 
 
 @pytest.mark.strategy_manager
@@ -13,7 +14,8 @@ from strategy_manager.strategies.sma_strategy import SmaStrategy
 class TestSmaStrategy:
     @pytest.fixture
     def strategy(self) -> SmaStrategy:
-        return SmaStrategy(short_window=5, long_window=10)
+        config = SmaStrategyConfig(short_window=5, long_window=10)
+        return SmaStrategy(config)
 
     @pytest.fixture
     def sample_ohlc(self) -> pd.Series:
@@ -70,7 +72,8 @@ class TestSmaStrategy:
 
     def test_generate_signal_with_mocked_indicators(self):
         # Given
-        strategy = SmaStrategy(short_window=5, long_window=10)
+        config = SmaStrategyConfig(short_window=5, long_window=10)
+        strategy = SmaStrategy(config)
 
         # Mock the indicators to control their output
         mock_short_sma = Mock()
@@ -100,7 +103,8 @@ class TestSmaStrategy:
 
     def test_generate_signal_suppresses_consecutive_buy_signals(self):
         # Given
-        strategy = SmaStrategy(short_window=5, long_window=10)
+        config = SmaStrategyConfig(short_window=5, long_window=10)
+        strategy = SmaStrategy(config)
 
         mock_short_sma = Mock()
         mock_short_sma.update.return_value = 105.0
@@ -128,7 +132,8 @@ class TestSmaStrategy:
 
     def test_vectorised_compute_with_simple_data(self):
         # Given
-        strategy = SmaStrategy(short_window=3, long_window=5)
+        config = SmaStrategyConfig(short_window=3, long_window=5)
+        strategy = SmaStrategy(config)
 
         # Create simple trending data
         np.random.seed(42)

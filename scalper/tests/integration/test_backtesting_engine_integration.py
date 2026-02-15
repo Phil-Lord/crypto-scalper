@@ -17,6 +17,7 @@ from data_system import (
     SQLAlchemyGeneralisationEvaluationRepository
 )
 from data_system.models import Signal
+from strategy_manager import SmaStrategy, SmaStrategyConfig
 
 
 @pytest.mark.integration
@@ -84,14 +85,20 @@ class TestBacktestingEngineIntegration:
 
     @pytest.fixture
     def mock_trade_repository(self, sample_trades: list[Trade]):
-        '''Mock TradeRepository that returns sample trades.'''
+        ''' Mock TradeRepository that returns sample trades. '''
         mock_repo = Mock(spec=SQLAlchemyTradeRepository)
         mock_repo.get.return_value = sample_trades
         return mock_repo
 
+    @pytest.fixture
+    def sma_strategy(self):
+        ''' Create a default SMA strategy for testing. '''
+        config = SmaStrategyConfig(short_window=5, long_window=10)
+        return SmaStrategy(config)
+
     # ==================== BacktestingEngine Full Stack Tests ====================
 
-    def test_backtesting_engine_loads_and_transforms_data(self, mock_trade_repository: Mock):
+    def test_backtesting_engine_loads_and_transforms_data(self, mock_trade_repository: Mock, sma_strategy: SmaStrategy):
         '''
         Test full data loading pipeline: repository -> trades -> OHLC.
         Verifies transformation from Trade domain objects to OHLC DataFrame.
@@ -104,14 +111,12 @@ class TestBacktestingEngineIntegration:
         # When
         engine = BacktestingEngine(
             pair=pair,
-            strategy_name='SmaStrategy',
+            strategy=sma_strategy,
             repository=mock_trade_repository,
             start=start,
             end=end,
             interval=5,
-            vectorised=True,
-            short_window=5,
-            long_window=10
+            vectorised=True
         )
 
         # Then
@@ -132,22 +137,20 @@ class TestBacktestingEngineIntegration:
         assert len(engine.ohlc_full) > 0
         assert len(engine.ohlc_full) < len(mock_trade_repository.get.return_value)
 
-    def test_backtesting_engine_runs_strategy_end_to_end(self, mock_trade_repository: Mock):
+    def test_backtesting_engine_runs_strategy_end_to_end(self, mock_trade_repository: Mock, sma_strategy: SmaStrategy):
         '''
         Test full execution: load data -> run strategy -> generate signals.
-        Verifies integration between BacktestingEngine and StrategyManager.
+        Verifies integration between BacktestingEngine and strategy.
         '''
         # Given
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='SmaStrategy',
+            strategy=sma_strategy,
             repository=mock_trade_repository,
             start=1704067200.0,
             end=1704097200.0,
             interval=5,
-            vectorised=True,
-            short_window=5,
-            long_window=10
+            vectorised=True
         )
 
         # When
@@ -178,32 +181,31 @@ class TestBacktestingEngineIntegration:
         Verifies both execution modes work correctly.
         '''
         # Given - Vectorised mode
+        config = SmaStrategyConfig(short_window=5, long_window=10)
+        strategy_v = SmaStrategy(config)
         engine_vectorised = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='SmaStrategy',
+            strategy=strategy_v,
             repository=mock_trade_repository,
             start=1704067200.0,
             end=1704097200.0,
             interval=5,
-            vectorised=True,
-            short_window=5,
-            long_window=10
+            vectorised=True
         )
 
-        # Create new engine for iterative mode (needs fresh OHLC)
+        # Create new engine for iterative mode (needs fresh OHLC and strategy)
         mock_repo_copy = Mock(spec=SQLAlchemyTradeRepository)
         mock_repo_copy.get.return_value = mock_trade_repository.get.return_value
 
+        strategy_i = SmaStrategy(config)
         engine_iterative = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='SmaStrategy',
+            strategy=strategy_i,
             repository=mock_repo_copy,
             start=1704067200.0,
             end=1704097200.0,
             interval=5,
-            vectorised=False,
-            short_window=5,
-            long_window=10
+            vectorised=False
         )
 
         # When
@@ -224,7 +226,7 @@ class TestBacktestingEngineIntegration:
 
     # ==================== Profit Calculation Integration Tests ====================
 
-    def test_profit_calculation_full_integration(self, mock_trade_repository: Mock):
+    def test_profit_calculation_full_integration(self, mock_trade_repository: Mock, sma_strategy: SmaStrategy):
         '''
         Test full profit calculation flow with real strategy results.
         Verifies integration of strategy execution -> profit calculation.
@@ -232,14 +234,12 @@ class TestBacktestingEngineIntegration:
         # Given
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='SmaStrategy',
+            strategy=sma_strategy,
             repository=mock_trade_repository,
             start=1704067200.0,
             end=1704097200.0,
             interval=5,
-            vectorised=True,
-            short_window=5,
-            long_window=10
+            vectorised=True
         )
         engine.run()
         initial_balance = 1000.0
@@ -268,16 +268,16 @@ class TestBacktestingEngineIntegration:
         Integration test of realistic trading scenario.
         '''
         # Given - Data has uptrend built in
+        config = SmaStrategyConfig(short_window=3, long_window=8)
+        strategy = SmaStrategy(config)
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='SmaStrategy',
+            strategy=strategy,
             repository=mock_trade_repository,
             start=1704067200.0,
             end=1704097200.0,
             interval=5,
-            vectorised=True,
-            short_window=3,
-            long_window=8
+            vectorised=True
         )
         engine.run()
         initial_balance = 1000.0
@@ -288,7 +288,7 @@ class TestBacktestingEngineIntegration:
         # Then - Should make profit on uptrend with good parameters
         assert final_balance >= initial_balance * 0.95  # Allow for fees
 
-    def test_set_ohlc_window_filters_data_correctly(self, mock_trade_repository: Mock):
+    def test_set_ohlc_window_filters_data_correctly(self, mock_trade_repository: Mock, sma_strategy: SmaStrategy):
         '''
         Test window filtering for parameter optimisation.
         Verifies ability to run strategy on subsets of data.
@@ -296,14 +296,12 @@ class TestBacktestingEngineIntegration:
         # Given
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='SmaStrategy',
+            strategy=sma_strategy,
             repository=mock_trade_repository,
             start=1704067200.0,
             end=1704097200.0,
             interval=5,
-            vectorised=True,
-            short_window=5,
-            long_window=10
+            vectorised=True
         )
 
         original_length = len(engine.ohlc_full)
@@ -355,7 +353,7 @@ class TestBacktestingEngineIntegration:
             duration = (window_end - window_start).days
             assert 85 <= duration <= 95  # ~90 days ± some tolerance
 
-    def test_objective_function_integration(self, mock_trade_repository: Mock):
+    def test_objective_function_integration(self, mock_trade_repository: Mock, sma_strategy: SmaStrategy):
         '''
         Test objective function with real strategy execution.
         Verifies optimisation objective logic without running full Optuna.
@@ -365,14 +363,12 @@ class TestBacktestingEngineIntegration:
 
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='SmaStrategy',
+            strategy=sma_strategy,
             repository=mock_trade_repository,
             start=1704067200.0,
             end=1704097200.0,
             interval=5,
             vectorised=True,
-            short_window=5,
-            long_window=10
         )
 
         # Create a single window (full data for simplicity)
@@ -434,7 +430,7 @@ class TestBacktestingEngineIntegration:
         assert top_sets[0]['value'] == 1.08
         assert top_sets[1]['trial_number'] == 1
 
-    def test_run_evaluation_calculates_metrics(self, mock_trade_repository: Mock):
+    def test_run_evaluation_calculates_metrics(self, mock_trade_repository: Mock, sma_strategy: SmaStrategy):
         '''
         Test generalisation evaluation calculation.
         Verifies evaluation metrics computation on new data.
@@ -442,14 +438,12 @@ class TestBacktestingEngineIntegration:
         # Given
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='SmaStrategy',
+            strategy=sma_strategy,
             repository=mock_trade_repository,
             start=1704067200.0,
             end=1704097200.0,
             interval=5,
             vectorised=True,
-            short_window=5,
-            long_window=10
         )
 
         top_param_sets = [
@@ -537,7 +531,7 @@ class TestBacktestingEngineIntegration:
 
     # ==================== Error Handling Integration Tests ====================
 
-    def test_backtesting_engine_raises_error_when_no_trades_found(self):
+    def test_backtesting_engine_raises_error_when_no_trades_found(self, sma_strategy: SmaStrategy):
         '''
         Test error handling when repository returns no data.
         Verifies error propagation through layers.
@@ -550,16 +544,14 @@ class TestBacktestingEngineIntegration:
         with pytest.raises(ValueError, match='No trades found'):
             BacktestingEngine(
                 pair='XXBTZGBP',
-                strategy_name='SmaStrategy',
+                strategy=sma_strategy,
                 repository=mock_repo,
                 start=1704067200.0,
                 end=1704097200.0,
                 interval=5,
-                short_window=5,
-                long_window=10
             )
 
-    def test_profit_calculation_raises_error_before_run(self, mock_trade_repository: Mock):
+    def test_profit_calculation_raises_error_before_run(self, mock_trade_repository: Mock, sma_strategy: SmaStrategy):
         '''
         Test error handling when calculating profits before running backtest.
         Verifies validation logic.
@@ -567,13 +559,11 @@ class TestBacktestingEngineIntegration:
         # Given
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='SmaStrategy',
+            strategy=sma_strategy,
             repository=mock_trade_repository,
             start=1704067200.0,
             end=1704097200.0,
             interval=5,
-            short_window=5,
-            long_window=10
         )
 
         # When / Then - Before run()
@@ -597,7 +587,7 @@ class TestBacktestingEngineIntegration:
 
     # ==================== Data Integrity Tests ====================
 
-    def test_ohlc_resampling_preserves_price_continuity(self, mock_trade_repository: Mock):
+    def test_ohlc_resampling_preserves_price_continuity(self, mock_trade_repository: Mock, sma_strategy: SmaStrategy):
         '''
         Test that OHLC resampling produces continuous price data.
         Verifies no gaps or invalid values after transformation.
@@ -605,13 +595,11 @@ class TestBacktestingEngineIntegration:
         # Given
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='SmaStrategy',
+            strategy=sma_strategy,
             repository=mock_trade_repository,
             start=1704067200.0,
             end=1704097200.0,
             interval=5,
-            short_window=5,
-            long_window=10
         )
 
         # Then
@@ -620,7 +608,7 @@ class TestBacktestingEngineIntegration:
         assert (engine.ohlc_full['low'] <= engine.ohlc_full['price']).all()
         assert (engine.ohlc_full['high'] >= engine.ohlc_full['low']).all()
 
-    def test_multiple_strategies_on_same_data(self, mock_trade_repository: Mock):
+    def test_multiple_strategies_on_same_data(self, mock_trade_repository: Mock, sma_strategy: SmaStrategy):
         '''
         Test running different strategies on same dataset.
         Verifies engine reusability and strategy isolation.
@@ -628,14 +616,12 @@ class TestBacktestingEngineIntegration:
         # Given - SMA Strategy
         engine_sma = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='SmaStrategy',
+            strategy=sma_strategy,
             repository=mock_trade_repository,
             start=1704067200.0,
             end=1704097200.0,
             interval=5,
             vectorised=True,
-            short_window=5,
-            long_window=10
         )
 
         # Given - Another SMA Strategy with different parameters
@@ -644,14 +630,12 @@ class TestBacktestingEngineIntegration:
 
         engine_sma2 = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='SmaStrategy',
+            strategy=sma_strategy,
             repository=mock_repo_2,
             start=1704067200.0,
             end=1704097200.0,
             interval=5,
             vectorised=True,
-            short_window=3,
-            long_window=15
         )
 
         # When

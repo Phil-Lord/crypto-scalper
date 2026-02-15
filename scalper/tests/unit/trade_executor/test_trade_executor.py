@@ -10,12 +10,11 @@ class TestTradeExecutor:
     MODULE_NAME = 'trade_executor.trade_executor'
 
     @pytest.fixture()
-    def strategy_manager_patch(self, mocker):
-        mock_strategy = mocker.MagicMock()
-        manager_patch = mocker.patch(f'{self.MODULE_NAME}.StrategyManager')
-        manager_patch.return_value.get_strategy.return_value = mock_strategy
-        manager_patch.mock_strategy = mock_strategy
-        return manager_patch
+    def mock_strategy(self, mocker):
+        ''' Mock strategy that can be passed to TradeExecutor. '''
+        mock = mocker.MagicMock()
+        mock.__class__.__name__ = 'TestStrategy'
+        return mock
 
     @pytest.fixture()
     def add_order_connector_patch(self, mocker):
@@ -31,12 +30,12 @@ class TestTradeExecutor:
 
     @pytest.mark.execute_interval
     def test_execute_interval_buy(
-        self, caplog, strategy_manager_patch, add_order_connector_patch,
+        self, caplog, mock_strategy, add_order_connector_patch,
         balance_connector_patch, ticker_connector_patch
     ):
         # Given
         ticker_connector_patch.fetch.return_value = {'c': [50]}
-        strategy_manager_patch.mock_strategy.generate_signal.return_value = {'signal': 'buy'}
+        mock_strategy.generate_signal.return_value = {'signal': 'buy'}
         balance_connector_patch.fetch.return_value = {'ZGBP': 100, 'XXBT': 0}
         add_order_connector_patch.place.return_value = OrderResult(
             txid=['testId'],
@@ -45,33 +44,30 @@ class TestTradeExecutor:
 
         # When
         caplog.set_level(logging.INFO)
-        executor = TradeExecutor('XXBTZGBP', 1, 'testStrategy', param1=10, param2=20)
+        executor = TradeExecutor('XXBTZGBP', 1, mock_strategy)
         executor.execute_interval()
 
         # Then
         self.assert_logged_messages(caplog, [
-            "Initialised TradeExecutor: XXBTZGBP - testStrategy - {'param1': 10, 'param2': 20}",
+            "Initialised TradeExecutor: XXBTZGBP - TestStrategy",
             "Interval result: price=50.00, signal=buy",
             "Placing BUY order: volume=100",
             "Trade executed: id=testId, order=buy 0.002 BTC at 50 GBP"
         ])
 
-        strategy_manager_patch().get_strategy.assert_called_once_with(
-            'testStrategy', param1=10, param2=20
-        )
         ticker_connector_patch.fetch.assert_called_once_with('XXBTZGBP')
-        strategy_manager_patch.mock_strategy.generate_signal.assert_called_once_with(50)
+        mock_strategy.generate_signal.assert_called_once_with(50)
         balance_connector_patch.fetch.assert_called_once()
         add_order_connector_patch.place.assert_called_once_with('XXBTZGBP', 'buy', 100)
 
     @pytest.mark.execute_interval
     def test_execute_interval_sell(
-        self, caplog, strategy_manager_patch, add_order_connector_patch,
+        self, caplog, mock_strategy, add_order_connector_patch,
         balance_connector_patch, ticker_connector_patch
     ):
         # Given
         ticker_connector_patch.fetch.return_value = {'c': [50]}
-        strategy_manager_patch.mock_strategy.generate_signal.return_value = {'signal': 'sell'}
+        mock_strategy.generate_signal.return_value = {'signal': 'sell'}
         balance_connector_patch.fetch.return_value = {'ZGBP': 0, 'XXBT': 1}
         add_order_connector_patch.place.return_value = OrderResult(
             txid=['testId'],
@@ -80,50 +76,44 @@ class TestTradeExecutor:
 
         # When
         caplog.set_level(logging.INFO)
-        executor = TradeExecutor('XXBTZGBP', 1, 'testStrategy', param1=10, param2=20)
+        executor = TradeExecutor('XXBTZGBP', 1, mock_strategy)
         executor.execute_interval()
 
         # Then
         self.assert_logged_messages(caplog, [
-            "Initialised TradeExecutor: XXBTZGBP - testStrategy - {'param1': 10, 'param2': 20}",
+            "Initialised TradeExecutor: XXBTZGBP - TestStrategy",
             "Interval result: price=50.00, signal=sell",
             "Placing SELL order: volume=1",
             "Trade executed: id=testId, order=sell 1 BTC at 50 GBP"
         ])
 
-        strategy_manager_patch().get_strategy.assert_called_once_with(
-            'testStrategy', param1=10, param2=20
-        )
         ticker_connector_patch.fetch.assert_called_once_with('XXBTZGBP')
-        strategy_manager_patch.mock_strategy.generate_signal.assert_called_once_with(50)
+        mock_strategy.generate_signal.assert_called_once_with(50)
         balance_connector_patch.fetch.assert_called_once()
         add_order_connector_patch.place.assert_called_once_with('XXBTZGBP', 'sell', 1)
 
     @pytest.mark.execute_interval
     def test_execute_interval_hold(
-        self, caplog, strategy_manager_patch, add_order_connector_patch,
+        self, caplog, mock_strategy, add_order_connector_patch,
         balance_connector_patch, ticker_connector_patch
     ):
         # Given
         ticker_connector_patch.fetch.return_value = {'c': [50]}
-        strategy_manager_patch.mock_strategy.generate_signal.return_value = {'signal': 'hold'}
+        mock_strategy.generate_signal.return_value = {'signal': 'hold'}
 
         # When
         caplog.set_level(logging.INFO)
-        executor = TradeExecutor('XXBTZGBP', 1, 'testStrategy', param1=10, param2=20)
+        executor = TradeExecutor('XXBTZGBP', 1, mock_strategy)
         executor.execute_interval()
 
         # Then
         self.assert_logged_messages(caplog, [
-            "Initialised TradeExecutor: XXBTZGBP - testStrategy - {'param1': 10, 'param2': 20}",
+            "Initialised TradeExecutor: XXBTZGBP - TestStrategy",
             "Interval result: price=50.00, signal=hold"
         ])
 
-        strategy_manager_patch().get_strategy.assert_called_once_with(
-            'testStrategy', param1=10, param2=20
-        )
         ticker_connector_patch.fetch.assert_called_once_with('XXBTZGBP')
-        strategy_manager_patch.mock_strategy.generate_signal.assert_called_once_with(50)
+        mock_strategy.generate_signal.assert_called_once_with(50)
         balance_connector_patch.fetch.assert_not_called()
         add_order_connector_patch.place.assert_not_called()
 

@@ -46,6 +46,9 @@ test/exchange_connector/kraken_utils:
 test/strategy_manager:
 	pytest -m strategy_manager
 
+test/strategy_manager/factory:
+	pytest -m "strategy_manager and factory"
+
 # Run strategy_manager category tests
 test/strategy_manager/indicators:
 	pytest -m "strategy_manager and indicators"

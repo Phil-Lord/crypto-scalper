@@ -56,18 +56,12 @@ class TestBacktestingEngine:
         strategy.generate_signal.return_value = {'signal': 'hold'}
         return strategy
 
-    @pytest.fixture
-    def mock_strategy_manager(self, mocker, mock_strategy):
-        manager = mocker.patch('backtesting_engine.backtesting_engine.StrategyManager')
-        manager.return_value.get_strategy.return_value = mock_strategy
-        return manager
-
     @pytest.mark.run
-    def test_run_vectorised_mode(self, mock_repository, mock_strategy, mock_strategy_manager):
+    def test_run_vectorised_mode(self, mock_repository, mock_strategy):
         # Given
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='TestStrategy',
+            strategy=mock_strategy,
             repository=mock_repository,
             vectorised=True
         )
@@ -81,11 +75,11 @@ class TestBacktestingEngine:
         assert len(results) == 3
 
     @pytest.mark.run
-    def test_run_non_vectorised_mode(self, mock_repository, mock_strategy, mock_strategy_manager):
+    def test_run_non_vectorised_mode(self, mock_repository, mock_strategy):
         # Given
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='TestStrategy',
+            strategy=mock_strategy,
             repository=mock_repository,
             vectorised=False
         )
@@ -100,11 +94,11 @@ class TestBacktestingEngine:
         assert len(results) == 3
 
     @pytest.mark.set_ohlc_window
-    def test_set_ohlc_window_with_both_args(self, mock_repository, mock_strategy_manager):
+    def test_set_ohlc_window_with_both_args(self, mock_repository, mock_strategy):
         # Given
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='TestStrategy',
+            strategy=mock_strategy,
             repository=mock_repository
         )
         start = pd.Timestamp('2021-01-01 00:00:00')
@@ -119,11 +113,11 @@ class TestBacktestingEngine:
         assert engine.ohlc_window.index[-1] == end
 
     @pytest.mark.set_ohlc_window
-    def test_set_ohlc_window_with_no_args(self, mock_repository, mock_strategy_manager):
+    def test_set_ohlc_window_with_no_args(self, mock_repository, mock_strategy):
         # Given
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='TestStrategy',
+            strategy=mock_strategy,
             repository=mock_repository
         )
         full_length = len(engine.ohlc_full)
@@ -136,11 +130,11 @@ class TestBacktestingEngine:
         pd.testing.assert_frame_equal(engine.ohlc_window, engine.ohlc_full)
 
     @pytest.mark.set_ohlc_window
-    def test_set_ohlc_window_with_only_start(self, mock_repository, mock_strategy_manager):
+    def test_set_ohlc_window_with_only_start(self, mock_repository, mock_strategy):
         # Given
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='TestStrategy',
+            strategy=mock_strategy,
             repository=mock_repository
         )
         start = pd.Timestamp('2021-01-01 00:01:00')
@@ -152,11 +146,11 @@ class TestBacktestingEngine:
         pd.testing.assert_frame_equal(engine.ohlc_window, engine.ohlc_full)
 
     @pytest.mark.calculate_position_profits
-    def test_calculate_position_profits_before_run_raises_error(self, mock_repository, mock_strategy_manager):
+    def test_calculate_position_profits_before_run_raises_error(self, mock_repository, mock_strategy):
         # Given
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='TestStrategy',
+            strategy=mock_strategy,
             repository=mock_repository
         )
 
@@ -165,11 +159,11 @@ class TestBacktestingEngine:
             engine.calculate_position_profits()
 
     @pytest.mark.get_final_quote_balance
-    def test_get_final_quote_balance_before_run_raises_error(self, mock_repository, mock_strategy_manager):
+    def test_get_final_quote_balance_before_run_raises_error(self, mock_repository, mock_strategy):
         # Given
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='TestStrategy',
+            strategy=mock_strategy,
             repository=mock_repository
         )
 
@@ -178,7 +172,7 @@ class TestBacktestingEngine:
             engine.get_final_quote_balance()
 
     @pytest.mark.load_ohlc_data
-    def test_load_ohlc_data_with_no_trades_raises_error(self, mock_strategy_manager, mocker):
+    def test_load_ohlc_data_with_no_trades_raises_error(self, mock_strategy, mocker):
         # Given
         mock_repo = mocker.Mock()
         mock_repo.get.return_value = []
@@ -187,16 +181,16 @@ class TestBacktestingEngine:
         with pytest.raises(ValueError, match='No trades found'):
             BacktestingEngine(
                 pair='XXBTZGBP',
-                strategy_name='TestStrategy',
+                strategy=mock_strategy,
                 repository=mock_repo
             )
 
     @pytest.mark.load_ohlc_data
-    def test_load_ohlc_data_resamples_correctly(self, mock_repository, mock_strategy_manager, sample_trades):
+    def test_load_ohlc_data_resamples_correctly(self, mock_repository, mock_strategy, sample_trades):
         # Given / When
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='TestStrategy',
+            strategy=mock_strategy,
             repository=mock_repository,
             interval=1
         )
@@ -209,7 +203,7 @@ class TestBacktestingEngine:
         assert 'price' in engine.ohlc_full.columns  # renamed from 'close'
 
     @pytest.mark.load_ohlc_data
-    def test_load_ohlc_data_with_custom_interval(self, sample_trades, mock_strategy_manager, mocker):
+    def test_load_ohlc_data_with_custom_interval(self, mock_strategy, sample_trades, mocker):
         # Given
         mock_repo = mocker.Mock()
         mock_repo.get.return_value = sample_trades
@@ -217,7 +211,7 @@ class TestBacktestingEngine:
         # When
         engine = BacktestingEngine(
             pair='XXBTZGBP',
-            strategy_name='TestStrategy',
+            strategy=mock_strategy,
             repository=mock_repo,
             interval=2  # 2-minute intervals
         )
