@@ -143,7 +143,6 @@ tick = BotTick(
 
 1. **State Reset Methods** — Enable strategy reuse across backtest runs
 2. **Indicator Factories** — Reduce boilerplate when registering many indicators
-3. **Strategy Validation** — Validate parameter constraints at initialisation
-4. **Shared Calculation Logic** — Extract common code between dual implementations (where overlap exists)
+3. **Shared Calculation Logic** — Extract common code between dual implementations (where overlap exists)
 
 See Architecture Decision Log for rationale on current design choices.

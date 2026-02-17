@@ -13,6 +13,7 @@ The BacktestingEngine uses Optuna-based parameter optimisation to find effective
 
 ```python
 from backtesting_engine import BacktestingEngine
+from strategy_manager.strategies import PrecisionTrendStrategyConfig
 
 # Create engine with base configuration
 engine = BacktestingEngine(
@@ -28,13 +29,54 @@ engine = BacktestingEngine(
 param_grid = {
     'short_ema': [5, 20],
     'long_ema': [15, 50],
-    'rsi_buy': [20, 40],
-    'rsi_sell': [60, 80]
+    'rsi_oversold': [20, 40],
+    'rsi_overbought': [60, 80]
 }
 
 # Run optimisation
 engine.optimise_parameters(param_grid, n_trials=100)
 ```
+
+---
+
+## Parameter Validation
+
+**Config-based validation** — Parameter constraints are enforced in strategy config dataclasses using `__post_init__` validation.
+
+**Example:**
+
+```python
+@dataclass(frozen=True)
+class PrecisionTrendStrategyConfig:
+    short_ema: int
+    long_ema: int
+    rsi_oversold: float
+    rsi_overbought: float
+
+    def __post_init__(self):
+        if self.short_ema >= self.long_ema:
+            raise ValueError(
+                f'short_ema ({self.short_ema}) must be < long_ema ({self.long_ema})'
+            )
+        if self.rsi_oversold >= self.rsi_overbought:
+            raise ValueError(
+                f'rsi_oversold ({self.rsi_oversold}) must be < rsi_overbought ({self.rsi_overbought})'
+            )
+```
+
+**During optimisation:**
+
+- Optuna suggests parameter combinations within the defined ranges
+- Config instantiation validates constraints
+- Invalid combinations raise `ValueError`, which is caught and converted to `optuna.TrialPruned`
+- Pruned trials don't affect study statistics and are efficiently skipped
+
+**Benefits:**
+
+- **Single source of truth** — Constraints defined once in config
+- **Runtime safety** — Same validation applies in backtesting and live trading
+- **Type safety** — Config dataclasses provide IDE support and type checking
+- **No duplication** — Eliminates need for separate constraint functions
 
 ---
 

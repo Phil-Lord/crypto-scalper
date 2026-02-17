@@ -57,21 +57,6 @@ class PrecisionTrendStrategy(Strategy):
         return Signal.HOLD
 ```
 
-### 3. Parameter Constraints
-
-Use `@staticmethod` for constraint functions:
-
-```python
-class MyStrategy(Strategy):
-    @staticmethod
-    def constraints() -> list[callable]:
-        '''Constraints for parameter optimisation.'''
-        return [
-            lambda x: x['short_window'] < x['long_window'],
-            lambda x: x['rsi_oversold'] < x['rsi_overbought']
-        ]
-```
-
 ---
 
 ## Creating Custom Indicators
