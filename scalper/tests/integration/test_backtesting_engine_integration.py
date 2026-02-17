@@ -382,7 +382,7 @@ class TestBacktestingEngineIntegration:
         mock_trial.set_user_attr = Mock()
 
         # When
-        objective = get_objective(engine, param_grid, constraints=None, windows=windows)
+        objective = get_objective(engine, param_grid, windows=windows)
         score = objective(mock_trial)
 
         # Then
