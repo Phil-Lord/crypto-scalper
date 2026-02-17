@@ -60,28 +60,6 @@ class TestPrecisionTrendStrategy:
                  strategy.weight_adx + strategy.weight_atr)
         assert abs(total - 1.0) < 1e-6
 
-    def test_constraints_validates_ema_ordering(self):
-        # Given
-        constraints = PrecisionTrendStrategy.constraints()
-
-        # When / Then
-        valid_params = {'short_ema': 5, 'long_ema': 10, 'rsi_oversold': 30, 'rsi_overbought': 70}
-        invalid_params = {'short_ema': 10, 'long_ema': 5, 'rsi_oversold': 30, 'rsi_overbought': 70}
-
-        assert all(c(valid_params) for c in constraints)
-        assert not all(c(invalid_params) for c in constraints)
-
-    def test_constraints_validates_rsi_thresholds(self):
-        # Given
-        constraints = PrecisionTrendStrategy.constraints()
-
-        # When / Then
-        valid_params = {'short_ema': 5, 'long_ema': 10, 'rsi_oversold': 30, 'rsi_overbought': 70}
-        invalid_params = {'short_ema': 5, 'long_ema': 10, 'rsi_oversold': 70, 'rsi_overbought': 30}
-
-        assert all(c(valid_params) for c in constraints)
-        assert not all(c(invalid_params) for c in constraints)
-
     def test_generate_signal_returns_buy_when_score_above_threshold(self, strategy: PrecisionTrendStrategy):
         # Given - All rules return BUY
         rule_results = {

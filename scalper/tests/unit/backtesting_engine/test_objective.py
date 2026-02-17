@@ -6,7 +6,7 @@ from backtesting_engine.objective import (
     calculate_penalty,
     get_objective,
     suggest_parameters,
-    parameters_violate_constraints
+    run_strategy_on_window
 )
 
 
@@ -57,7 +57,7 @@ class TestGetObjective:
         windows = [(pd.Timestamp('2021-01-01'), pd.Timestamp('2021-03-31'))]
 
         # When
-        objective = get_objective(engine_patch, param_grid, None, windows)
+        objective = get_objective(engine_patch, param_grid, windows)
 
         # Then
         assert callable(objective)
@@ -81,7 +81,7 @@ class TestGetObjective:
         )]
 
         # When
-        objective = get_objective(engine_patch, param_grid, None, windows)
+        objective = get_objective(engine_patch, param_grid, windows)
         avg_return = objective(optuna.trial.FixedTrial({'short_ema': 9, 'long_ema': 25}))
 
         # Then
@@ -100,17 +100,19 @@ class TestGetObjective:
         engine_patch.run.assert_called_once()
         engine_patch.get_final_quote_balance.assert_called_once_with(1000)
 
-    def test_get_objective_prunes_when_constraints_violated(self, engine_patch):
+    def test_get_objective_prunes_when_config_validation_fails(self, engine_patch, mocker):
         # Given
         param_grid = {'short_ema': [1, 25], 'long_ema': [10, 30]}
         windows = [(pd.Timestamp('2021-01-01'), pd.Timestamp('2021-03-31'))]
-        constraints = [lambda params: params['short_ema']
-                       < params['long_ema']]  # short must be < long
+
+        # Make config instantiation raise ValueError for invalid params
+        config_class = engine_patch._mock_config_class
+        config_class.side_effect = ValueError('short_ema must be < long_ema')
 
         # When
-        objective = get_objective(engine_patch, param_grid, constraints, windows)
+        objective = get_objective(engine_patch, param_grid, windows)
 
-        # Then - Violating constraint should raise TrialPruned
+        # Then - Config validation failure should raise TrialPruned
         with pytest.raises(optuna.TrialPruned):
             objective(optuna.trial.FixedTrial({'short_ema': 20, 'long_ema': 15}))
 
@@ -154,38 +156,36 @@ class TestSuggestParameters:
 
 @pytest.mark.backtesting_engine
 @pytest.mark.objective
-class TestParametersViolateConstraints:
-    def test_no_constraints_returns_false(self):
+class TestRunStrategyOnWindow:
+    def test_prunes_trial_when_config_raises_value_error(self, mocker):
         # Given
-        params = {'short_ema': 9, 'long_ema': 25}
+        mock_engine = mocker.Mock()
+        mock_config_class = mocker.Mock(side_effect=ValueError('Invalid params'))
+        mock_strategy_class = mocker.Mock()
 
-        # When
-        result = parameters_violate_constraints(None, params)
+        mock_current_config = mocker.Mock()
+        mock_current_strategy = mocker.Mock()
+        mock_current_strategy.config = mock_current_config
+        mock_engine.strategy = mock_current_strategy
 
-        # Then
-        assert result is False
+        # Mock type() to return our mock classes
+        original_type = type
 
-    def test_constraints_satisfied_returns_false(self):
-        # Given
-        params = {'short_ema': 9, 'long_ema': 25}
-        constraints = [lambda p: p['short_ema'] < p['long_ema']]
+        def mock_type(obj):
+            if obj is mock_current_config:
+                return mock_config_class
+            elif obj is mock_current_strategy:
+                return mock_strategy_class
+            return original_type(obj)
+        mocker.patch('backtesting_engine.objective.type', side_effect=mock_type)
 
-        # When
-        result = parameters_violate_constraints(constraints, params)
+        params = {'short_ema': 20, 'long_ema': 10}  # Invalid
+        start = pd.Timestamp('2021-01-01')
+        end = pd.Timestamp('2021-03-31')
 
-        # Then
-        assert result is False
-
-    def test_constraints_violated_returns_true(self):
-        # Given
-        params = {'short_ema': 25, 'long_ema': 9}
-        constraints = [lambda p: p['short_ema'] < p['long_ema']]
-
-        # When
-        result = parameters_violate_constraints(constraints, params)
-
-        # Then
-        assert result is True
+        # When / Then
+        with pytest.raises(optuna.TrialPruned):
+            run_strategy_on_window(mock_engine, params, start, end)
 
 
 @pytest.mark.backtesting_engine
