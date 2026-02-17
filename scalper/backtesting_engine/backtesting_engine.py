@@ -48,8 +48,7 @@ class BacktestingEngine:
         return self.results
 
     def optimise_parameters(self, param_grid: dict[str, list[Any]], n_trials: int = 100) -> None:
-        strategy_constraints = getattr(self.strategy.__class__, 'constraints', lambda: [])()
-        optimise_parameters(self, param_grid, n_trials, strategy_constraints)
+        optimise_parameters(self, param_grid, n_trials)
 
     def calculate_position_profits(self, initial_quote_balance: float = 1000) -> pd.DataFrame:
         if self.results is None:

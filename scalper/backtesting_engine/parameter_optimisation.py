@@ -1,5 +1,5 @@
 import os
-from typing import Any, Callable
+from typing import Any
 import warnings
 
 import optuna
@@ -11,15 +11,14 @@ from .objective import get_objective
 from utils import OPTUNA_DB_URL
 
 
-def optimise_parameters(engine, param_grid: dict[str, list[Any]], n_trials: int = 100,
-                        constraints: list[callable] = None) -> None:
+def optimise_parameters(engine, param_grid: dict[str, list[Any]], n_trials: int = 100) -> None:
     warnings.filterwarnings('ignore', category=ExperimentalWarning)
     windows = create_windows(engine.start, engine.end)
     study_name = create_study_name(engine)
     storage = create_storage()
     study = create_study(storage, study_name, n_trials)
     validate_search_space(study, param_grid)
-    optimise(n_trials, study, engine, windows, param_grid, constraints)
+    optimise(n_trials, study, engine, windows, param_grid)
 
 
 def create_study_name(engine) -> str:
@@ -46,7 +45,7 @@ def create_storage() -> optuna.storages.RDBStorage:
     )
 
 
-def create_study(storage, study_name: str, n_trials: int) -> optuna.study.Study:
+def create_study(storage: optuna.storages.RDBStorage, study_name: str, n_trials: int) -> optuna.study.Study:
     try:
         return optuna.create_study(
             study_name=study_name,
@@ -125,14 +124,18 @@ def create_windows(start: float, end: float) -> list[tuple[pd.Timestamp, pd.Time
     return windows
 
 
-def optimise(n_trials: int, study: optuna.study.Study, engine,
-             windows: list[tuple[pd.Timestamp, pd.Timestamp]], param_grid: dict[str, list[Any]],
-             constraints: list[Callable] = None) -> None:
+def optimise(
+    n_trials: int,
+    study: optuna.study.Study,
+    engine,
+    windows: list[tuple[pd.Timestamp, pd.Timestamp]],
+    param_grid: dict[str, list[Any]]
+) -> None:
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     progress_callback = TqdmProgressCallback(n_trials)
     try:
         study.optimize(
-            get_objective(engine, param_grid, constraints, windows),
+            get_objective(engine, param_grid, windows),
             n_trials=n_trials,
             n_jobs=-1,
             callbacks=[progress_callback]

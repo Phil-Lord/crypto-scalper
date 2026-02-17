@@ -38,14 +38,6 @@ class PrecisionTrendStrategy(Strategy):
         self.register_rule('atr_threshold', AtrThresholdRule('atr', config.atr_threshold))
         self.weight_atr = config.weight_atr / total_weight
 
-    @staticmethod
-    def constraints() -> list[callable]:
-        ''' Constraints for parameter optimisation. '''
-        return [
-            lambda x: x['short_ema'] < x['long_ema'],
-            lambda x: x['rsi_oversold'] < x['rsi_overbought']
-        ]
-
     def _generate_signal(self, rule_results: dict) -> Signal:
         crossover_signal = rule_results['crossover']
         rsi_threshold_signal = rule_results['rsi_threshold']

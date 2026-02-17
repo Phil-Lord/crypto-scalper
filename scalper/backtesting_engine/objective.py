@@ -7,15 +7,14 @@ import numpy as np
 INITIAL_BALANCE = 1000
 
 
-def get_objective(engine, param_grid: dict[str, list[Any]], constraints: list[Callable] = None,
-                  windows: list[tuple[pd.Timestamp, pd.Timestamp]] = None) -> Callable:
+def get_objective(
+        engine,
+        param_grid: dict[str, list[Any]],
+        windows: list[tuple[pd.Timestamp, pd.Timestamp]] = None
+) -> Callable:
     def objective(trial: optuna.Trial) -> float:
         ''' Optimisation Objective: Maximise geometric mean of per-window return ratios. '''
         params = suggest_parameters(trial, param_grid)
-        if parameters_violate_constraints(constraints, params):
-            raise optuna.TrialPruned()
-
-        # --- Window-based optimisation --- #
         adjusted_window_returns = []
 
         for window_start, window_end in windows:
@@ -47,20 +46,16 @@ def suggest_parameters(trial: optuna.Trial, param_grid: dict[str, list[Any]]) ->
     return params
 
 
-def parameters_violate_constraints(constraints: list[Callable], params: dict[str, list[Any]]) -> bool:
-    ''' Check if parameters violate constraints. '''
-    if constraints:
-        for constraint in constraints:
-            if not constraint(params):
-                return True
-    return False
-
-
 def run_strategy_on_window(engine, params: dict[str, Any], start: pd.Timestamp, end: pd.Timestamp) -> None:
     ''' Configure and run the strategy on an OHLC window. '''
     config_cls = type(engine.strategy.config)
     strategy_cls = type(engine.strategy)
-    new_config = config_cls(**params)
+
+    try:
+        new_config = config_cls(**params)
+    except ValueError:
+        raise optuna.TrialPruned()
+
     engine.strategy = strategy_cls(new_config)
     engine.set_ohlc_window(start, end)
     engine.run()
