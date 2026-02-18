@@ -18,3 +18,6 @@ class EmaIndicator(Indicator):
 
     def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
         return ohlc['price'].ewm(span=self.window, adjust=False).mean()
+
+    def reset(self) -> None:
+        self.ema = None

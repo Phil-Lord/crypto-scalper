@@ -18,3 +18,6 @@ class SmaIndicator(Indicator):
 
     def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
         return ohlc['price'].rolling(self.window).mean()
+
+    def reset(self) -> None:
+        self.prices = deque(maxlen=self.window)

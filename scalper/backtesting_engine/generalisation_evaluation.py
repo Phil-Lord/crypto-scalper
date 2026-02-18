@@ -15,7 +15,6 @@ from strategy_manager import create_strategy
 from utils import OPTUNA_DB_URL
 
 from .backtesting_engine import BacktestingEngine
-from .objective import run_strategy_on_window
 from .parameter_optimisation import create_windows
 
 logger = logging.getLogger(__name__)
@@ -97,18 +96,18 @@ def run_evaluation(engine: BacktestingEngine, top_param_sets: list[dict], window
     with tqdm(total=len(top_param_sets), desc=f'Evaluating', dynamic_ncols=True, bar_format='{l_bar}{bar}') as pbar:
         for param_set in top_param_sets:
             # Run on full period first
+            strategy_name = type(engine.strategy).__name__
+            engine.strategy = create_strategy(strategy_name, param_set['params'])
             engine.set_ohlc_window()
-            config_cls = type(engine.strategy.config)
-            strategy_cls = type(engine.strategy)
-            new_config = config_cls(**param_set['params'])
-            engine.strategy = strategy_cls(new_config)
             engine.run()
             final_quote_balance = engine.get_final_quote_balance(INITIAL_BALANCE)
 
-            # Run on each window
+            # Run on each window (same params, only reset state)
             window_balances = []
             for window_start, window_end in windows:
-                run_strategy_on_window(engine, param_set['params'], window_start, window_end)
+                engine.strategy.reset()
+                engine.set_ohlc_window(window_start, window_end)
+                engine.run()
                 final_balance = engine.get_final_quote_balance(INITIAL_BALANCE)
                 window_balances.append(final_balance)
 

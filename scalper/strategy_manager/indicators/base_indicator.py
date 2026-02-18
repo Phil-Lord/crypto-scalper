@@ -13,3 +13,8 @@ class Indicator(ABC):
     def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
         ''' Compute indicator for entire series during backtesting. '''
         pass
+
+    @abstractmethod
+    def reset(self) -> None:
+        ''' Reset internal state to initial values, as if freshly constructed. '''
+        pass

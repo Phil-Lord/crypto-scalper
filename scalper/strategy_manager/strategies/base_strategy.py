@@ -85,3 +85,10 @@ class Strategy:
                 last_action = signal
 
         return pd.Series(suppressed, index=signals.index)
+
+    def reset(self) -> None:
+        ''' Reset strategy and all registered indicators to initial state. '''
+        self.last_action = Signal.SELL
+        self.prev_indicator_values = {}
+        for indicator in self.indicators.values():
+            indicator.reset()

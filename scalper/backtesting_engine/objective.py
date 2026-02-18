@@ -4,6 +4,8 @@ import optuna
 import pandas as pd
 import numpy as np
 
+from strategy_manager import create_strategy
+
 INITIAL_BALANCE = 1000
 
 
@@ -48,15 +50,13 @@ def suggest_parameters(trial: optuna.Trial, param_grid: dict[str, list[Any]]) ->
 
 def run_strategy_on_window(engine, params: dict[str, Any], start: pd.Timestamp, end: pd.Timestamp) -> None:
     ''' Configure and run the strategy on an OHLC window. '''
-    config_cls = type(engine.strategy.config)
-    strategy_cls = type(engine.strategy)
+    strategy_name = type(engine.strategy).__name__
 
     try:
-        new_config = config_cls(**params)
+        engine.strategy = create_strategy(strategy_name, params)
     except ValueError:
         raise optuna.TrialPruned()
 
-    engine.strategy = strategy_cls(new_config)
     engine.set_ohlc_window(start, end)
     engine.run()
 

@@ -45,3 +45,7 @@ class AtrIndicator(Indicator):
         # Return ratio of ATRs to current close prices.
         atr_ratio = (atr / closes).rename('atr')
         return atr_ratio
+
+    def reset(self) -> None:
+        self.prev_close = None
+        self.smoothed_tr = None

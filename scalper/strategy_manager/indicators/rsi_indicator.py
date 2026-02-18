@@ -58,3 +58,9 @@ class RsiIndicator(Indicator):
         rsi = 100 - (100 / (1 + rs))
         rsi[avg_loss == 0] = 100  # Handle division by zero
         return rsi
+
+    def reset(self) -> None:
+        self.prices = []
+        self.avg_gain = None
+        self.avg_loss = None
+        self.prev_price = None

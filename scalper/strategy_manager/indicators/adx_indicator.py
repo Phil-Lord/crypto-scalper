@@ -96,3 +96,12 @@ class AdxIndicator(Indicator):
         adx.iloc[1] = dx.iloc[1]
 
         return adx.rename('adx')
+
+    def reset(self) -> None:
+        self.prev_high = None
+        self.prev_low = None
+        self.prev_close = None
+        self.smoothed_tr = None
+        self.smoothed_plus_dm = None
+        self.smoothed_minus_dm = None
+        self.adx = None
