@@ -15,6 +15,24 @@ class TestRsiIndicator:
         prices = np.random.uniform(100, 110, 200)
         return pd.DataFrame({'price': prices})
 
+    def test_reset_clears_state(self):
+        # Given
+        indicator = RsiIndicator(window=14)
+        prices = np.linspace(100, 120, 30)
+        for price in prices:
+            indicator.update(pd.Series({'price': price}))
+        assert indicator.prev_price is not None
+        assert indicator.avg_gain is not None
+
+        # When
+        indicator.reset()
+
+        # Then
+        assert indicator.prices == []
+        assert indicator.avg_gain is None
+        assert indicator.avg_loss is None
+        assert indicator.prev_price is None
+
     def test_update_returns_none_initially(self):
         # Given
         indicator = RsiIndicator(window=14)

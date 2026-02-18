@@ -19,6 +19,30 @@ class TestAdxIndicator:
             'price': np.random.uniform(7, 18, n)
         })
 
+    def test_reset_clears_state(self):
+        # Given
+        indicator = AdxIndicator(window=3)
+        ohlc = pd.DataFrame({
+            'high': [11, 12, 13, 14],
+            'low': [9, 10, 11, 12],
+            'price': [10, 11, 12, 13],
+        })
+        for _, row in ohlc.iterrows():
+            indicator.update(row)
+        assert indicator.adx is not None
+
+        # When
+        indicator.reset()
+
+        # Then
+        assert indicator.prev_high is None
+        assert indicator.prev_low is None
+        assert indicator.prev_close is None
+        assert indicator.smoothed_tr is None
+        assert indicator.smoothed_plus_dm is None
+        assert indicator.smoothed_minus_dm is None
+        assert indicator.adx is None
+
     def test_update_returns_none_first(self):
         # Given
         ohlc = pd.DataFrame({

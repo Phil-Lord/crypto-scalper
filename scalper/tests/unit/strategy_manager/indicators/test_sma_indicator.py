@@ -110,3 +110,17 @@ class TestSmaIndicator:
                 assert pd.isna(sma.iloc[i])
             else:
                 assert sma.iloc[i] == val
+
+    def test_reset_clears_state(self):
+        # Given
+        indicator = SmaIndicator(window=3)
+        for price in [100.0, 102.0, 104.0]:
+            indicator.update(pd.Series({'price': price}))
+        assert indicator.update(pd.Series({'price': 106.0})) is not None
+
+        # When
+        indicator.reset()
+
+        # Then
+        assert len(indicator.prices) == 0
+        assert indicator.update(pd.Series({'price': 100.0})) is None

@@ -15,38 +15,22 @@ from backtesting_engine.objective import (
 class TestGetObjective:
     @pytest.fixture
     def engine_patch(self, mocker):
-        ''' Mock engine with strategy and config setup. '''
-        # Create simple callable mocks that don't try to use args as spec
-        mock_config_instance = mocker.MagicMock(name='config_instance')
-        mock_config_class = mocker.MagicMock(name='ConfigClass', return_value=mock_config_instance)
-
+        ''' Mock engine with strategy and create_strategy factory. '''
         mock_new_strategy = mocker.MagicMock(name='new_strategy')
-        mock_strategy_class = mocker.MagicMock(name='StrategyClass', return_value=mock_new_strategy)
+        mock_create_strategy = mocker.patch(
+            'backtesting_engine.objective.create_strategy',
+            return_value=mock_new_strategy
+        )
 
         # Create the engine
         engine = mocker.patch('backtesting_engine.BacktestingEngine')
 
-        # Set up current strategy and config
-        mock_current_config = mocker.MagicMock(name='current_config')
-        mock_current_strategy = mocker.MagicMock(name='current_strategy')
-        mock_current_strategy.config = mock_current_config
-        engine.strategy = mock_current_strategy
-
-        # Mock type() to return our mock classes when called on the mocks
-        original_type = type
-
-        def mock_type(obj):
-            if obj is mock_current_config:
-                return mock_config_class
-            elif obj is mock_current_strategy:
-                return mock_strategy_class
-            return original_type(obj)
-
-        mocker.patch('backtesting_engine.objective.type', side_effect=mock_type)
+        # Use a stub class so type().__name__ returns the expected strategy name
+        PrecisionTrendStrategy = type('PrecisionTrendStrategy', (), {})
+        engine.strategy = PrecisionTrendStrategy()
 
         # Store references for assertions
-        engine._mock_config_class = mock_config_class
-        engine._mock_strategy_class = mock_strategy_class
+        engine._mock_create_strategy = mock_create_strategy
         engine._mock_new_strategy = mock_new_strategy
 
         return engine
@@ -64,8 +48,7 @@ class TestGetObjective:
 
     def test_get_objective(self, engine_patch):
         # Given
-        config_class = engine_patch._mock_config_class
-        strategy_class = engine_patch._mock_strategy_class
+        mock_create_strategy = engine_patch._mock_create_strategy
 
         engine_patch.set_ohlc_window.return_value = None
         engine_patch.run.return_value = None
@@ -87,11 +70,10 @@ class TestGetObjective:
         # Then
         assert isinstance(avg_return, float)
 
-        # Verify config was created with the right parameters
-        config_class.assert_called_with(short_ema=9, long_ema=25)
-
-        # Verify strategy was created with new config
-        assert strategy_class.call_count == 1
+        # Verify create_strategy was called with class name and params
+        mock_create_strategy.assert_called_with(
+            'PrecisionTrendStrategy', {'short_ema': 9, 'long_ema': 25}
+        )
 
         engine_patch.set_ohlc_window.assert_called_once_with(
             pd.Timestamp('2021-01-01 00:00:00'),
@@ -105,9 +87,8 @@ class TestGetObjective:
         param_grid = {'short_ema': [1, 25], 'long_ema': [10, 30]}
         windows = [(pd.Timestamp('2021-01-01'), pd.Timestamp('2021-03-31'))]
 
-        # Make config instantiation raise ValueError for invalid params
-        config_class = engine_patch._mock_config_class
-        config_class.side_effect = ValueError('short_ema must be < long_ema')
+        # Make create_strategy raise ValueError for invalid params
+        engine_patch._mock_create_strategy.side_effect = ValueError('short_ema must be < long_ema')
 
         # When
         objective = get_objective(engine_patch, param_grid, windows)
@@ -157,27 +138,41 @@ class TestSuggestParameters:
 @pytest.mark.backtesting_engine
 @pytest.mark.objective
 class TestRunStrategyOnWindow:
+    def test_creates_strategy_via_factory(self, mocker):
+        # Given
+        mock_engine = mocker.Mock()
+        mock_new_strategy = mocker.MagicMock(name='new_strategy')
+        mock_create = mocker.patch(
+            'backtesting_engine.objective.create_strategy',
+            return_value=mock_new_strategy
+        )
+
+        SmaStrategy = type('SmaStrategy', (), {})
+        mock_engine.strategy = SmaStrategy()
+
+        params = {'short_window': 5, 'long_window': 10}
+        start = pd.Timestamp('2021-01-01')
+        end = pd.Timestamp('2021-03-31')
+
+        # When
+        run_strategy_on_window(mock_engine, params, start, end)
+
+        # Then
+        mock_create.assert_called_once_with('SmaStrategy', params)
+        assert mock_engine.strategy == mock_new_strategy
+        mock_engine.set_ohlc_window.assert_called_once_with(start, end)
+        mock_engine.run.assert_called_once()
+
     def test_prunes_trial_when_config_raises_value_error(self, mocker):
         # Given
         mock_engine = mocker.Mock()
-        mock_config_class = mocker.Mock(side_effect=ValueError('Invalid params'))
-        mock_strategy_class = mocker.Mock()
+        mocker.patch(
+            'backtesting_engine.objective.create_strategy',
+            side_effect=ValueError('Invalid params')
+        )
 
-        mock_current_config = mocker.Mock()
-        mock_current_strategy = mocker.Mock()
-        mock_current_strategy.config = mock_current_config
-        mock_engine.strategy = mock_current_strategy
-
-        # Mock type() to return our mock classes
-        original_type = type
-
-        def mock_type(obj):
-            if obj is mock_current_config:
-                return mock_config_class
-            elif obj is mock_current_strategy:
-                return mock_strategy_class
-            return original_type(obj)
-        mocker.patch('backtesting_engine.objective.type', side_effect=mock_type)
+        SmaStrategy = type('SmaStrategy', (), {})
+        mock_engine.strategy = SmaStrategy()
 
         params = {'short_ema': 20, 'long_ema': 10}  # Invalid
         start = pd.Timestamp('2021-01-01')

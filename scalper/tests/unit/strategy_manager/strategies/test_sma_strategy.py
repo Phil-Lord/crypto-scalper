@@ -152,3 +152,60 @@ class TestSmaStrategy:
         assert len(result) == len(ohlc)
         # Signals should only be BUY, HOLD, or SELL
         assert result['signal'].isin([Signal.BUY, Signal.HOLD, Signal.SELL]).all()
+
+    def test_reset_clears_strategy_state(self):
+        # Given
+        config = SmaStrategyConfig(short_window=3, long_window=5)
+        strategy = SmaStrategy(config)
+        prices = [100.0, 102.0, 104.0, 106.0, 108.0]
+        for price in prices:
+            strategy.generate_signal(pd.Series({'price': price}))
+        assert strategy.last_action != Signal.SELL or strategy.prev_indicator_values != {}
+
+        # When
+        strategy.reset()
+
+        # Then
+        assert strategy.last_action == Signal.SELL
+        assert strategy.prev_indicator_values == {}
+
+    def test_reset_clears_indicator_state(self):
+        # Given
+        config = SmaStrategyConfig(short_window=3, long_window=5)
+        strategy = SmaStrategy(config)
+        prices = [100.0, 102.0, 104.0, 106.0, 108.0]
+        for price in prices:
+            strategy.generate_signal(pd.Series({'price': price}))
+        assert len(strategy.indicators['short_sma'].prices) > 0
+
+        # When
+        strategy.reset()
+
+        # Then
+        assert len(strategy.indicators['short_sma'].prices) == 0
+        assert len(strategy.indicators['long_sma'].prices) == 0
+
+    def test_reset_produces_identical_results_to_fresh_instance(self):
+        # Given
+        config = SmaStrategyConfig(short_window=3, long_window=5)
+        strategy = SmaStrategy(config)
+        prices = [100.0, 102.0, 104.0, 106.0, 108.0, 110.0, 108.0, 106.0]
+        for price in prices:
+            strategy.generate_signal(pd.Series({'price': price}))
+
+        # When
+        strategy.reset()
+        reset_results = [
+            strategy.generate_signal(pd.Series({'price': p}))
+            for p in prices
+        ]
+
+        # Then
+        fresh_strategy = SmaStrategy(config)
+        fresh_results = [
+            fresh_strategy.generate_signal(pd.Series({'price': p}))
+            for p in prices
+        ]
+        for reset_r, fresh_r in zip(reset_results, fresh_results):
+            assert reset_r['signal'] == fresh_r['signal']
+            assert reset_r['price'] == fresh_r['price']

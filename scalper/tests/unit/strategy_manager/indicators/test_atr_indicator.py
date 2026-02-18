@@ -20,6 +20,21 @@ class TestAtrIndicator:
             'price': np.random.uniform(95, 105, n)
         })
 
+    def test_reset_clears_state(self):
+        # Given
+        indicator = AtrIndicator(window=3)
+        indicator.update(pd.Series({'high': 105, 'low': 95, 'price': 100}))
+        indicator.update(pd.Series({'high': 110, 'low': 90, 'price': 102}))
+        assert indicator.prev_close is not None
+        assert indicator.smoothed_tr is not None
+
+        # When
+        indicator.reset()
+
+        # Then
+        assert indicator.prev_close is None
+        assert indicator.smoothed_tr is None
+
     def test_update_returns_none_initially(self):
         # Given
         indicator = AtrIndicator(window=3)

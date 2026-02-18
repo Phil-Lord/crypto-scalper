@@ -75,3 +75,16 @@ class TestEmaIndicator:
         assert not pd.isna(ema.iloc[2])
         assert pd.isna(ohlc['price'].iloc[2])
         assert not pd.isna(ema.iloc[4])
+
+    def test_reset_clears_state(self):
+        # Given
+        indicator = EmaIndicator(window=5)
+        for price in [100.0, 102.0, 104.0]:
+            indicator.update(pd.Series({'price': price}))
+        assert indicator.ema is not None
+
+        # When
+        indicator.reset()
+
+        # Then
+        assert indicator.ema is None
