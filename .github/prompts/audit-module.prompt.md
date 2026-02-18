@@ -1,12 +1,18 @@
 # Audit Module
 
+> ⚠️ **Do NOT fix anything.** Audit only. Report findings and wait for confirmation before making
+> any changes.
+
 Audit the specified module against the project's copilot-instructions.md standards.
 
 ## Instructions
 
 1. **Read the module** — All source files in the module directory
 2. **Read the tests** — Corresponding unit test files in `scalper/tests/unit/{module}/`
-3. **Compare against standards** — Check alignment with copilot-instructions.md
+3. **Check `pytest.ini`** — Verify all module markers are registered
+4. **Check `scalper/Makefile`** — Verify `make test/{module}` target exists
+5. **Run the tests** — `cd scalper && make test/{module}` to capture current pass/fail state
+6. **Compare against standards** — Check alignment with copilot-instructions.md
 
 ## Checklist
 
@@ -45,8 +51,8 @@ Audit the specified module against the project's copilot-instructions.md standar
 - [ ] **Test structure** — Classes named `Test{ClassName}`, methods `test_{action}_{condition}_{expectation}`
 - [ ] **Given/When/Then** — Pattern used with comments
 - [ ] **Hierarchical markers** — Module, category, and class-level markers
-- [ ] **Markers registered** — All markers in `pytest.ini`
-- [ ] **Makefile target** — `test/{module}` exists
+- [ ] **Markers registered** — All markers present in `pytest.ini` (check the file)
+- [ ] **Makefile target** — `test/{module}` exists in `scalper/Makefile` (check the file)
 - [ ] **Test coverage depth** — Testing complex behaviours (retry, pagination, errors), not just happy paths
 - [ ] **Integration tests** — Mock only system boundaries (HTTP, DB), let all our code run, test multi-layer interactions
 - [ ] **Fixture quality** — Type-hinted, descriptive names, appropriate scope
@@ -100,8 +106,7 @@ Audit the specified module against the project's copilot-instructions.md standar
 
 Provide:
 
-1. **What's aligned** — Brief summary of what follows standards
-2. **Issues to fix** — Table of specific issues with file locations
-3. **Recommendations** — Any patterns worth adding to instructions
-
-Do NOT fix anything yet — wait for confirmation.
+1. **Test results** — Pass/fail summary from running `make test/{module}`
+2. **What's aligned** — Brief summary of what follows standards
+3. **Issues to fix** — Table with columns: `File | Line | Issue | Severity (High/Medium/Low)`
+4. **Recommendations** — Any patterns worth adding to instructions

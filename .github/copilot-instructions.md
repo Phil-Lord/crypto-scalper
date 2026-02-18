@@ -252,8 +252,14 @@ when:
 
 ### Prompt Files
 
-Reusable prompts live in `.github/prompts/`. When a task becomes repeatable (e.g., auditing
-modules, adding strategies), consider creating a prompt file for it.
+Reusable prompts live in `.github/prompts/`:
+
+- **`audit-module.prompt.md`** — Audit a module against project standards
+- **`new-module.prompt.md`** — Scaffold a new module from scratch
+- **`add-strategy.prompt.md`** — Add a new trading strategy
+- **`new-feature.prompt.md`** — Checklist for shipping a complete feature
+
+When a task becomes repeatable, create a new prompt file for it.
 
 ---
 
@@ -537,19 +543,7 @@ class SmaIndicator:
         return sum(self.prices) / self.window
 ```
 
-**Anti-pattern:**
-
-```python
-# ❌ Unbounded growth - memory leak in 24/7 operation
-class SmaIndicator:
-    def __init__(self, window: int):
-        self.window = window
-        self.prices = []  # Grows forever
-    
-    def update(self, price: float) -> float | None:
-        self.prices.append(price)
-        return sum(self.prices[-self.window:]) / self.window  # Only uses last N
-```
+❌ **Anti-pattern:** `self.prices = []` — grows forever while only the last `window` values are ever used.
 
 ### State Management Guidelines
 
@@ -746,23 +740,6 @@ from exchange_connector import TickerConnector  # ✅ Correct (public API)
 from exchange_connector.services import TickerService  # ❌ Wrong (internal)
 ```
 
-**Future structure when adding new exchanges:**
-```
-exchange_connector/
-├── __init__.py              # Exports connectors only
-├── connectors/              # Platform-agnostic interfaces (public)
-│   ├── ticker_connector.py  # Routes to platform-specific service
-│   └── ...
-├── api/                     # Platform-specific API clients (internal)
-│   ├── kraken_api_client.py
-│   └── binance_api_client.py
-└── services/                # Platform-specific services (internal)
-    ├── kraken/
-    │   └── ticker_service.py
-    └── binance/
-        └── ticker_service.py
-```
-
 ### Layer Responsibilities
 
 **Connector layer (domain logic):**
@@ -837,20 +814,23 @@ class TradesConnector:
 
 ---
 
-## Layered Module Structure
+## Dual Implementation Patterns
 
-**When to use:** Complex modules with multiple concerns (data, config, logic).
+**When to use:** Classes that need both a stateful (live) and vectorised (backtesting) implementation — primarily strategies and indicators in `strategy_manager`.
 
+**Rule:** Both implementations must produce identical signals for identical data. Any logic change must update both paths.
+
+```python
+# Live — called once per bar
+def _generate_signal(self, rule_results: dict) -> Signal:
+    return rule_results['my_rule']
+
+# Vectorised — called with full DataFrame for backtesting
+def _generate_signals(self, results: pd.DataFrame) -> pd.Series:
+    return results['my_rule']
 ```
-module_name/
-├── __init__.py          # Public API exports
-├── models/              # Immutable dataclasses
-├── config/              # Environment/settings classes
-├── clients/             # Low-level connectivity
-└── repositories/        # Business logic / CRUD
-```
 
-Simpler modules may only need a flat structure with a few files.
+**Testing:** Include a test that runs both implementations on the same data and asserts they produce the same result.
 
 ---
 
@@ -913,25 +893,4 @@ Apply when working with database schemas or models that map to tables.
 
 ---
 
-# Checklists
-
-## New Feature Checklist
-
-- [ ] Models are frozen dataclasses with full docstrings
-- [ ] All methods have type hints
-- [ ] Tests use Given/When/Then structure
-- [ ] Tests have appropriate pytest markers
-- [ ] Markers registered in `pytest.ini`
-- [ ] Makefile target added for new module tests
-- [ ] Public API exported in `__init__.py`
-
-## Repository Pattern Checklist (when applicable)
-
-- [ ] Abstract base class defines the interface
-- [ ] Implementation injected with client (dependency injection)
-- [ ] Naming follows `{Backend}{Entity}Repository`
-- [ ] Both interface and implementation exported
-
----
-
-**Module Auditing:** See `.github/prompts/audit-module.prompt.md` for the comprehensive audit checklist.
+**Prompts:** Actionable checklists and scaffolding guides live in `.github/prompts/`. See `CLAUDE.md` for orientation and quick-start commands.
