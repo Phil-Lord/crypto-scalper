@@ -117,4 +117,4 @@ Check these before creating new ones:
 
 **Indicators:** `SmaIndicator`, `EmaIndicator`, `RsiIndicator`, `AtrIndicator`, `AdxIndicator`
 
-**Rules:** `MaCrossoverRule` (and others in `strategy_manager/rules/`)
+**Rules:** `MaCrossoverRule`, `RsiThresholdRule`, `AdxThresholdRule`, `AtrThresholdRule`

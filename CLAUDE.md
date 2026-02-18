@@ -21,9 +21,15 @@ make test/utils
 # Run sub-category tests
 make test/data_system/repositories
 make test/exchange_connector/connectors
+make test/strategy_manager/indicators
+make test/strategy_manager/rules
+make test/strategy_manager/strategies
 
 # Run integration tests only
 make test/integration
+make test/integration/exchange_connector
+make test/integration/strategy_manager
+make test/integration/backtesting_engine
 ```
 
 ---
@@ -36,8 +42,9 @@ scalper/
 ├── data_system/            # Storage: SQLite (local) + Supabase (cloud)
 ├── exchange_connector/     # Kraken API (connectors/ is the public interface)
 ├── strategy_manager/       # Strategies, indicators, rules
+├── study_analyser/         # Optuna study analysis and plotting
 ├── trade_executor/         # Live trading execution loop
-├── utils/                  # Shared utilities (timestamp, env, logging)
+├── utils/                  # Shared utilities (timestamp, env vars, pair config, Optuna utils, data visualisation, strategy configs)
 ├── scripts/                # Entry-point scripts (not production code)
 └── tests/
     ├── unit/               # Mirror source structure

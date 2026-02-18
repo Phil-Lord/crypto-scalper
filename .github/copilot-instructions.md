@@ -13,6 +13,7 @@ A cryptocurrency scalping bot with:
 - **Data System** — Multi-backend storage (SQLAlchemy/SQLite + Supabase/PostgreSQL)
 - **Exchange Connector** — Kraken API integration
 - **Strategy Manager** — Trading strategy implementations
+- **Study Analyser** — Optuna study analysis and plotting
 - **Trade Executor** — Live trading execution
 
 ---
