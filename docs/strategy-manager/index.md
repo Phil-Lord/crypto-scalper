@@ -40,6 +40,10 @@ class Indicator(ABC):
     @abstractmethod
     def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
         '''Compute indicator for entire series during backtesting.'''
+
+    @abstractmethod
+    def reset(self) -> None:
+        '''Reset internal state to initial values.'''
 ```
 
 **2. Rules** — Signal generation logic based on indicator values
@@ -63,6 +67,7 @@ class Strategy:
     def register_rule(self, name: str, rule: Rule)
     def generate_signal(self, ohlc: pd.Series) -> dict
     def vectorised_compute(self, ohlc: pd.DataFrame) -> pd.DataFrame
+    def reset(self) -> None
 ```
 
 ---

@@ -81,9 +81,29 @@ class MyIndicator(Indicator):
     def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
         '''Backtest mode: stateless, vectorised calculation.'''
         return ohlc['price'].rolling(self.window).apply(calculate)
+
+    def reset(self) -> None:
+        '''Reset state to initial values.'''
+        self.prices = deque(maxlen=self.window)
 ```
 
 ### State Management Guidelines
+
+**Implement `reset()` to mirror `__init__` state:**
+
+```python
+# ✅ Good - reset mirrors __init__
+def __init__(self, window: int):
+    self.window = window
+    self.ema = None
+
+def reset(self) -> None:
+    self.ema = None
+
+# ❌ Bad - reset misses state
+def reset(self) -> None:
+    pass  # Forgot to clear self.ema
+```
 
 **Use bounded collections:**
 
