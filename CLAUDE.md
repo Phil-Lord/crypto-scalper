@@ -83,6 +83,7 @@ Reusable prompts in `.github/prompts/`:
 - **`new-module.prompt.md`** — Scaffold a new module from scratch
 - **`add-strategy.prompt.md`** — Add a new trading strategy
 - **`new-feature.prompt.md`** — Checklist for shipping a complete feature
+- **`review-instructions.prompt.md`** — Sync instructions and prompts with the codebase
 
 ---
 
