@@ -14,6 +14,9 @@ def get_headers(params: dict, endpoint: str) -> dict[str, str]:
     public_key = os.getenv('KRAKEN_TRADING_API_KEY')
     private_key = os.getenv('KRAKEN_TRADING_API_SECRET')
 
+    if not public_key or not private_key:
+        raise ValueError('Kraken API keys are not set in environment variables.')
+
     return {
         'API-Key': public_key,
         'API-Sign': get_signature(private_key, params, params['nonce'], endpoint)
