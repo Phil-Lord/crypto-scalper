@@ -39,6 +39,8 @@ class KrakenApiClient:
             elif method.upper() == 'POST':
                 headers = get_headers(params, endpoint)
                 response = requests.post(url, data=params, headers=headers)
+            else:
+                raise ValueError(f'Unsupported HTTP method: {method}')
             response.raise_for_status()
             json_response = response.json()
             self._handle_errors(json_response)
