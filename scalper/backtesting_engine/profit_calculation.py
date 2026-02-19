@@ -61,6 +61,6 @@ def get_final_quote_balance(results: pd.DataFrame, initial_quote_balance: float 
             base_balance = 0
 
     if base_balance > 0:
-        quote_balance += base_balance * results.iloc[-1].price
+        quote_balance += base_balance * results.iloc[-1].price * (1 - fee)
 
     return quote_balance
