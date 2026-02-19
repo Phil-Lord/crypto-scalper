@@ -67,3 +67,27 @@ class TestKrakenAuthUtils:
             assert 'API-Sign' in headers
             assert isinstance(headers['API-Sign'], str)
             assert len(headers['API-Sign']) > 0
+
+    def test_get_headers_raises_when_api_key_missing(self):
+        # Given
+        with patch('exchange_connector.kraken_utils.kraken_auth_utils.os.getenv') as mock_env:
+            mock_env.side_effect = lambda key: {
+                'KRAKEN_TRADING_API_KEY': None,
+                'KRAKEN_TRADING_API_SECRET': 'dGVzdF9wcml2YXRlX2tleQ==',
+            }.get(key)
+
+            # When / Then
+            with pytest.raises(ValueError, match='Kraken API keys are not set'):
+                get_headers({'nonce': '123'}, '/0/private/Balance')
+
+    def test_get_headers_raises_when_api_secret_missing(self):
+        # Given
+        with patch('exchange_connector.kraken_utils.kraken_auth_utils.os.getenv') as mock_env:
+            mock_env.side_effect = lambda key: {
+                'KRAKEN_TRADING_API_KEY': 'test_public_key',
+                'KRAKEN_TRADING_API_SECRET': None,
+            }.get(key)
+
+            # When / Then
+            with pytest.raises(ValueError, match='Kraken API keys are not set'):
+                get_headers({'nonce': '123'}, '/0/private/Balance')

@@ -184,3 +184,22 @@ class TestGetFinalQuoteBalance:
         assert balance < 1000
         # Approximately 0.08% loss
         assert balance > 1000 * 0.99
+
+    def test_get_final_quote_balance_open_position_applies_exit_fee(self):
+        # Given - Buy but no sell, final price equals buy price (isolates fee behaviour)
+        results = pd.DataFrame([
+            {'signal': 'buy', 'price': 100.0},
+            {'signal': 'hold', 'price': 100.0},
+        ])
+        fee = 0.0004
+        initial = 1000.0
+
+        # When
+        balance = get_final_quote_balance(results, initial)
+
+        # Then - Exit fee is applied: initial * (1-fee) on buy, * (1-fee) on final valuation
+        # base_balance = (1000 / 100) * (1 - 0.0004) = 9.9996
+        # final = 9.9996 * 100 * (1 - 0.0004) = 999.560016
+        base = (initial / 100.0) * (1 - fee)
+        expected = base * 100.0 * (1 - fee)
+        assert balance == pytest.approx(expected, rel=1e-9)

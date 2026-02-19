@@ -194,6 +194,11 @@ class TestKrakenApiClient:
             # Then
             mock_status.assert_called_once()
 
+    def test_make_request_raises_value_error_on_unsupported_method(self, client):
+        # Given / When / Then
+        with pytest.raises(ValueError, match='Unsupported HTTP method: DELETE'):
+            client.make_request('DELETE', '/0/public/Ticker', {})
+
 
 @pytest.mark.exchange_connector
 @pytest.mark.api
