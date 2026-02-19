@@ -12,7 +12,7 @@ class TestRsiIndicator:
     @pytest.fixture
     def sample_prices(self) -> pd.DataFrame:
         np.random.seed(42)
-        prices = np.random.uniform(100, 110, 200)
+        prices = np.random.uniform(100, 110, 300)
         return pd.DataFrame({'price': prices})
 
     def test_reset_clears_state(self):
