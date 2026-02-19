@@ -32,6 +32,8 @@ class KrakenApiClient:
         :raises KrakenTooManyRequestsError: If API rate limit is exceeded.
         :raises KrakenApiResponseError: If API returns an error response.
         '''
+        if method.upper() not in ('GET', 'POST'):
+            raise ValueError(f'Unsupported HTTP method: {method}')
         try:
             url = self.BASE_URL + endpoint
             if method.upper() == 'GET':
@@ -39,8 +41,6 @@ class KrakenApiClient:
             elif method.upper() == 'POST':
                 headers = get_headers(params, endpoint)
                 response = requests.post(url, data=params, headers=headers)
-            else:
-                raise ValueError(f'Unsupported HTTP method: {method}')
             response.raise_for_status()
             json_response = response.json()
             self._handle_errors(json_response)
