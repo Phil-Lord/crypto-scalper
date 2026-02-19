@@ -48,6 +48,8 @@ def get_params_for_strategy(strategy_name: str) -> tuple:
         return SMA_CONFIG, SMA_GRID
     elif strategy_name == 'PrecisionTrendStrategy':
         return PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
+    else:
+        raise ValueError(f'No default config found for strategy: {strategy_name}')
 
 
 def create_engine(pair: str, strategy_name: str, start: str, end: str, interval: int, vectorised: bool, **params) -> BacktestingEngine:
