@@ -1,4 +1,3 @@
-import logging
 from typing import Any
 
 from exchange_connector.kraken_utils import get_nonce
