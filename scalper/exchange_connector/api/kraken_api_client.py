@@ -55,4 +55,4 @@ class KrakenApiClient:
             if response['error'] == ['EGeneral:Too many requests']:
                 raise KrakenTooManyRequestsError()
             else:
-                raise KrakenApiResponseError(f"API Error: {response['error']}")
+                raise KrakenApiResponseError(f'API Error: {response["error"]}')

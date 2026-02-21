@@ -15,7 +15,7 @@ def delete_study():
         print('No studies found.')
         return
 
-    selected_studies = checkbox("Select studies:", choices=study_choices).ask()
+    selected_studies = checkbox('Select studies:', choices=study_choices).ask()
     count = len(selected_studies)
     confirm_delete = confirm(f'Delete {count} stud{'ies' if count > 1 else 'y'}?').ask()
     if not confirm_delete:

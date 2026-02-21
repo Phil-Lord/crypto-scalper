@@ -105,5 +105,5 @@ def ask_datetime(message: str) -> datetime:
     return datetime.strptime(ask(message), '%Y-%m-%d %H:%M:%S')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     query_supabase()

@@ -30,9 +30,9 @@ class SupabaseBotOrderRepository(BotOrderRepository):
         response = (
             self.client
             .table(self.TABLE_NAME)
-            .select("*")
-            .eq("bot_id", bot_id)
-            .order("executed_at", desc=True)
+            .select('*')
+            .eq('bot_id', bot_id)
+            .order('executed_at', desc=True)
             .execute()
         )
         return [self._to_bot_order(row) for row in response.data]

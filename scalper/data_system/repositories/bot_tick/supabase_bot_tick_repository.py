@@ -29,9 +29,9 @@ class SupabaseBotTickRepository(BotTickRepository):
         response = (
             self.client
             .table(self.TABLE_NAME)
-            .select("*")
-            .eq("bot_id", bot_id)
-            .order("timestamp", desc=True)
+            .select('*')
+            .eq('bot_id', bot_id)
+            .order('timestamp', desc=True)
             .execute()
         )
         return [self._to_bot_tick(row) for row in response.data]

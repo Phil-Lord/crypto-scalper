@@ -29,8 +29,8 @@ class SupabaseBotRunRepository(BotRunRepository):
         response = (
             self.client
             .table(self.TABLE_NAME)
-            .select("*")
-            .eq("id", str(id))
+            .select('*')
+            .eq('id', str(id))
             .execute()
         )
         if not response.data:
