@@ -1,3 +1,5 @@
+from collections import deque
+
 import numpy as np
 import pandas as pd
 
@@ -7,7 +9,7 @@ from .base_indicator import Indicator
 class RsiIndicator(Indicator):
     def __init__(self, window: int):
         self.window = window
-        self.prices = []
+        self.prices: deque[float] = deque(maxlen=self.window + 1)
         self.avg_gain, self.avg_loss, self.prev_price = None, None, None
 
     def update(self, ohlc: pd.Series) -> float | None:
@@ -23,12 +25,10 @@ class RsiIndicator(Indicator):
         if len(self.prices) < self.window + 1:
             self.prices.append(ohlc['price'])
             return None
-        else:
-            self.prices = self.prices[-(self.window + 1):]
 
         if self.avg_gain is None:
             # Calculate initial average gain and loss.
-            deltas = np.diff(self.prices[-(self.window + 1):])
+            deltas = np.diff(list(self.prices))
             gains = np.maximum(deltas, 0)
             losses = np.maximum(-deltas, 0)
             self.avg_gain = np.mean(gains)
@@ -60,7 +60,7 @@ class RsiIndicator(Indicator):
         return rsi
 
     def reset(self) -> None:
-        self.prices = []
+        self.prices = deque(maxlen=self.window + 1)
         self.avg_gain = None
         self.avg_loss = None
         self.prev_price = None

@@ -28,7 +28,7 @@ class TestRsiIndicator:
         indicator.reset()
 
         # Then
-        assert indicator.prices == []
+        assert len(indicator.prices) == 0
         assert indicator.avg_gain is None
         assert indicator.avg_loss is None
         assert indicator.prev_price is None
