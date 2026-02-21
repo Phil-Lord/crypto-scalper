@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 import numpy as np
 import pandas as pd
 
@@ -7,7 +9,7 @@ from strategy_manager.indicators import Indicator
 from strategy_manager.rules import Rule
 
 
-class Strategy:
+class Strategy(ABC):
     def __init__(self):
         self.indicators: dict[str, Indicator] = {}
         self.rules: dict[str, Rule] = {}
@@ -61,13 +63,13 @@ class Strategy:
         results['signal'] = self._suppress_consecutive_signals(signals)
         return results
 
+    @abstractmethod
     def _generate_signal(self, rule_results: dict) -> Signal:
         ''' Generate a signal based on the rule results of a training run interval. '''
-        raise NotImplementedError('Subclasses must implement _generate_signal method')
 
+    @abstractmethod
     def _generate_signals(self, results: pd.DataFrame) -> pd.Series:
         ''' Generate signals based on the results of a vectorised trading run. '''
-        raise NotImplementedError('Subclasses must implement _generate_signals method')
 
     def _suppress_consecutive_signals(self, signals: pd.Series) -> pd.Series:
         ''' Replace consecutive buy or sell signals with hold. '''
