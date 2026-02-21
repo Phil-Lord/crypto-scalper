@@ -5,7 +5,7 @@ import click
 import questionary
 
 from study_analyser import StudyAnalyser
-from utils import load_env, LOG_FORMAT, get_study_choices, OPTUNA_DB_URL
+from utils import load_env, LOG_FORMAT, get_study_choices, OptunaConfig
 
 load_env()
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
@@ -28,7 +28,7 @@ def analyse_study(dashboard: bool = False) -> None:
 
 
 def launch_optuna_dashboard() -> None:
-    url = OPTUNA_DB_URL.replace('postgresql://', 'postgresql+psycopg2://')
+    url = OptunaConfig.DB_URL.replace('postgresql://', 'postgresql+psycopg2://')
     print('Launching Optuna dashboard at http://localhost:8080 ...')
     subprocess.run(['optuna-dashboard', url])
 

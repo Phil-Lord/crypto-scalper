@@ -4,7 +4,7 @@ import optuna
 import pandas as pd
 
 from .study_plotter import StudyPlotter
-from utils import OPTUNA_DB_URL
+from utils import OptunaConfig
 
 
 class StudyAnalyser:
@@ -14,7 +14,7 @@ class StudyAnalyser:
 
     def _load_study(self) -> optuna.Study:
         storage = optuna.storages.RDBStorage(
-            url=OPTUNA_DB_URL,
+            url=OptunaConfig.DB_URL,
             engine_kwargs={
                 'pool_pre_ping': True,
                 'connect_args': {

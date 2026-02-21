@@ -8,7 +8,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from .objective import get_objective
-from utils import OPTUNA_DB_URL
+from utils import OptunaConfig
 
 
 def optimise_parameters(engine, param_grid: dict[str, list[Any]], n_trials: int = 100) -> None:
@@ -32,7 +32,7 @@ def create_study_name(engine) -> str:
 
 def create_storage() -> optuna.storages.RDBStorage:
     return optuna.storages.RDBStorage(
-        url=OPTUNA_DB_URL,
+        url=OptunaConfig.DB_URL,
         engine_kwargs={
             'pool_size': 10,
             'max_overflow': 10,

@@ -12,7 +12,7 @@ from data_system import (
     SQLAlchemyTradeRepository
 )
 from strategy_manager import create_strategy
-from utils import OPTUNA_DB_URL
+from utils import OptunaConfig
 
 from .backtesting_engine import BacktestingEngine
 from .parameter_optimisation import create_windows
@@ -60,7 +60,7 @@ def find_params(study_name: str, num_sets: int, start: float, end: float) -> Non
 def load_study(study_name: str) -> optuna.Study:
     logger.info(f'Loading study: {study_name}')
     storage = optuna.storages.RDBStorage(
-        url=OPTUNA_DB_URL,
+        url=OptunaConfig.DB_URL,
         engine_kwargs={
             'pool_pre_ping': True,
             'connect_args': {

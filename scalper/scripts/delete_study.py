@@ -3,7 +3,7 @@ import logging
 import optuna
 from questionary import checkbox, confirm
 
-from utils import load_env, LOG_FORMAT, get_study_choices, OPTUNA_DB_URL
+from utils import load_env, LOG_FORMAT, get_study_choices, OptunaConfig
 
 load_env()
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
@@ -22,7 +22,7 @@ def delete_study():
         print('Deletion cancelled.')
         return
 
-    storage = optuna.storages.RDBStorage(url=OPTUNA_DB_URL)
+    storage = optuna.storages.RDBStorage(url=OptunaConfig.DB_URL)
     for study_name in selected_studies:
         optuna.delete_study(study_name=study_name, storage=storage)
         print(f'Study {study_name} deleted.')

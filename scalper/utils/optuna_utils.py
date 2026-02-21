@@ -2,12 +2,12 @@ from sqlalchemy import text
 import optuna
 from questionary import Choice
 
-from utils import OPTUNA_DB_URL
+from utils import OptunaConfig
 
 
 def get_study_choices() -> list[Choice]:
     ''' Retrieve all study names and trial counts from the database as Questionary Choices. '''
-    storage = optuna.storages.RDBStorage(url=OPTUNA_DB_URL)
+    storage = optuna.storages.RDBStorage(url=OptunaConfig.DB_URL)
     engine = storage.engine
 
     query = text(
