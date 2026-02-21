@@ -9,14 +9,10 @@ from data_system.clients.supabase_client import SupabaseClient
 class TestSupabaseClient:
     @pytest.fixture
     def mock_supabase_config(self, mocker):
-        mocker.patch(
-            'data_system.clients.supabase_client.SupabaseConfig.URL',
-            'https://fake.supabase.co'
-        )
-        mocker.patch(
-            'data_system.clients.supabase_client.SupabaseConfig.KEY',
-            'fake-api-key'
-        )
+        mocker.patch.dict('os.environ', {
+            'SUPABASE_URL': 'https://fake.supabase.co',
+            'SUPABASE_KEY': 'fake-api-key',
+        })
 
     @pytest.fixture
     def mock_create_client(self, mocker, mock_supabase_config):
