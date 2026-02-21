@@ -42,7 +42,11 @@ client.table("bots").select("*").execute()  # Direct access to Supabase API
 
 ## Environment Configuration
 
-| Config Class        | Source                                                 | Usage                         |
-| ------------------- | ------------------------------------------------------ | ----------------------------- |
-| `LocalSQLiteConfig` | Hardcoded paths                                        | Local development/backtesting |
-| `SupabaseConfig`    | Environment variables (`SUPABASE_URL`, `SUPABASE_KEY`) | Cloud deployment              |
+| Config Class        | Source                                                                                      | Usage                         |
+| ------------------- | ------------------------------------------------------------------------------------------- | ----------------------------- |
+| `LocalSQLiteConfig` | Hardcoded paths                                                                             | Local development/backtesting |
+| `SupabaseConfig`    | Environment variables (`SUPABASE_URL`, `SUPABASE_KEY`) read lazily via metaclass properties | Cloud deployment              |
+
+> **Note:** `SupabaseConfig` reads env vars at attribute access time (not import time) using
+> metaclass `@property`. This means scripts can import `data_system` in normal import order without
+> needing to call `load_env()` before the import statement.

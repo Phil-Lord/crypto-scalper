@@ -567,26 +567,34 @@ class SmaIndicator:
 **Application entry points** load `.env` once:
 
 ```python
+from data_system import SupabaseClient
 from utils import load_env, LOG_FORMAT
 
-load_env()  # MUST be called before importing modules that use env vars
+load_env()
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-
-# Import modules that depend on env vars AFTER load_env()
-from data_system import SupabaseClient
 ```
 
-**⚠️ Critical:** Call `load_env()` **before** importing modules that read env vars at import time (e.g., `SupabaseConfig`). Otherwise env vars won't be loaded yet!
-
-**Library code** uses `os.getenv()` directly:
+**Library code** reads env vars lazily via metaclass properties, so values are resolved at access time not import time:
 
 ```python
 import os
 
-class SupabaseConfig:
-    URL = os.getenv('SUPABASE_URL')
-    KEY = os.getenv('SUPABASE_KEY')
+
+class _SupabaseConfigMeta(type):
+    @property
+    def URL(cls) -> str | None:
+        return os.getenv('SUPABASE_URL')
+
+    @property
+    def KEY(cls) -> str | None:
+        return os.getenv('SUPABASE_KEY')
+
+
+class SupabaseConfig(metaclass=_SupabaseConfigMeta):
+    pass
 ```
+
+This means scripts can import `data_system` in normal import order without worrying about whether `load_env()` has been called yet. Config values are read from the environment at the point of use (e.g., `SupabaseClient.__init__`), not when the module is imported.
 
 **Production:** Environment variables come from AWS/platform, no `.env` file needed.
 

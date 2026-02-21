@@ -17,11 +17,12 @@ Record decisions here when future-you might ask _"why did I do it this way?"_.
 
 ## Data System
 
-| Decision                                             | Rationale                                                                                                                                   |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Denormalise `bot_id` on `bot_ticks`                  | Read performance is critical for time-series data; avoids JOIN on `bot_runs` for common query _"all ticks for bot X"_; enables partitioning |
-| Composite primary key `(trade_id, pair)` on `trades` | Kraken trade IDs are only unique within a trading pair                                                                                      |
-| Dual backend (SQLite + PostgreSQL)                   | SQLite for fast local backtesting; PostgreSQL/Supabase for durable cloud storage and Lambda integration                                     |
+| Decision                                                          | Rationale                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Denormalise `bot_id` on `bot_ticks`                               | Read performance is critical for time-series data; avoids JOIN on `bot_runs` for common query _"all ticks for bot X"_; enables partitioning                                                                                                                                                    |
+| Composite primary key `(trade_id, pair)` on `trades`              | Kraken trade IDs are only unique within a trading pair                                                                                                                                                                                                                                         |
+| Dual backend (SQLite + PostgreSQL)                                | SQLite for fast local backtesting; PostgreSQL/Supabase for durable cloud storage and Lambda integration                                                                                                                                                                                        |
+| `SupabaseConfig` uses metaclass properties (lazy env var reading) | Class-level `os.getenv()` calls are evaluated at import time, before `load_env()` runs in scripts. Metaclass `@property` defers reading until attribute access (i.e., inside `SupabaseClient.__init__`), so scripts can import `data_system` in normal order without needing deferred imports. |
 
 ---
 
