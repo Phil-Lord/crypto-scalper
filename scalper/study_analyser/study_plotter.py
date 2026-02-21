@@ -39,7 +39,7 @@ class StudyPlotter:
         sns.stripplot(data=melted, x='param', y='value',
                       color='black', size=3, jitter=0.2, alpha=0.6)
         title = f'Normalised Parameter Stability (Top {top_n} Trials)'
-        plt.ylabel('Normalized Value (0-1)')
+        plt.ylabel('Normalised Value (0-1)')
         plt.title(title)
         plt.xticks(rotation=45)
         plt.tight_layout()

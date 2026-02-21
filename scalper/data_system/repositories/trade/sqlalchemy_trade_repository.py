@@ -29,7 +29,7 @@ class SQLAlchemyTradeRepository(TradeRepository):
 
             session.execute(stmt, records)
 
-    def get(self, pair: str, start: float = None, end: float = None) -> list[Trade]:
+    def get(self, pair: str, start: float | None = None, end: float | None = None) -> list[Trade]:
         with self.client.session() as session:
             # Get min/max timestamps if not provided
             if start is None:

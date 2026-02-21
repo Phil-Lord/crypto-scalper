@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 @click.command()
 @click.option('--dashboard', '-d', is_flag=True, help='Launch Optuna HTML Dashboard.')
 def analyse_study(dashboard: bool = False) -> None:
-    if (dashboard):
+    if dashboard:
         launch_optuna_dashboard()
 
     study_choices = get_study_choices()

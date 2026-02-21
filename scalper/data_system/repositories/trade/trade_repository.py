@@ -14,7 +14,7 @@ class TradeRepository(ABC):
         pass
 
     @abstractmethod
-    def get(self, pair: str, start: float = None, end: float = None) -> list[Trade]:
+    def get(self, pair: str, start: float | None = None, end: float | None = None) -> list[Trade]:
         '''
         Fetches trades for a trading pair within a time range.
 

@@ -5,7 +5,7 @@ from exchange_connector.services import TradesService
 
 
 class TradesConnector(FetchConnector):
-    def __init__(self, client: KrakenApiClient = None):
+    def __init__(self, client: KrakenApiClient | None = None):
         self.client = client or KrakenApiClient()
         self.service = TradesService(self.client)
 
