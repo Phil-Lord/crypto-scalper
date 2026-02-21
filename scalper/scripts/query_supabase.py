@@ -1,15 +1,15 @@
-from data_system import (
-    Bot, BotOrder, BotRun, BotTick, SupabaseBotOrderRepository, SupabaseBotRepository,
-    SupabaseBotRunRepository, SupabaseBotTickRepository, SupabaseClient
-)
 import logging
 from datetime import datetime
 
 import questionary
 
+from data_system import (
+    Bot, BotOrder, BotRun, BotTick, SupabaseBotOrderRepository, SupabaseBotRepository,
+    SupabaseBotRunRepository, SupabaseBotTickRepository, SupabaseClient,
+)
 from utils import load_env, LOG_FORMAT
 
-load_env()  # Load .env BEFORE importing modules that use env vars
+load_env()
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 
