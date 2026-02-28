@@ -276,6 +276,84 @@
 
 ---
 
+## Operational Workflows
+
+### Deploying code updates
+
+`fly deploy` is the only deployment command. The full lifecycle:
+
+1. `fly deploy` builds and pushes the new Docker image
+2. Fly.io sends `SIGTERM` to the running container
+3. Signal handler sets `_shutting_down = True` on each executor — any in-flight `execute_interval()` completes (including order placement and fill query), but the next scheduled interval returns immediately
+4. `scheduler.shutdown(wait=True)` blocks until running jobs finish
+5. `executor.shutdown()` marks each `BotRun` as completed via `bot_run_repo.complete()`
+6. Process exits, old container is removed
+7. New container starts with the updated image
+8. `entrypoint.sh` parses `BOT_IDS` env var and launches `start_scalping.py`
+9. For each bot: `_recover_state()` restores `strategy.last_action` from the latest persisted tick
+10. For each bot: `warm_up()` fetches OHLC history and replays through the strategy to rebuild indicator state
+11. Scheduler starts — bots resume trading on the next wall-clock-aligned interval
+
+**Safety guarantees:** No order placement is interrupted mid-flight (graceful drain). At most 1 interval is missed during the container swap (~30s). State is fully recovered from Supabase — no in-memory state is lost. `BotRun` records cleanly delineate pre- and post-deploy activity.
+
+### Adding a new bot
+
+1. Register the bot in Supabase: `python -m scripts.register_bot --id eth_5m_v2 --pair XETHZGBP --strategy-name PrecisionTrendStrategy --strategy-version v1.0.0 --interval 5 --parameters '{"short_ema": 43, ...}'`
+2. Update the `BOT_IDS` env var on Fly.io: `fly secrets set BOT_IDS=btc_1m_001,eth_5m_v2`
+3. Deploy: `fly deploy`
+
+The new bot starts with `_recover_state()` finding no previous ticks (first run), warms up from OHLC history, and begins trading. Existing bots recover their state from their latest ticks and resume normally. No code changes needed — bot config lives entirely in the database.
+
+### Removing a bot
+
+1. Update `BOT_IDS` to exclude the bot: `fly secrets set BOT_IDS=btc_1m_001`
+2. Deploy: `fly deploy`
+
+The removed bot's `BotRun` from the previous deployment was already marked complete during graceful shutdown. Its historical data (`bot_ticks`, `bot_orders`, `bot_runs`) remains in Supabase for analysis. The `Bot` record can optionally be left in the `bots` table (inert — only bots in `BOT_IDS` are started).
+
+### Updating bot parameters
+
+Bot parameters (strategy windows, thresholds) are read from Supabase at startup. To update:
+
+1. Update the `Bot` record in Supabase (directly or via a future `update_bot.py` script)
+2. Deploy: `fly deploy` (or restart: `fly apps restart crypto-scalper`)
+
+The bot picks up the new parameters on restart, warms up with the updated strategy config, and resumes. **Note:** changing parameters mid-run without restart has no effect — parameters are read once during `TradeExecutor` construction.
+
+### Crash recovery
+
+Fly.io auto-restarts the container on crash (typically <30s). The recovery sequence:
+
+1. New container starts → `entrypoint.sh` → `start_scalping.py`
+2. `_recover_state()` queries `bot_tick_repo.get_latest_by_bot_id()` — restores `strategy.last_action` from the most recent tick's signal, preventing position-unaware double buys
+3. `warm_up()` replays OHLC history through the strategy to rebuild indicator state (one API call, milliseconds of computation)
+4. `_reconcile_placed_orders()` runs at the start of the first `execute_interval()` — any orders placed before the crash that were left in PLACED status are checked against Kraken and resolved (FILLED or FAILED)
+5. Scheduler resumes normal operation
+
+**Worst case:** 1 missed interval. The crashed `BotRun` remains with `completed_at IS NULL` — detectable for monitoring/alerting.
+
+### Monitoring bot health
+
+Query `bot_ticks` timestamps to verify bots are active:
+
+```sql
+SELECT bot_id, MAX(timestamp) AS last_tick
+FROM bot_ticks
+GROUP BY bot_id;
+```
+
+A gap exceeding the bot's interval + grace period indicates a problem. Persistent gaps during OHLC failures are expected and acceptable — they surface in the logs via `fly logs`.
+
+Unfinished runs indicate crashes:
+
+```sql
+SELECT id, bot_id, started_at
+FROM bot_runs
+WHERE completed_at IS NULL;
+```
+
+---
+
 ## Decisions
 
 - **Fly.io over Lambda:** Warm indicators stay in memory, halves Kraken API calls, simpler deployment and code. ~$2/month vs free but operationally complex. After warm-up, seed value carries ~5% weight in the EMA — most consequential at crossover boundaries where scalping decisions flip. Always-on eliminates this by maintaining continuous indicator state after a one-time warm-up.
