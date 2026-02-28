@@ -1,13 +1,13 @@
 # Plan: Trade Executor + Live Trading on Fly.io
 
-**TL;DR:** Rewrite the trade executor module as an always-on process that loads bot config from Supabase, recovers state from the latest persisted tick, warms up strategy indicators from OHLC history (using a `warmup_candles` property on each strategy), runs a BlockingScheduler with CronTrigger per bot interval (with jitter, fixed delay, misfire protection), and persists every tick and order to Supabase. Build a `QueryOrderConnector` in the exchange connector to fetch fill details from Kraken after order placement, with a retry loop and per-interval reconciliation of outstanding orders. Extend `BotOrder` with `status`/`txid`/`filled_at` fields for order safety — persist immediately after placement, update on fill. Add an injectable `PositionSizer` abstraction for volume calculation. Deploy as a Docker container on Fly.io with `fly deploy`. The core executor is platform-agnostic — Fly.io specifics are confined to the Dockerfile, `fly.toml`, `entrypoint.sh`, and the entry-point script.
+**TL;DR:** Rewrite the trade executor module as an always-on process that loads bot config from Supabase, recovers state from the latest persisted tick, warms up strategy indicators from OHLC history (using a `warmup_candles` property on each strategy), runs a BlockingScheduler with CronTrigger per bot interval (with jitter, fixed delay, misfire protection), and persists every tick and order to Supabase. Build a `QueryOrderConnector` in the exchange connector to fetch fill details from Kraken after order placement, with a retry loop and per-interval reconciliation of outstanding orders. Extend `BotOrder` with `status`/`txid`/`placed_at`/`filled_at` fields for order safety — persist immediately after placement, update on fill. Add an injectable `PositionSizer` abstraction for volume calculation. Deploy as a Docker container on Fly.io with `fly deploy`. The core executor is platform-agnostic — Fly.io specifics are confined to the Dockerfile, `fly.toml`, `entrypoint.sh`, and the entry-point script.
 
 **Key decisions reflected:**
 - Platform: Fly.io (~$2/month), CronTrigger + jitter + 5s delay
 - Bot config: DB-registered (looked up from Supabase `bots` table by `bot_id`)
 - Warm-up: Skip recording ticks until indicators are ready; warn if insufficient candles; requirement derived from `Strategy.warmup_candles` property
 - Order fills: Build `QueryOrderConnector` to retrieve actual execution details; retry 3× in-interval, reconcile outstanding PLACED orders every interval
-- Order safety: Extend `BotOrder` with `status`/`txid`/`filled_at`; persist immediately after placement, update on fill
+- Order safety: Extend `BotOrder` with `status`/`txid`/`placed_at`/`filled_at`; persist immediately after placement, update on fill
 - State recovery: Query latest tick on startup to restore `strategy.last_action`
 - Volume: Injectable `PositionSizer` with `AllInPositionSizer` default
 - No `IntervalContext`: Transformation logic lives in private `TradeExecutor` methods
@@ -40,14 +40,19 @@
     - Add `status: OrderStatus` field (default `PLACED`)
     - Make `price`, `volume`, `fee` optional: `Decimal | None = None`
     - Make `tick_id` optional: `int | None = None` (may not have tick ID at placement time)
-    - Rename `executed_at` → `filled_at: datetime | None = None` — set when fill details arrive from QueryOrders. No `placed_at` field; the linked `BotTick.timestamp` serves as the placement timestamp.
+    - Add `placed_at: datetime` field (default `datetime.now(utc)`) — always records when the order was submitted, independent of tick persistence
+    - Rename `executed_at` → `filled_at: datetime | None = None` — set when fill details arrive from QueryOrders
+
+    **Note:** `BotOrder` remains `frozen=True`. Updates (e.g., setting fill details or `tick_id` after persistence) use `dataclasses.replace()` to create a new instance, which is then passed to `bot_order_repo.update()`. This maintains immutability consistency with all other domain models.
 
 7. **Update `bot_orders` schema** in `data_system/schema.sql`:
     - Add `txid TEXT NOT NULL`
     - Add `status TEXT NOT NULL DEFAULT 'placed'` with `CHECK (status IN ('placed', 'filled', 'failed'))`
+    - Add `placed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`
     - Make `price`, `volume`, `fee` nullable: `DECIMAL(32, 12)` (remove NOT NULL)
     - Make `tick_id` nullable (already is — `REFERENCES` without NOT NULL)
     - Rename `executed_at` → `filled_at`: make nullable, remove `NOT NULL` and `DEFAULT NOW()`
+    - **No migration needed** — no production data exists yet. Recreate the table from the updated schema.
 
 8. **Add `update()` method to `BotOrderRepository`** at `data_system/repositories/bot_order/bot_order_repository.py`. Signature: `update(self, bot_order: BotOrder) -> BotOrder`. Updates an existing order record (used to fill in price/volume/fee/filled_at after QueryOrders succeeds).
 
@@ -81,7 +86,7 @@
 
 21. **Add abstract `warmup_candles` property to `Strategy`** at `strategy_manager/strategies/base_strategy.py`. Signature: `@property @abstractmethod def warmup_candles(self) -> int`. Each strategy must declare how many candles it needs for indicator convergence.
 
-22. **Implement `warmup_candles` on `PrecisionTrendStrategy`** — returns `3 * max(self.config.short_ema, self.config.long_ema, self.config.rsi_window, self.config.adx_window, self.config.atr_window)`. The 3× multiplier is the standard EMA convergence heuristic (~5% residual error from seed value). Changing indicator windows in `utils/strategy_configs.py` automatically adjusts the warm-up requirement — no strategy code changes needed.
+22. **Implement `warmup_candles` on `PrecisionTrendStrategy`** — returns `3 * max(self.config.short_ema, self.config.long_ema, self.config.rsi_window, self.config.adx_window, self.config.atr_window)`. The 3× multiplier is the standard EMA convergence heuristic — after 3× the window length, the seed value's contribution to the EMA carries ~5% weight ($e^{-3} \approx 0.05$). The actual output error depends on how far the seed is from the true EMA, so for a well-chosen seed (e.g., SMA of the first N values) the practical error is smaller. Changing indicator windows in `utils/strategy_configs.py` automatically adjusts the warm-up requirement — no strategy code changes needed.
 
 23. **Implement `warmup_candles` on `SmaStrategy`** — returns `self.config.long_window + 1`. SMA needs exactly N candles plus 1 for crossover detection.
 
@@ -91,7 +96,7 @@
 
 25. **Delete** the current `trade_executor/config.py` and `trade_executor/handler.py`. These are Lambda artefacts being replaced.
 
-26. **Delete `IntervalContext`** at `trade_executor/interval_context.py`. Transformation logic moves to private `TradeExecutor` methods (`_fetch_ohlc()`, `_fetch_balances()`).
+26. **Delete `IntervalContext`** at `trade_executor/interval_context.py`. Transformation logic moves to private `TradeExecutor` methods (`_fetch_ohlc()`, `_fetch_balances()`). Also **drop `TickerConnector`** from the executor — the current executor uses it to get a `float` price, but `Strategy.generate_signal()` expects a `pd.Series` with `price`/`high`/`low`/`close` keys. `OhlcConnector` provides all required fields in a single call, replacing `TickerConnector` entirely.
 
 27. **Rewrite `TradeExecutor`** at `trade_executor/trade_executor.py`. Complete redesign:
 
@@ -107,9 +112,10 @@
     - Creates `run: BotRun` on construction and persists it via `bot_run_repo.add()`
     - Has `self._shutting_down: bool = False` flag for graceful drain
     - **`_recover_state(self) -> None`**: Queries latest tick via `bot_tick_repo.get_latest_by_bot_id(bot.id)`. If found, sets `strategy.last_action` from tick's signal. Logs recovery details or 'first run' if no tick exists.
-    - **`_fetch_ohlc(self) -> pd.Series`**: Private method. Fetches latest OHLC via `OhlcConnector`, extracts the latest closed candle from the raw array, returns as `pd.Series` with keys `price`, `open`, `high`, `low`, `close` matching what `Strategy.generate_signal()` expects.
+    - **`_fetch_ohlc(self) -> pd.Series`**: Private method. Fetches latest OHLC via `OhlcConnector`, extracts the latest closed candle from the raw array, returns as `pd.Series` with keys `price`, `open`, `high`, `low`, `close` matching what `Strategy.generate_signal()` expects. Used by `execute_interval()` for single-candle fetches.
+    - **`_fetch_ohlc_history(self) -> list[pd.Series]`**: Private method. Fetches historical OHLC candles via `OhlcConnector` using a `since` timestamp derived from `bot.interval * strategy.warmup_candles`. Returns the full batch as a list of `pd.Series`, each with the same keys as `_fetch_ohlc()`. Used exclusively by `warm_up()`. Separate from `_fetch_ohlc()` because the return type (`list[pd.Series]` vs `pd.Series`) and `since` calculation logic are fundamentally different.
     - **`_fetch_balances(self) -> tuple[Decimal, Decimal]`**: Private method. Fetches balances via `BalanceConnector`, looks up symbols using `pair_symbols`, converts string values to `Decimal`, handles missing keys (zero balance). Returns `(balance_base, balance_quote)`.
-    - **`warm_up(self) -> None`**: Fetches historical OHLC candles via `OhlcConnector`, feeds them sequentially through `strategy.generate_signal()` to warm up indicators. Calculates appropriate `since` timestamp from `bot.interval` and `self.strategy.warmup_candles`. Logs progress but does **not** persist ticks during warm-up.
+    - **`warm_up(self) -> None`**: Fetches historical OHLC candles via `self._fetch_ohlc_history()`, feeds them sequentially through `strategy.generate_signal()` to warm up indicators. Logs progress but does **not** persist ticks during warm-up.
         - **Warm-up validation**: After fetching, check that candle count meets `self.strategy.warmup_candles`. If insufficient (e.g., new trading pair), log a warning that signals may be unreliable for the first N intervals. Bot starts anyway (warn and continue).
     - **`_reconcile_placed_orders(self) -> None`**: Queries outstanding PLACED orders via `bot_order_repo.get_placed_by_bot_id(bot.id)`. For each, queries Kraken via `QueryOrderConnector.fetch([order.txid])`. If Kraken reports `closed` → update to FILLED with fill details and `filled_at`. If Kraken reports `cancelled` → update to FAILED. If still `open` → leave as PLACED (will retry next interval). Logs each resolution.
     - **`execute_interval(self) -> None`**: One decision cycle:
@@ -187,6 +193,10 @@
 
 36. **Secrets management**: Kraken API keys and Supabase credentials stored as Fly.io secrets (`fly secrets set KRAKEN_API_KEY=... KRAKEN_API_SECRET=... SUPABASE_URL=... SUPABASE_KEY=...`). These become environment variables in the container — the existing `SupabaseConfig` metaclass and `os.getenv` patterns already handle this.
 
+36b. **Nonce thread-safety**: Verify that `KrakenApiClient`'s nonce generation is safe for concurrent calls from multiple bots in a single process. APScheduler runs jobs in a thread pool — if two bots call private Kraken endpoints simultaneously, nonce collisions could cause `EAPI:Invalid nonce` errors. If the current nonce strategy (e.g., `time.time_ns()`) doesn't guarantee uniqueness under concurrent access, add a `threading.Lock` around `make_request()` or use a monotonic counter with a lock.
+
+36c. **Supabase client thread-safety**: Each `TradeExecutor` should receive its own `SupabaseClient` instance (constructed in the entry-point script per bot). The underlying `httpx` client used by the Supabase SDK may not be thread-safe for concurrent writes from APScheduler's thread pool. One client per executor avoids shared-state issues.
+
 ## Phase 8: Tests
 
 37. **Rewrite unit tests** for `TradeExecutor` at `tests/unit/trade_executor/test_trade_executor.py`. New tests covering:
@@ -243,7 +253,7 @@
     - Chose `warmup_candles` as abstract Strategy property over hard-coded values
     - Chose `PositionSizer` abstraction over hardcoded all-in logic
     - Chose `BotOrder` status lifecycle (PLACED → FILLED) over atomic persist
-    - Chose `filled_at` over `executed_at` — set on fill confirmation, not placement
+    - Chose `filled_at` over `executed_at` — set on fill confirmation, not placement; added `placed_at` for crash-safe placement timestamps
     - Chose state recovery from latest tick over cold-start defaults
     - Chose to remove `IntervalContext` — private methods instead
     - Chose partial error ticks over sentinel values
@@ -267,16 +277,16 @@
 
 ## Decisions
 
-- **Fly.io over Lambda:** Warm indicators stay in memory, halves Kraken API calls, simpler deployment and code. ~$2/month vs free but operationally complex. EMA convergence error from cold-start replay (~5% at 240 candles) is most consequential at crossover boundaries where scalping decisions flip. Always-on eliminates this by maintaining continuous indicator state after a one-time warm-up.
+- **Fly.io over Lambda:** Warm indicators stay in memory, halves Kraken API calls, simpler deployment and code. ~$2/month vs free but operationally complex. After warm-up, seed value carries ~5% weight in the EMA — most consequential at crossover boundaries where scalping decisions flip. Always-on eliminates this by maintaining continuous indicator state after a one-time warm-up.
 - **Fly.io over VPS:** Container abstraction (`fly deploy`) is simpler than managing OS, systemd, SSH, and monitoring on a VPS, for comparable cost ($2-3/month vs $4-6/month).
 - **APScheduler with CronTrigger and BlockingScheduler:** Battle-tested scheduling library. `BlockingScheduler` is the correct choice for a single-purpose script — it blocks the main thread after `start()` and integrates cleanly with signal handlers via `shutdown(wait=True)`. `CronTrigger` provides wall-clock alignment (fires at `:00`, `:05`, etc.), unlike `IntervalTrigger` which fires relative to start time. 5-second offset handles Kraken data propagation delay. Jitter (3s) prevents simultaneous API calls from multiple bots.
 - **Misfire protection (`misfire_grace_time=0`, `max_instances=1`):** If `execute_interval()` for one bot runs long (Kraken slow, network issues), the next scheduled execution is skipped rather than queued. `max_instances=1` ensures only one instance runs per bot at a time. Critical for trading safety — prevents stacking intervals that could cause double-orders or stale data.
 - **IntervalContext removed:** Too thin to justify as a class — just two wrapper methods over connectors. Transformation logic (extracting latest closed candle, balance key lookup, string→Decimal conversion) lives in private `TradeExecutor` methods (`_fetch_ohlc()`, `_fetch_balances()`). Less indirection, one fewer class.
 - **PositionSizer abstraction:** Injectable component with `AllInPositionSizer` default (buy → full quote balance, sell → full base balance). Enables future strategies (grid trading, DCA, partial fills) without modifying `TradeExecutor`. Interface: `calculate_volume(signal, balances, pair_symbols) -> Decimal`.
-- **BotOrder status lifecycle (PLACED → FILLED) with `filled_at`:** After `AddOrderConnector.place()` succeeds, extract `txid` from `order_result.txid[0]` (Kraken returns a list; simple market orders always produce a single-element list). Immediately persist a partial `BotOrder` with txid, status=PLACED, fill fields nullable, `filled_at=None`. Then retry QueryOrders up to 3 times (1s apart) checking for Kraken's `status='closed'`. On fill confirmation: update with price/volume/fee, `filled_at=datetime.now(utc)`, status=FILLED. If still `open` after 3 attempts: leave as PLACED — will be reconciled at the start of the next interval. If `cancelled`: mark FAILED. The field is called `filled_at` (not `executed_at`) because it represents *fill confirmation time*, not *placement time*. Placement time is derivable from the linked `BotTick.timestamp`.
+- **BotOrder status lifecycle (PLACED → FILLED) with `placed_at` and `filled_at`:** After `AddOrderConnector.place()` succeeds, extract `txid` from `order_result.txid[0]` (Kraken returns a list; simple market orders always produce a single-element list). Immediately persist a partial `BotOrder` with txid, status=PLACED, `placed_at=datetime.now(utc)`, fill fields nullable, `filled_at=None`. Then retry QueryOrders up to 3 times (1s apart) checking for Kraken's `status='closed'`. On fill confirmation: update with price/volume/fee, `filled_at=datetime.now(utc)`, status=FILLED via `dataclasses.replace()` (frozen dataclass). If still `open` after 3 attempts: leave as PLACED — will be reconciled at the start of the next interval. If `cancelled`: mark FAILED. `placed_at` records submission time directly on the order (independent of tick persistence — if the process crashes between order placement and tick persist, placement time is still recorded). `filled_at` records when fill confirmation arrived from QueryOrders.
 - **Per-interval order reconciliation:** Every `execute_interval` starts by querying for outstanding PLACED orders and checking their status via QueryOrders. This handles market orders that take slightly longer than expected and naturally supports future limit orders (which may take minutes/hours to fill or be cancelled). No order stays in PLACED limbo indefinitely.
 - **State recovery from latest tick:** On startup (before warm-up), query `bot_tick_repo.get_latest_by_bot_id()`. If a previous tick exists, set `strategy.last_action` from its signal. Prevents position-unaware double buys after crash-restart.
-- **Warm-up via `Strategy.warmup_candles` property:** Each strategy declares its own warm-up requirement as an abstract property computed from its configured indicator windows (e.g., PrecisionTrendStrategy: `3 × max(window sizes)`, SmaStrategy: `long_window + 1`). The 3× multiplier is the standard EMA convergence heuristic. Changing indicator windows in `strategy_configs.py` automatically adjusts the warm-up requirement — no strategy code changes needed. `TradeExecutor.warm_up()` uses this property to calculate the `since` timestamp and validate candle count.
+- **Warm-up via `Strategy.warmup_candles` property:** Each strategy declares its own warm-up requirement as an abstract property computed from its configured indicator windows (e.g., PrecisionTrendStrategy: `3 × max(window sizes)`, SmaStrategy: `long_window + 1`). The 3× multiplier is the standard EMA convergence heuristic — after 3× the window length, the seed value carries ~5% weight in the EMA. Changing indicator windows in `strategy_configs.py` automatically adjusts the warm-up requirement — no strategy code changes needed. `TradeExecutor.warm_up()` calls `_fetch_ohlc_history()` to get the full candle batch, then feeds each candle through `strategy.generate_signal()` sequentially.
 - **Partial error ticks:** If OHLC fetch fails → log error, skip tick (can't construct BotTick without non-nullable price/balance fields). If strategy or order placement fails → persist tick with `error` field set (price data is available). Clean data in `bot_ticks` — every row has real values.
 - **Graceful drain shutdown:** On `SIGTERM`/`SIGINT`, set `_shutting_down` flag on each executor (checked at start of `execute_interval()` — prevents new intervals from doing work). Then call `scheduler.shutdown(wait=True)` which blocks until any currently-running jobs finish. Then call `executor.shutdown()` on each executor to mark runs complete. Prevents interrupted order placements during `fly deploy`.
 - **`QueryOrderConnector` for fill data:** `BotOrder` requires `price`, `volume`, `fee` as `Decimal` — estimated values would compromise the data integrity the schema is designed for.
@@ -287,7 +297,7 @@
 - **Post-suppression signal in BotTick:** Store the final signal the bot acted on (after consecutive-signal suppression), not the raw strategy output.
 - **`strategy_version` is metadata only:** `Bot.strategy_version` is stored in Supabase for auditing and debugging (e.g., "which version of PrecisionTrendStrategy was this bot running?"). It is *not* used by `create_strategy()` or the executor at runtime.
 - **Health monitoring via bot_ticks:** Query `MAX(timestamp)` from `bot_ticks` grouped by `bot_id` to check bot health. No schema changes needed. Gaps in ticks during OHLC failures are acceptable — if OHLC is failing repeatedly, that's worth knowing about.
-- **Text logging for now:** Use existing `LOG_FORMAT` from utils. Switch to JSON structured logging when a log aggregation sink (Datadog, Loki) is added — one-line change in the entry-point formatter.
+- **Text logging for now:** Use existing `LOG_FORMAT` from utils. Logs go to stderr via `logging.basicConfig()`, which Fly.io captures and exposes via `fly logs` — adequate for monitoring during initial deployment. Switch to JSON structured logging when a log aggregation sink (Datadog, Loki) is added — one-line change in the entry-point formatter.
 - **Entrypoint script for multi-bot Docker:** `entrypoint.sh` parses comma-separated `BOT_IDS` env var into `--bot-id` flags, with validation that `BOT_IDS` is set and non-empty. Cleaner than embedding CLI flag format in env vars.
 - **`auto_stop_machines = false` in `fly.toml`:** Explicitly prevents Fly.io from stopping the machine when it detects no inbound HTTP traffic. Critical for an always-on trading bot that only makes outbound API calls.
 - **Post-trade balance recording:** For BUY/SELL intervals, balances are fetched *after* the order flow so `BotTick` records reflect the bot's actual position after acting on its signal. For HOLD intervals, balances are fetched directly (no order flow).
@@ -307,7 +317,7 @@ The following capabilities are **not in scope** for this plan but are **not bloc
 
 ### Why always-on over stateless
 
-The core argument is **signal accuracy at crossover boundaries**. EMA indicators are infinite impulse response (IIR) filters — their "true" value depends on *all* historical data, not just the last N candles. A stateless approach that cold-starts from ~240 candles of OHLC history carries a convergence error of ~$e^{-3} \approx 5\%$ in the EMA values. Even fetching 720 candles (Kraken's max per call) only reduces this to ~$e^{-9} \approx 0.01\%$.
+The core argument is **signal accuracy at crossover boundaries**. EMA indicators are infinite impulse response (IIR) filters — their "true" value depends on *all* historical data, not just the last N candles. A stateless approach that cold-starts from ~240 candles of OHLC history means the seed value still carries ~$e^{-3} \approx 5\%$ weight in the EMA output. The actual prediction error depends on how far the seed is from the true EMA — for a well-chosen seed the error is smaller, but at crossover boundaries where EMAs are close together, even small biases can flip the signal. Fetching 720 candles (Kraken's max per call) reduces seed weight to ~$e^{-9} \approx 0.01\%$ but still isn't zero.
 
 These errors are smallest in absolute terms but **most consequential at EMA crossover boundaries** — precisely where scalping signals flip between BUY and HOLD. The entire purpose of Optuna parameter optimisation is to find precise EMA windows and thresholds; running those optimised parameters against cold-start EMAs undermines that precision.
 
