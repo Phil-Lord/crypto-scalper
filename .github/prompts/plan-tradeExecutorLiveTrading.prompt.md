@@ -190,7 +190,28 @@
     - Auto-restart: `restart` policy on failure
     - `auto_stop_machines = false` — prevents Fly.io from stopping the machine when it detects no inbound HTTP traffic
 
-35. **Create `.dockerignore`** — exclude `legacy/`, `docs/`, `site/`, `.git/`, `__pycache__/`, `*.pyc`, `local_storage/`, `logs/`, `.env`
+35. **Create `.dockerignore`** — exclude everything not needed at runtime:
+    ```
+    .git/
+    .github/
+    .env
+    .venv/
+    venv/
+    legacy/
+    docs/
+    site/
+    mkdocs.yml
+    pytest.ini
+    *.md
+    __pycache__/
+    *.pyc
+    scalper/local_storage/
+    scalper/logs/
+    scalper/tests/
+    scalper/backtesting_engine/
+    scalper/study_analyser/
+    ```
+    Only `scalper/` production modules (`data_system`, `exchange_connector`, `strategy_manager`, `trade_executor`, `utils`, `scripts`), `requirements.txt`, and `entrypoint.sh` are copied into the image. Test code, analysis tools, local storage, docs, and secrets are excluded.
 
 36. **Secrets management**: Kraken API keys and Supabase credentials stored as Fly.io secrets (`fly secrets set KRAKEN_API_KEY=... KRAKEN_API_SECRET=... SUPABASE_URL=... SUPABASE_KEY=...`). These become environment variables in the container — the existing `SupabaseConfig` metaclass and `os.getenv` patterns already handle this.
 
