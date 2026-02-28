@@ -1,12 +1,12 @@
 # Plan: Trade Executor + Live Trading on Fly.io
 
-**TL;DR:** Rewrite the trade executor module as an always-on process that loads bot config from Supabase, recovers state from the latest persisted tick, warms up strategy indicators from OHLC history (using a `warmup_candles` property on each strategy), runs a BlockingScheduler with CronTrigger per bot interval (with jitter, fixed delay, misfire protection), and persists every tick and order to Supabase. Build a `QueryOrderConnector` in the exchange connector to fetch fill details from Kraken after order placement, with a retry loop and per-interval reconciliation of outstanding orders. Extend `BotOrder` with `status`/`txid`/`placed_at`/`filled_at` fields for order safety — persist immediately after placement, update on fill. Add an injectable `PositionSizer` abstraction for volume calculation. Deploy as a Docker container on Fly.io with `fly deploy`. The core executor is platform-agnostic — Fly.io specifics are confined to the Dockerfile, `fly.toml`, `entrypoint.sh`, and the entry-point script.
+**TL;DR:** Rewrite the trade executor module as an always-on process that loads bot config from Supabase, recovers state from the latest persisted tick, warms up strategy indicators from OHLC history (using a `warmup_candles` property on each strategy), runs a BlockingScheduler with CronTrigger per bot interval (with jitter, fixed delay, misfire protection), and persists every tick and order to Supabase. Build a `QueryOrdersConnector` in the exchange connector to fetch fill details from Kraken after order placement, with a retry loop and per-interval reconciliation of outstanding orders. Extend `BotOrder` with `status`/`txid`/`placed_at`/`filled_at` fields for order safety — persist immediately after placement, update on fill. Add an injectable `PositionSizer` abstraction for volume calculation. Deploy as a Docker container on Fly.io with `fly deploy`. The core executor is platform-agnostic — Fly.io specifics are confined to the Dockerfile, `fly.toml`, `entrypoint.sh`, and the entry-point script.
 
 **Key decisions reflected:**
 - Platform: Fly.io (~$2/month), CronTrigger + jitter + 5s delay
 - Bot config: DB-registered (looked up from Supabase `bots` table by `bot_id`)
 - Warm-up: Skip recording ticks until indicators are ready; warn if insufficient candles; requirement derived from `Strategy.warmup_candles` property
-- Order fills: Build `QueryOrderConnector` to retrieve actual execution details; retry 3× in-interval, reconcile outstanding PLACED orders every interval
+- Order fills: Build `QueryOrdersConnector` to retrieve actual execution details; retry 3× in-interval, reconcile outstanding PLACED orders every interval
 - Order safety: Extend `BotOrder` with `status`/`txid`/`placed_at`/`filled_at`; persist immediately after placement, update on fill
 - State recovery: Query latest tick on startup to restore `strategy.last_action`
 - Volume: Injectable `PositionSizer` with `AllInPositionSizer` default
@@ -20,17 +20,17 @@
 
 **Steps**
 
-## Phase 1: Exchange Connector — QueryOrder Support
+## Phase 1: Exchange Connector — QueryOrders Support
 
-1. **Add `QueryOrderService`** at `exchange_connector/services/query_order_service.py`. Inherits `KrakenService`. Calls Kraken's `POST /0/private/QueryOrders` endpoint with `txid` param. Returns raw dict of order details keyed by txid. Kraken response includes `price` (average executed price), `vol_exec` (volume executed), and `fee`.
+1. **Add `QueryOrdersService`** at `exchange_connector/services/query_orders_service.py`. Inherits `KrakenService`. Calls Kraken's `POST /0/private/QueryOrders` endpoint with `txid` param. Returns raw dict of order details keyed by txid. Kraken response includes `price` (average executed price), `vol_exec` (volume executed), and `fee`.
 
 2. **Add `OrderFill` domain model** at `exchange_connector/models/order_fill.py`. Frozen dataclass with fields: `txid: str`, `price: Decimal`, `volume: Decimal`, `fee: Decimal`, `status: str`. This is the typed representation of a filled order's execution details.
 
-3. **Add `QueryOrderConnector`** at `exchange_connector/connectors/query_order_connector.py`. Inherits `FetchConnector`. Method: `fetch(txids: list[str]) -> list[OrderFill]`. Delegates to `QueryOrderService`, transforms raw response into `OrderFill` domain objects by extracting `price`, `vol_exec`, and `fee` from each order entry.
+3. **Add `QueryOrdersConnector`** at `exchange_connector/connectors/query_orders_connector.py`. Inherits `FetchConnector`. Method: `fetch(txids: list[str]) -> list[OrderFill]`. Delegates to `QueryOrdersService`, transforms raw response into `OrderFill` domain objects by extracting `price`, `vol_exec`, and `fee` from each order entry.
 
-4. **Export new symbols** from `exchange_connector/__init__.py` — add `QueryOrderConnector` and `OrderFill`. Also export from `exchange_connector/models/__init__.py` and `exchange_connector/connectors/__init__.py`.
+4. **Export new symbols** from `exchange_connector/__init__.py` — add `QueryOrdersConnector` and `OrderFill`. Also export from `exchange_connector/models/__init__.py` and `exchange_connector/connectors/__init__.py`.
 
-5. **Unit tests** for `QueryOrderService` and `QueryOrderConnector` in `tests/unit/exchange_connector/`. Follow existing patterns (e.g., `TestAddOrderConnector`). Test happy path, error parsing, multi-txid response, and `_to_domain` conversion. Register markers `query_order_service` and `query_order_connector` in `pytest.ini`.
+5. **Unit tests** for `QueryOrdersService` and `QueryOrdersConnector` in `tests/unit/exchange_connector/`. Follow existing patterns (e.g., `TestAddOrderConnector`). Test happy path, error parsing, multi-txid response, and `_to_domain` conversion. Register markers `query_orders_service` and `query_orders_connector` in `pytest.ini`.
 
 ## Phase 2: Data System — Model + Repository Extensions
 
@@ -107,7 +107,7 @@
       - `bot_run_repo: BotRunRepository`
       - `bot_tick_repo: BotTickRepository`
       - `bot_order_repo: BotOrderRepository`
-      - Connectors: `OhlcConnector`, `BalanceConnector`, `AddOrderConnector`, `QueryOrderConnector`
+      - Connectors: `OhlcConnector`, `BalanceConnector`, `AddOrderConnector`, `QueryOrdersConnector`
     - Stores `pair_symbols` from `get_kraken_pair_symbols(bot.pair)`
     - Creates `run: BotRun` on construction and persists it via `bot_run_repo.add()`
     - Has `self._shutting_down: bool = False` flag for graceful drain
@@ -118,7 +118,7 @@
     - **`_fetch_balances(self) -> tuple[Decimal, Decimal]`**: Private method. Fetches balances via `BalanceConnector`, looks up symbols using `pair_symbols`, converts string values to `Decimal`, handles missing keys (zero balance). Returns `(balance_base, balance_quote)`.
     - **`warm_up(self) -> None`**: Fetches historical OHLC candles via `self._fetch_ohlc_history()`, feeds them sequentially through `strategy.generate_signal()` to warm up indicators. Logs progress but does **not** persist ticks during warm-up.
         - **Warm-up validation**: After fetching, check that candle count meets `self.strategy.warmup_candles`. If insufficient (e.g., new trading pair), log a warning that signals may be unreliable for the first N intervals. Bot starts anyway (warn and continue).
-    - **`_reconcile_placed_orders(self) -> None`**: Queries outstanding PLACED orders via `bot_order_repo.get_placed_by_bot_id(bot.id)`. For each, queries Kraken via `QueryOrderConnector.fetch([order.txid])`. If Kraken reports `closed` → update to FILLED with fill details and `filled_at`. If Kraken reports `cancelled` → update to FAILED. If still `open` → leave as PLACED (will retry next interval). Logs each resolution.
+    - **`_reconcile_placed_orders(self) -> None`**: Queries outstanding PLACED orders via `bot_order_repo.get_placed_by_bot_id(bot.id)`. For each, queries Kraken via `QueryOrdersConnector.fetch([order.txid])`. If Kraken reports `closed` → update to FILLED with fill details and `filled_at`. If Kraken reports `cancelled` → update to FAILED. If still `open` → leave as PLACED (will retry next interval). Logs each resolution.
     - **`execute_interval(self) -> None`**: One decision cycle:
       1. Check `self._shutting_down` — if True, return immediately (graceful drain)
       2. Reconcile outstanding PLACED orders via `self._reconcile_placed_orders()`
@@ -222,7 +222,7 @@
 ## Phase 8: Tests
 
 37. **Rewrite unit tests** for `TradeExecutor` at `tests/unit/trade_executor/test_trade_executor.py`. New tests covering:
-    - `test_execute_interval_buy_persists_tick_and_order` — verify tick repo receives `BotTick` with correct fields, order repo receives `BotOrder` with `txid` (extracted from `order_result.txid[0]`) and status=PLACED, then updated to FILLED with fill details and `filled_at` from `QueryOrderConnector`. Verify balances fetched **after** order fill.
+    - `test_execute_interval_buy_persists_tick_and_order` — verify tick repo receives `BotTick` with correct fields, order repo receives `BotOrder` with `txid` (extracted from `order_result.txid[0]`) and status=PLACED, then updated to FILLED with fill details and `filled_at` from `QueryOrdersConnector`. Verify balances fetched **after** order fill.
     - `test_execute_interval_hold_persists_tick_only` — no order placed, tick still recorded
     - `test_execute_interval_sell_persists_tick_and_order` — sell path
     - `test_execute_interval_ohlc_failure_skips_tick` — when OHLC fetch throws, no tick persisted, error logged
@@ -248,9 +248,9 @@
 
 39. **Integration test** at `tests/integration/test_trade_executor_integration.py`. Mock Kraken HTTP at the `requests.Session.request` level and mock Supabase repositories directly (not at the httpx transport layer — Supabase CRUD isn't the integration boundary being tested). Let `TradeExecutor` → exchange connectors → services → client stack all run. Verify end-to-end: OHLC fetch → strategy signal → order placement → query fill → tick persistence → order persistence.
 
-40. **`QueryOrderConnector` integration test** — mock only HTTP, let connector → service → client stack run with realistic Kraken response data.
+40. **`QueryOrdersConnector` integration test** — mock only HTTP, let connector → service → client stack run with realistic Kraken response data.
 
-41. **Register new pytest markers** in `pytest.ini`: `position_sizer`, `query_order_service`, `query_order_connector`, `trade_executor_integration`, `warmup_candles`.
+41. **Register new pytest markers** in `pytest.ini`: `position_sizer`, `query_orders_service`, `query_orders_connector`, `trade_executor_integration`, `warmup_candles`.
 
 42. **Add Makefile targets** to `Makefile`:
     - `test/trade_executor` — `pytest -m trade_executor`
@@ -269,7 +269,7 @@
     - Chose BlockingScheduler over BackgroundScheduler
     - Chose `misfire_grace_time=0` and `max_instances=1` for trading safety
     - Chose DB-registered bot config over CLI args
-    - Chose `QueryOrderConnector` for accurate fill data over estimated values
+    - Chose `QueryOrdersConnector` for accurate fill data over estimated values
     - Chose order reconciliation loop over single-attempt fill query
     - Chose to skip tick recording during warm-up
     - Chose `warmup_candles` as abstract Strategy property over hard-coded values
@@ -281,7 +281,7 @@
     - Chose partial error ticks over sentinel values
     - Chose graceful drain shutdown over immediate shutdown
 
-46. **Update `docs/exchange-connector/api-reference.md`** to document `QueryOrderConnector` and `OrderFill`.
+46. **Update `docs/exchange-connector/api-reference.md`** to document `QueryOrdersConnector` and `OrderFill`.
 
 ---
 
@@ -389,7 +389,7 @@ WHERE completed_at IS NULL;
 - **Warm-up via `Strategy.warmup_candles` property:** Each strategy declares its own warm-up requirement as an abstract property computed from its configured indicator windows (e.g., PrecisionTrendStrategy: `3 × max(window sizes)`, SmaStrategy: `long_window + 1`). The 3× multiplier is the standard EMA convergence heuristic — after 3× the window length, the seed value carries ~5% weight in the EMA. Changing indicator windows in `strategy_configs.py` automatically adjusts the warm-up requirement — no strategy code changes needed. `TradeExecutor.warm_up()` calls `_fetch_ohlc_history()` to get the full candle batch, then feeds each candle through `strategy.generate_signal()` sequentially.
 - **Partial error ticks:** If OHLC fetch fails → log error, skip tick (can't construct BotTick without non-nullable price/balance fields). If strategy or order placement fails → persist tick with `error` field set (price data is available). Clean data in `bot_ticks` — every row has real values.
 - **Graceful drain shutdown:** On `SIGTERM`/`SIGINT`, set `_shutting_down` flag on each executor (checked at start of `execute_interval()` — prevents new intervals from doing work). Then call `scheduler.shutdown(wait=True)` which blocks until any currently-running jobs finish. Then call `executor.shutdown()` on each executor to mark runs complete. Prevents interrupted order placements during `fly deploy`.
-- **`QueryOrderConnector` for fill data:** `BotOrder` requires `price`, `volume`, `fee` as `Decimal` — estimated values would compromise the data integrity the schema is designed for.
+- **`QueryOrdersConnector` for fill data:** `BotOrder` requires `price`, `volume`, `fee` as `Decimal` — estimated values would compromise the data integrity the schema is designed for.
 - **Skip ticks during warm-up:** Warm-up signals are mathematically incomplete (EMA hasn't converged). Recording them would pollute the decision log with unreliable data.
 - **Warm-up validation — warn and continue:** If Kraken returns fewer candles than `strategy.warmup_candles`, log a warning but start anyway. Refusing to start would prevent new trading pairs from ever running.
 - **Per-bot `BotRun` lifecycle:** Run is created when executor starts, marked complete on graceful shutdown. Unfinished runs (crash) are detectable by `completed_at IS NULL`.
@@ -408,7 +408,7 @@ WHERE completed_at IS NULL;
 
 The following capabilities are **not in scope** for this plan but are **not blocked** by the architecture:
 
-- **Stop-losses / take-profits:** Would require a position monitor component that runs between intervals (not just interval-based decisions). The `BotOrder` model and `QueryOrderConnector` provide the foundation for tracking open positions.
+- **Stop-losses / take-profits:** Would require a position monitor component that runs between intervals (not just interval-based decisions). The `BotOrder` model and `QueryOrdersConnector` provide the foundation for tracking open positions.
 - **Multi-timeframe strategies:** Would require signal aggregation across multiple `TradeExecutor` instances (e.g., 1m and 15m charts for the same pair). The single-bot `execute_interval` model would need a coordinator layer.
 - **Risk-aware position sizing:** `PositionSizer.calculate_volume()` currently receives balances and pair symbols. A future `RiskAwarePositionSizer` (e.g., Kelly criterion, volatility-scaled sizing) would need additional context such as open orders, position history, or unrealised P&L. The interface can be extended without modifying `TradeExecutor`.
 
