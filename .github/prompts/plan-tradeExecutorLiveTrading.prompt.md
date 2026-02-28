@@ -13,6 +13,7 @@
 - No `IntervalContext`: Transformation logic lives in private `TradeExecutor` methods
 - Error ticks: Skip on OHLC failure; persist with error field when price data available
 - Graceful shutdown: `BlockingScheduler.shutdown(wait=True)` + `_shutting_down` flag; `misfire_grace_time=0` and `max_instances=1` per job
+- Dry run mode: `--dry-run` flag passes `validate=True` to Kraken (no real orders); log-only, no ticks or orders persisted
 - Health monitoring: Use `bot_ticks` timestamps — no schema changes needed
 - Logging: Text format for now; switch to JSON when a log sink is added
 
@@ -104,6 +105,7 @@
       - `bot: Bot` — configuration from Supabase
       - `strategy: Strategy` — created from `bot.strategy_name` + `bot.parameters` via `create_strategy()`
       - `position_sizer: PositionSizer` — injectable, default `AllInPositionSizer`
+      - `dry_run: bool = False` — when `True`, orders are validated but not executed
       - `bot_run_repo: BotRunRepository`
       - `bot_tick_repo: BotTickRepository`
       - `bot_order_repo: BotOrderRepository`
@@ -127,19 +129,22 @@
       5. If signal is `BUY` or `SELL`:
           - Fetch balances via `self._fetch_balances()` (before order, to calculate volume)
           - Calculate volume via `position_sizer.calculate_volume(signal, balances, pair_symbols)`
-          - Place order via `AddOrderConnector.place()` → get `OrderResult`
-          - Extract `txid = order_result.txid[0]` (guard for `None` — should not happen outside `validate=True` mode)
-          - **Immediately persist** partial `BotOrder` with txid, status=`PLACED`, fill fields=`None`, `filled_at=None`
-          - **Retry QueryOrders up to 3 times** (1s delay between attempts). Check for Kraken's `status='closed'` (fully filled).
-              - On fill success (status `closed`): update `BotOrder` with price/volume/fee, `filled_at=datetime.now(utc)`, status=`FILLED` via `bot_order_repo.update()`
-              - On still open after 3 attempts: leave as `PLACED`, log info — will be reconciled at the start of the next interval
-              - On `cancelled` status: update to `FAILED`, log warning with txid
-          - Fetch balances again after order flow to get post-trade balances for the tick record
+          - Place order via `AddOrderConnector.place(pair, signal, volume, validate=self.dry_run)` → get `OrderResult`
+          - **If `self.dry_run`:** Log the validated order description from `OrderResult`. Skip order persistence, QueryOrders, and post-trade balance fetch — no real order was placed.
+          - **If live (not dry run):**
+              - Extract `txid = order_result.txid[0]` (guard for `None` — should not happen outside `validate=True` mode)
+              - **Immediately persist** partial `BotOrder` with txid, status=`PLACED`, fill fields=`None`, `filled_at=None`
+              - **Retry QueryOrders up to 3 times** (1s delay between attempts). Check for Kraken's `status='closed'` (fully filled).
+                  - On fill success (status `closed`): update `BotOrder` with price/volume/fee, `filled_at=datetime.now(utc)`, status=`FILLED` via `bot_order_repo.update()`
+                  - On still open after 3 attempts: leave as `PLACED`, log info — will be reconciled at the start of the next interval
+                  - On `cancelled` status: update to `FAILED`, log warning with txid
+              - Fetch balances again after order flow to get post-trade balances for the tick record
       6. If signal is `HOLD`: fetch balances via `self._fetch_balances()` (no order flow needed)
-      7. Construct `BotTick` with `bot_id`, `run_id`, `timestamp`, `price` (from OHLC), `signal` (post-suppression), `balance_base`, `balance_quote` — balances always reflect the bot's position **after** acting on the signal
-      8. Persist tick via `bot_tick_repo.add()` → get back tick with DB-generated `id`
-      9. If order was placed: update `BotOrder` with `tick_id` from persisted tick via `bot_order_repo.update()`
-      10. Log results
+      7. **If `self.dry_run`:** Log tick summary (price, signal, balances) and return — no persistence. This prevents dry run ticks from polluting `bot_ticks` and corrupting `_recover_state()` when switching to live mode.
+      8. Construct `BotTick` with `bot_id`, `run_id`, `timestamp`, `price` (from OHLC), `signal` (post-suppression), `balance_base`, `balance_quote` — balances always reflect the bot's position **after** acting on the signal
+      9. Persist tick via `bot_tick_repo.add()` → get back tick with DB-generated `id`
+      10. If order was placed: update `BotOrder` with `tick_id` from persisted tick via `bot_order_repo.update()`
+      11. Log results
     - **Error handling**: If OHLC fetch fails → log error, return (no tick — can't construct BotTick without price). If strategy or order placement fails → persist tick with `error` field set, log error, continue. On fatal errors (Supabase unreachable): log and let the process crash (Fly.io auto-restarts).
     - **`shutdown(self) -> None`**: Marks the run as completed via `bot_run_repo.complete(self.run.id, datetime.now(timezone.utc))`.
     - **No `load_env()`** or `logging.basicConfig()` — these stay in the entry-point script only.
@@ -153,12 +158,12 @@
 
 30. **Rewrite `start_scalping.py`** at `scripts/start_scalping.py`. New flow:
     - `load_env()` + `logging.basicConfig()` (entry-point responsibilities)
-    - Click CLI: `--bot-id` (required, `multiple=True`). Example: `--bot-id btc_1m_001 --bot-id eth_5m_v2`
+    - Click CLI: `--bot-id` (required, `multiple=True`), `--dry-run` (flag, default `False`). Example: `--bot-id btc_1m_001 --bot-id eth_5m_v2 --dry-run`
     - For each `bot_id`:
       1. Look up `Bot` from Supabase via `SupabaseBotRepository.get(bot_id)` — fail if not found
       2. Create strategy via `create_strategy(bot.strategy_name, bot.parameters)` — note: `bot.strategy_version` is metadata for auditing/debugging only, not used by `create_strategy()`
       3. Create `AllInPositionSizer()` (or future: select sizer from config)
-      4. Instantiate `TradeExecutor` with all dependencies (repositories, connectors, strategy, position sizer, bot)
+      4. Instantiate `TradeExecutor` with all dependencies (repositories, connectors, strategy, position sizer, bot, `dry_run=dry_run`)
       5. Call `executor._recover_state()` — restore `last_action` from latest persisted tick
       6. Call `executor.warm_up()` — blocks until indicators are ready
       7. Schedule `executor.execute_interval` with APScheduler **`BlockingScheduler`** using **`CronTrigger`** aligned to wall-clock + **5-second offset** + **`jitter=3`** + **`misfire_grace_time=0`** + **`max_instances=1`** (e.g., `CronTrigger(minute='*', second=5)` for 1-min interval, `CronTrigger(minute='*/5', second=5)` for 5-min). The 5-second offset handles Kraken data propagation delay. Jitter prevents simultaneous API calls from multiple bots. `misfire_grace_time=0` skips misfired executions rather than stacking them. `max_instances=1` ensures only one `execute_interval` runs per bot at a time.
@@ -180,7 +185,7 @@
     - Copy `entrypoint.sh`
     - `ENTRYPOINT ["./entrypoint.sh"]`
 
-33. **Create `entrypoint.sh`** at project root. Parses comma-separated `BOT_IDS` env var into `--bot-id` flags. Validates that `BOT_IDS` is set and non-empty — exits with a clear error message if missing (`echo "Error: BOT_IDS env var is required" && exit 1`). Example: `BOT_IDS=btc_1m_001,eth_5m_v2` → `python -m scripts.start_scalping --bot-id btc_1m_001 --bot-id eth_5m_v2`. Adding a bot requires updating the `BOT_IDS` env var and running `fly deploy` (restart is safe — warm-up replays history, `_recover_state()` restores position).
+33. **Create `entrypoint.sh`** at project root. Parses comma-separated `BOT_IDS` env var into `--bot-id` flags. Validates that `BOT_IDS` is set and non-empty — exits with a clear error message if missing (`echo "Error: BOT_IDS env var is required" && exit 1`). If `DRY_RUN=true` env var is set, appends `--dry-run` to the command. Example: `BOT_IDS=btc_1m_001,eth_5m_v2` → `python -m scripts.start_scalping --bot-id btc_1m_001 --bot-id eth_5m_v2`. With `DRY_RUN=true` → appends `--dry-run`. Adding a bot requires updating the `BOT_IDS` env var and running `fly deploy` (restart is safe — warm-up replays history, `_recover_state()` restores position).
 
 34. **Create `fly.toml`** at project root. Configuration:
     - `app = 'crypto-scalper'`
@@ -242,6 +247,9 @@
     - `test_recover_state_first_run` — verify no error when no previous tick exists
     - `test_shutdown_marks_run_completed` — verify `bot_run_repo.complete()` called
     - `test_constructor_creates_and_persists_run` — verify `BotRun` created and added to repo
+    - `test_execute_interval_dry_run_validates_without_placing` — verify `validate=True` passed to `AddOrderConnector.place()`, no `BotOrder` persisted, no `QueryOrdersConnector` calls, no tick persisted
+    - `test_execute_interval_dry_run_logs_tick_without_persisting` — verify tick data (price, signal, balances) is logged but `bot_tick_repo.add()` is never called
+    - `test_execute_interval_dry_run_skips_reconciliation` — verify `_reconcile_placed_orders` is a no-op in dry run mode (no PLACED orders exist to reconcile)
     - All connectors and repositories are mocked (constructor is DI-based)
 
 38. **Unit tests** for `AllInPositionSizer` at `tests/unit/trade_executor/test_position_sizer.py`.
@@ -280,6 +288,7 @@
     - Chose to remove `IntervalContext` — private methods instead
     - Chose partial error ticks over sentinel values
     - Chose graceful drain shutdown over immediate shutdown
+    - Chose dry run mode via Kraken's `validate=True` for zero-cost production verification
 
 46. **Update `docs/exchange-connector/api-reference.md`** to document `QueryOrdersConnector` and `OrderFill`.
 
@@ -293,7 +302,8 @@
 - `make test/integration/trade_executor` — integration test passes
 - `fly deploy --local-only` — Docker image builds successfully
 - Manual dry run: `python -m scripts.register_bot --id test_bot_001 --pair BTCGBP --strategy-name PrecisionTrendStrategy --strategy-version v1.0.0 --interval 1 --parameters '{"short_ema": 43, ...}'` → verify bot appears in Supabase
-- Manual test: `python -m scripts.start_scalping --bot-id test_bot_001` → verify state recovery logged, warm-up completes (using `strategy.warmup_candles` to determine history depth), first tick appears in `bot_ticks` table, scheduler fires at `:05` past each minute
+- Manual dry run: `python -m scripts.start_scalping --bot-id test_bot_001 --dry-run` → verify state recovery logged, warm-up completes (using `strategy.warmup_candles` to determine history depth), no rows in `bot_ticks` or `bot_orders`, tick data and order validations visible in logs with `[DRY RUN]` prefix, scheduler fires at `:05` past each minute
+- Manual live run: `python -m scripts.start_scalping --bot-id test_bot_001` → verify same as above but with real orders placed and persisted to `bot_orders`
 
 ---
 
@@ -402,6 +412,7 @@ WHERE completed_at IS NULL;
 - **Entrypoint script for multi-bot Docker:** `entrypoint.sh` parses comma-separated `BOT_IDS` env var into `--bot-id` flags, with validation that `BOT_IDS` is set and non-empty. Cleaner than embedding CLI flag format in env vars.
 - **`auto_stop_machines = false` in `fly.toml`:** Explicitly prevents Fly.io from stopping the machine when it detects no inbound HTTP traffic. Critical for an always-on trading bot that only makes outbound API calls.
 - **Post-trade balance recording:** For BUY/SELL intervals, balances are fetched *after* the order flow so `BotTick` records reflect the bot's actual position after acting on its signal. For HOLD intervals, balances are fetched directly (no order flow).
+- **Dry run mode via Kraken's `validate=True`:** `AddOrderConnector.place()` already accepts a `validate` parameter — Kraken validates the order (pair, volume, balance) without executing it, returning an `OrderResult` with `txid=None` and the order description. In dry run mode: orders are validated but not placed, no `BotOrder` is persisted (no txid to track), `QueryOrdersConnector` is not called, and **no ticks are persisted** — all tick data is logged instead. This prevents dry run data from polluting `bot_ticks` and, critically, from corrupting `_recover_state()` when switching to live: if the last dry run tick recorded signal=BUY, the live bot would think it already holds a position it never bought, skipping its first real entry. Logs include a `[DRY RUN]` prefix on all output lines. This enables verifying the full OHLC → signal → order-validation loop in production before risking real money. Zero additional API cost — Kraken's validate endpoint is free. Activated via `--dry-run` CLI flag or `DRY_RUN=true` env var in Docker.
 - **Current executor requires full rewrite regardless of platform:** The existing `TradeExecutor` calls `generate_signal(price)` with a `float`, but `Strategy.generate_signal()` expects a `pd.Series` with `price`, `high`, `low` keys. No persistence, no warm-up, no DI. Both stateless and always-on approaches require the same rewrite scope — platform choice doesn't affect implementation effort.
 
 ### Future extension points
