@@ -8,7 +8,7 @@
 - Warm-up: Skip recording ticks until indicators are ready; warn if insufficient candles; requirement derived from `Strategy.warmup_candles` property
 - Order fills: Build `QueryOrdersConnector` to retrieve actual execution details; retry 3× in-interval, reconcile outstanding PLACED orders every interval
 - Order safety: Extend `BotOrder` with `status`/`txid`/`placed_at`/`filled_at`; persist immediately after placement, update on fill
-- State recovery: Query latest tick on startup to restore `strategy.last_action`
+- State recovery: Query latest *directional* tick (BUY/SELL, not HOLD) on startup to restore `strategy.last_action`
 - Volume: Injectable `PositionSizer` with `AllInPositionSizer` default
 - No `IntervalContext`: Transformation logic lives in private `TradeExecutor` methods
 - Error ticks: Skip on OHLC failure; persist with error field when price data available
@@ -67,9 +67,13 @@
 
 13. **Implement `complete()` in `SupabaseBotRunRepository`** at `data_system/repositories/bot_run/supabase_bot_run_repository.py`. Uses `client.table('bot_runs').update({'completed_at': completed_at.isoformat()}).eq('id', str(id)).execute()`, then returns the deserialised `BotRun`.
 
-14. **Add `get_latest_by_bot_id()` to `BotTickRepository`** at `data_system/repositories/bot_tick/bot_tick_repository.py`. Signature: `get_latest_by_bot_id(self, bot_id: str) -> BotTick | None`. Returns the most recent tick for a bot (needed to determine last known state on restart).
+14. **Add `get_latest_by_bot_id()` to `BotTickRepository`** at `data_system/repositories/bot_tick/bot_tick_repository.py`. Signature: `get_latest_by_bot_id(self, bot_id: str) -> BotTick | None`. Returns the most recent tick for a bot (useful for health monitoring and general "when did this bot last tick?" queries).
 
 15. **Implement `get_latest_by_bot_id()` in `SupabaseBotTickRepository`** at `data_system/repositories/bot_tick/supabase_bot_tick_repository.py`. Query with `.eq('bot_id', bot_id).order('timestamp', desc=True).limit(1)`.
+
+15b. **Add `get_latest_action_by_bot_id()` to `BotTickRepository`**. Signature: `get_latest_action_by_bot_id(self, bot_id: str) -> BotTick | None`. Returns the most recent tick with `signal IN ('buy', 'sell')` for a bot — i.e., the last *directional* action, excluding HOLD ticks. Used exclusively by `_recover_state()` to correctly restore `strategy.last_action`, which is only ever `BUY` or `SELL` (never `HOLD`). Without this filter, recovering from a HOLD tick would corrupt the consecutive-signal suppression logic — e.g., if the bot bought, then held for 20 intervals (latest tick signal = HOLD), crash-recovery would set `last_action = HOLD`, causing the next BUY signal to pass through suppression unchecked → double buy into an existing position.
+
+15c. **Implement `get_latest_action_by_bot_id()` in `SupabaseBotTickRepository`**. Query with `.eq('bot_id', bot_id).in_('signal', ['buy', 'sell']).order('timestamp', desc=True).limit(1)`.
 
 16. **Unit tests** for all new/modified repository methods and the updated `BotOrder` model. Follow existing patterns in `tests/unit/data_system/`.
 
@@ -114,7 +118,7 @@
     - Creates `run: BotRun` on construction and persists it via `bot_run_repo.add()`
     - Has `self._shutting_down: bool = False` flag for graceful drain
     - Uses a `logging.LoggerAdapter` with `{'bot_id': bot.id}` extra context — all log calls automatically include bot ID, critical for debugging multi-bot processes
-    - **`_recover_state(self) -> None`**: Queries latest tick via `bot_tick_repo.get_latest_by_bot_id(bot.id)`. If found, sets `strategy.last_action` from tick's signal. Logs recovery details or 'first run' if no tick exists.
+    - **`_recover_state(self) -> None`**: Queries latest directional tick via `bot_tick_repo.get_latest_action_by_bot_id(bot.id)` — returns only BUY/SELL ticks, never HOLD. If found, sets `strategy.last_action` from tick's signal. Logs recovery details or 'first run' if no tick exists. Uses `get_latest_action_by_bot_id` instead of `get_latest_by_bot_id` because `last_action` is only ever `BUY` or `SELL` — recovering from a HOLD tick would break consecutive-signal suppression.
     - **`_fetch_ohlc(self) -> pd.Series`**: Private method. Fetches latest OHLC via `OhlcConnector`, extracts the latest closed candle from the raw array, returns as `pd.Series` with keys `price`, `open`, `high`, `low`, `close` matching what `Strategy.generate_signal()` expects. Used by `execute_interval()` for single-candle fetches.
     - **`_fetch_ohlc_history(self) -> list[pd.Series]`**: Private method. Fetches historical OHLC candles via `OhlcConnector` using a `since` timestamp derived from `bot.interval * strategy.warmup_candles`. Returns the full batch as a list of `pd.Series`, each with the same keys as `_fetch_ohlc()`. Used exclusively by `warm_up()`. Separate from `_fetch_ohlc()` because the return type (`list[pd.Series]` vs `pd.Series`) and `since` calculation logic are fundamentally different.
     - **`_fetch_balances(self) -> tuple[Decimal, Decimal]`**: Private method. Fetches balances via `BalanceConnector`, looks up symbols using `pair_symbols`, converts string values to `Decimal`, handles missing keys (zero balance). Returns `(balance_base, balance_quote)`.
@@ -164,7 +168,7 @@
       2. Create strategy via `create_strategy(bot.strategy_name, bot.parameters)` — note: `bot.strategy_version` is metadata for auditing/debugging only, not used by `create_strategy()`
       3. Create `AllInPositionSizer()` (or future: select sizer from config)
       4. Instantiate `TradeExecutor` with all dependencies (repositories, connectors, strategy, position sizer, bot, `dry_run=dry_run`)
-      5. Call `executor._recover_state()` — restore `last_action` from latest persisted tick
+      5. Call `executor._recover_state()` — restore `last_action` from latest directional (BUY/SELL) tick
       6. Call `executor.warm_up()` — blocks until indicators are ready
       7. Schedule `executor.execute_interval` with APScheduler **`BlockingScheduler`** using **`CronTrigger`** aligned to wall-clock + **5-second offset** + **`jitter=3`** + **`misfire_grace_time=0`** + **`max_instances=1`** (e.g., `CronTrigger(minute='*', second=5)` for 1-min interval, `CronTrigger(minute='*/5', second=5)` for 5-min). The 5-second offset handles Kraken data propagation delay. Jitter prevents simultaneous API calls from multiple bots. `misfire_grace_time=0` skips misfired executions rather than stacking them. `max_instances=1` ensures only one `execute_interval` runs per bot at a time.
     - Register signal handlers for `SIGTERM`/`SIGINT`:
@@ -243,7 +247,8 @@
     - `test_warm_up_feeds_candles_sequentially` — verify OHLC fetched and each candle fed through `generate_signal()`, no ticks persisted
     - `test_warm_up_uses_strategy_warmup_candles` — verify the `since` param to `OhlcConnector.fetch()` is derived from `strategy.warmup_candles`
     - `test_warm_up_warns_on_insufficient_candles` — verify warning logged when candle count < `strategy.warmup_candles`
-    - `test_recover_state_restores_last_action` — verify `strategy.last_action` set from latest tick's signal
+    - `test_recover_state_restores_last_action` — verify `strategy.last_action` set from latest directional tick's signal (uses `get_latest_action_by_bot_id`, not `get_latest_by_bot_id`)
+    - `test_recover_state_skips_hold_ticks` — verify that if the most recent tick is HOLD but there's an earlier BUY tick, `last_action` is set to BUY (not HOLD)
     - `test_recover_state_first_run` — verify no error when no previous tick exists
     - `test_shutdown_marks_run_completed` — verify `bot_run_repo.complete()` called
     - `test_constructor_creates_and_persists_run` — verify `BotRun` created and added to repo
@@ -284,7 +289,7 @@
     - Chose `PositionSizer` abstraction over hardcoded all-in logic
     - Chose `BotOrder` status lifecycle (PLACED → FILLED) over atomic persist
     - Chose `filled_at` over `executed_at` — set on fill confirmation, not placement; added `placed_at` for crash-safe placement timestamps
-    - Chose state recovery from latest tick over cold-start defaults
+    - Chose state recovery from latest *directional* tick (BUY/SELL only) over latest tick (which could be HOLD)
     - Chose to remove `IntervalContext` — private methods instead
     - Chose partial error ticks over sentinel values
     - Chose graceful drain shutdown over immediate shutdown
@@ -321,7 +326,7 @@
 6. Process exits, old container is removed
 7. New container starts with the updated image
 8. `entrypoint.sh` parses `BOT_IDS` env var and launches `start_scalping.py`
-9. For each bot: `_recover_state()` restores `strategy.last_action` from the latest persisted tick
+9. For each bot: `_recover_state()` restores `strategy.last_action` from the latest directional (BUY/SELL) tick
 10. For each bot: `warm_up()` fetches OHLC history and replays through the strategy to rebuild indicator state
 11. Scheduler starts — bots resume trading on the next wall-clock-aligned interval
 
@@ -356,7 +361,7 @@ The bot picks up the new parameters on restart, warms up with the updated strate
 Fly.io auto-restarts the container on crash (typically <30s). The recovery sequence:
 
 1. New container starts → `entrypoint.sh` → `start_scalping.py`
-2. `_recover_state()` queries `bot_tick_repo.get_latest_by_bot_id()` — restores `strategy.last_action` from the most recent tick's signal, preventing position-unaware double buys
+2. `_recover_state()` queries `bot_tick_repo.get_latest_action_by_bot_id()` — restores `strategy.last_action` from the most recent directional (BUY/SELL) tick's signal, preventing position-unaware double buys
 3. `warm_up()` replays OHLC history through the strategy to rebuild indicator state (one API call, milliseconds of computation)
 4. `_reconcile_placed_orders()` runs at the start of the first `execute_interval()` — any orders placed before the crash that were left in PLACED status are checked against Kraken and resolved (FILLED or FAILED)
 5. Scheduler resumes normal operation
@@ -395,7 +400,7 @@ WHERE completed_at IS NULL;
 - **PositionSizer abstraction:** Injectable component with `AllInPositionSizer` default (buy → full quote balance, sell → full base balance). Enables future strategies (grid trading, DCA, partial fills) without modifying `TradeExecutor`. Interface: `calculate_volume(signal, balances, pair_symbols) -> Decimal`.
 - **BotOrder status lifecycle (PLACED → FILLED) with `placed_at` and `filled_at`:** After `AddOrderConnector.place()` succeeds, extract `txid` from `order_result.txid[0]` (Kraken returns a list; simple market orders always produce a single-element list). Immediately persist a partial `BotOrder` with txid, status=PLACED, `placed_at=datetime.now(utc)`, fill fields nullable, `filled_at=None`. Then retry QueryOrders up to 3 times (1s apart) checking for Kraken's `status='closed'`. On fill confirmation: update with price/volume/fee, `filled_at=datetime.now(utc)`, status=FILLED via `dataclasses.replace()` (frozen dataclass). If still `open` after 3 attempts: leave as PLACED — will be reconciled at the start of the next interval. If `cancelled`: mark FAILED. `placed_at` records submission time directly on the order (independent of tick persistence — if the process crashes between order placement and tick persist, placement time is still recorded). `filled_at` records when fill confirmation arrived from QueryOrders.
 - **Per-interval order reconciliation:** Every `execute_interval` starts by querying for outstanding PLACED orders and checking their status via QueryOrders. This handles market orders that take slightly longer than expected and naturally supports future limit orders (which may take minutes/hours to fill or be cancelled). No order stays in PLACED limbo indefinitely.
-- **State recovery from latest tick:** On startup (before warm-up), query `bot_tick_repo.get_latest_by_bot_id()`. If a previous tick exists, set `strategy.last_action` from its signal. Prevents position-unaware double buys after crash-restart.
+- **State recovery from latest directional tick:** On startup (before warm-up), query `bot_tick_repo.get_latest_action_by_bot_id()` which filters for `signal IN ('buy', 'sell')`. `strategy.last_action` is only ever `BUY` or `SELL` (never `HOLD`) — it tracks the last directional action for consecutive-signal suppression. Recovering from a HOLD tick would corrupt this: e.g., bot buys → holds for 20 intervals → crash → recovery sets `last_action=HOLD` → next BUY signal passes suppression → double buy. The filtered query ensures `last_action` is always restored to a valid directional state. `get_latest_by_bot_id()` is retained separately for health monitoring ("when did this bot last tick?").
 - **Warm-up via `Strategy.warmup_candles` property:** Each strategy declares its own warm-up requirement as an abstract property computed from its configured indicator windows (e.g., PrecisionTrendStrategy: `3 × max(window sizes)`, SmaStrategy: `long_window + 1`). The 3× multiplier is the standard EMA convergence heuristic — after 3× the window length, the seed value carries ~5% weight in the EMA. Changing indicator windows in `strategy_configs.py` automatically adjusts the warm-up requirement — no strategy code changes needed. `TradeExecutor.warm_up()` calls `_fetch_ohlc_history()` to get the full candle batch, then feeds each candle through `strategy.generate_signal()` sequentially.
 - **Partial error ticks:** If OHLC fetch fails → log error, skip tick (can't construct BotTick without non-nullable price/balance fields). If strategy or order placement fails → persist tick with `error` field set (price data is available). Clean data in `bot_ticks` — every row has real values.
 - **Graceful drain shutdown:** On `SIGTERM`/`SIGINT`, set `_shutting_down` flag on each executor (checked at start of `execute_interval()` — prevents new intervals from doing work). Then call `scheduler.shutdown(wait=True)` which blocks until any currently-running jobs finish. Then call `executor.shutdown()` on each executor to mark runs complete. Prevents interrupted order placements during `fly deploy`.
@@ -475,4 +480,4 @@ Future: if scaling beyond ~10 bots, migrate to Fly.io Machines API — one conta
 
 ### Fault tolerance
 
-Process crash → Fly.io auto-restart (typically <30s) → state recovery from latest tick → warm-up replay (~milliseconds of computation, one OHLC API call) → scheduler resumes. At most 1 interval is missed on crash. Unfinished `BotRun` records (where `completed_at IS NULL`) are detectable for monitoring/alerting.
+Process crash → Fly.io auto-restart (typically <30s) → state recovery from latest directional tick → warm-up replay (~milliseconds of computation, single OHLC API call) → scheduler resumes. At most 1 interval is missed on crash. Unfinished `BotRun` records (where `completed_at IS NULL`) are detectable for monitoring/alerting.
