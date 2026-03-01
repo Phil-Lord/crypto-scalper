@@ -1,6 +1,16 @@
 # Plan: Trade Executor + Live Trading on Fly.io
 
-**TL;DR:** Rewrite the trade executor module as an always-on process that loads bot config from Supabase, recovers state from the latest persisted tick, warms up strategy indicators from OHLC history (using a `warmup_candles` property on each strategy), runs a BlockingScheduler with CronTrigger per bot interval (with jitter, fixed delay, misfire protection), and persists every tick and order to Supabase. Build a `QueryOrdersConnector` in the exchange connector to fetch fill details from Kraken after order placement, with a retry loop and per-interval reconciliation of outstanding orders. Extend `BotOrder` with `status`/`txid`/`placed_at`/`filled_at` fields for order safety — persist immediately after placement, update on fill. Add an injectable `PositionSizer` abstraction for volume calculation. Deploy as a Docker container on Fly.io with `fly deploy`. The core executor is platform-agnostic — Fly.io specifics are confined to the Dockerfile, `fly.toml`, `entrypoint.sh`, and the entry-point script.
+**TL;DR:**
+- Rewrite the trade executor module as an always-on process that:
+  1. loads bot config from Supabase
+  2. recovers state from the latest persisted tick
+  3. warms up strategy indicators from OHLC history (using a `warmup_candles` property on each strategy)
+  4. runs a BlockingScheduler with CronTrigger per bot interval (with jitter, fixed delay, misfire protection)
+  5. persists every tick and order to Supabase.
+- Build a `QueryOrdersConnector` in the exchange connector to fetch fill details from Kraken after order placement, with a retry loop and per-interval reconciliation of outstanding orders.
+- Extend `BotOrder` with `status`/`txid`/`placed_at`/`filled_at` fields for order safety — persist immediately after placement, update on fill.
+- Add an injectable `PositionSizer` abstraction for volume calculation.
+- Deploy as a Docker container on Fly.io with `fly deploy`. The core executor is platform-agnostic — Fly.io specifics are confined to the Dockerfile, `fly.toml`, `entrypoint.sh`, and the entry-point script.
 
 **Key decisions reflected:**
 - Platform: Fly.io (~$2/month), CronTrigger + jitter + 5s delay
@@ -16,10 +26,6 @@
 - Dry run mode: `--dry-run` flag passes `validate=True` to Kraken (no real orders); log-only, no ticks or orders persisted
 - Health monitoring: Use `bot_ticks` timestamps — no schema changes needed
 - Logging: Text format for now; switch to JSON when a log sink is added
-
----
-
-**Steps**
 
 ## Phase 1: Exchange Connector — QueryOrders Support
 
