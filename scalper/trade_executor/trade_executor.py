@@ -51,9 +51,9 @@ class TradeExecutor:
         ''' Call exchange connector to add order. '''
         balances = self.balance_connector.fetch()
         if signal == 'buy':
-            volume = balances[self.symbols['quote']]
+            volume = balances[self.symbols.quote]
         elif signal == 'sell':
-            volume = balances[self.symbols['base']]
+            volume = balances[self.symbols.base]
 
         try:
             logger.info(f'Placing {signal.upper()} order: volume={volume}')

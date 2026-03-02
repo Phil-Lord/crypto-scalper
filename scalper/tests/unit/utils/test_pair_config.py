@@ -1,6 +1,6 @@
 import pytest
 
-from utils import get_kraken_pair, get_kraken_pair_symbols
+from utils.pair_config import get_kraken_pair, get_kraken_pair_symbols, PairSymbols
 
 
 @pytest.mark.utils
@@ -34,8 +34,9 @@ class TestGetKrakenPairSymbols:
         symbols = get_kraken_pair_symbols('XXBTZGBP')
 
         # Then
-        assert symbols['base'] == 'XXBT'
-        assert symbols['quote'] == 'ZGBP'
+        assert isinstance(symbols, PairSymbols)
+        assert symbols.base == 'XXBT'
+        assert symbols.quote == 'ZGBP'
 
     def test_raises_value_error_for_invalid_pair(self):
         # When / Then

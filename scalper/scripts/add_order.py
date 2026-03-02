@@ -30,7 +30,7 @@ def get_wallet_volume(signal: str, kraken_pair: str) -> float:
     balance_connector = BalanceConnector()
     balances = balance_connector.fetch()
     symbols = get_kraken_pair_symbols(kraken_pair)
-    return balances[symbols['quote']] if signal == 'buy' else balances[symbols['base']]
+    return balances[symbols.quote] if signal == 'buy' else balances[symbols.base]
 
 
 if __name__ == '__main__':

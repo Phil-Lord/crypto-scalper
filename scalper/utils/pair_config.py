@@ -1,3 +1,19 @@
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class PairSymbols:
+    '''
+    Dataclass representing the base and quote asset symbols for a trading pair.
+
+    Attributes:
+        base (str): Kraken base asset symbol, e.g. 'XXBT'.
+        quote (str): Kraken quote asset symbol, e.g. 'ZGBP'.
+    '''
+    base: str
+    quote: str
+
+
 raw_to_kraken_pairs = {
     'BTCGBP': 'XXBTZGBP',
     'DOGEGBP': 'XXDGZGBP',
@@ -6,10 +22,10 @@ raw_to_kraken_pairs = {
 }
 
 kraken_pair_to_symbols = {
-    'XXBTZGBP': {'base': 'XXBT', 'quote': 'ZGBP'},
-    'XXDGZGBP': {'base': 'XXDG', 'quote': 'ZGBP'},
-    'XETHZGBP': {'base': 'XETH', 'quote': 'ZGBP'},
-    'XXBTZUSD': {'base': 'XXBT', 'quote': 'ZUSD'}
+    'XXBTZGBP': PairSymbols(base='XXBT', quote='ZGBP'),
+    'XXDGZGBP': PairSymbols(base='XXDG', quote='ZGBP'),
+    'XETHZGBP': PairSymbols(base='XETH', quote='ZGBP'),
+    'XXBTZUSD': PairSymbols(base='XXBT', quote='ZUSD')
 }
 
 
@@ -22,7 +38,7 @@ def get_kraken_pair(raw_pair: str) -> str:
     return kraken_pair
 
 
-def get_kraken_pair_symbols(kraken_pair: str) -> dict[str, str]:
+def get_kraken_pair_symbols(kraken_pair: str) -> PairSymbols:
     ''' Given a Kraken pair (e.g. 'XXBTZGBP'), return the base and quote symbols. '''
     symbols = kraken_pair_to_symbols.get(kraken_pair, None)
     if symbols is None:
