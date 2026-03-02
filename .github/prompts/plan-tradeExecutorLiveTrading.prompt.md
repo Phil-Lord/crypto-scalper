@@ -83,7 +83,9 @@
 
 ## Phase 3: Position Sizing
 
-18. **Add `PositionSizer` abstract base class** at `trade_executor/position_sizer.py`. Also define a `Balances` frozen dataclass in the same file with fields `base: Decimal` and `quote: Decimal` — consistent with the project's frozen dataclass conventions and makes call sites unambiguous. `PositionSizer` interface: `calculate_volume(self, signal: Signal, balances: Balances, pair_symbols: dict) -> Decimal`. ABC with a single abstract method.
+**Precursor — already done:** Added `PairSymbols` frozen dataclass (`base: str`, `quote: str`) to `utils/pair_config.py`. Updated `get_kraken_pair_symbols()` to return `PairSymbols` instead of `dict[str, str]`. Exported from `utils/__init__.py`. Updated existing callers (`scripts/add_order.py`, `tests/unit/utils/test_pair_config.py`) to attribute access (`.base`, `.quote`).
+
+18. **Add `PositionSizer` abstract base class** at `trade_executor/position_sizer.py`. Also define a `PairBalances` frozen dataclass in the same file with fields `base_symbol: str`, `quote_symbol: str`, `base: Decimal`, and `quote: Decimal` — merges the pair symbol info from `get_kraken_pair_symbols()` with the actual balance amounts into a single typed object. `PositionSizer` interface: `calculate_volume(self, signal: Signal, balances: PairBalances) -> Decimal`. ABC with a single abstract method.
 
 19. **Add `AllInPositionSizer`** in the same file. Implements `calculate_volume()`: buy → `balances.quote` (full quote balance), sell → `balances.base` (full base balance). This replicates current behaviour.
 
@@ -116,7 +118,7 @@
       - `bot_tick_repo: BotTickRepository`
       - `bot_order_repo: BotOrderRepository`
       - Connectors: `OhlcConnector`, `BalanceConnector`, `AddOrderConnector`, `QueryOrdersConnector`
-    - Stores `pair_symbols` from `get_kraken_pair_symbols(bot.pair)`
+    - Stores `self.pair_symbols: PairSymbols` from `get_kraken_pair_symbols(bot.pair)` — used internally by `_fetch_balances()` to look up base and quote asset symbols in Kraken's balance response; not passed downstream
     - Creates `run: BotRun` on construction and persists it via `bot_run_repo.add()`
     - Has `self._shutting_down: bool = False` flag for graceful drain
     - Uses a `logging.LoggerAdapter` with `{'bot_id': bot.id}` extra context — all log calls automatically include bot ID, critical for debugging multi-bot processes
@@ -124,7 +126,7 @@
     - **`_fetch_ohlc(self) -> pd.Series`**: Private method. Fetches latest OHLC via `OhlcConnector`, extracts the latest closed candle from the raw array, returns as `pd.Series` with keys `price`, `open`, `high`, `low`, `close` matching what `Strategy.generate_signal()` expects. Used by `execute_interval()` for single-candle fetches.
     - **`_fetch_ohlc_history(self) -> list[pd.Series]`**: Private method. Fetches historical OHLC candles via `OhlcConnector` using a `since` timestamp derived from `bot.interval * min(strategy.warmup_candles, 720)`. Returns the batch as a list of `pd.Series`, each with the same keys as `_fetch_ohlc()`. Used exclusively by `warm_up()`. Separate from `_fetch_ohlc()` because the return type (`list[pd.Series]` vs `pd.Series`) and `since` calculation logic are fundamentally different.
         - **Kraken 720-candle hard limit**: Kraken's OHLC endpoint returns at most 720 of the most recent candles. Older data cannot be retrieved regardless of the `since` value — pagination is not possible. Request `min(warmup_candles, 720)` candles. If `warmup_candles > 720` (e.g., an Optuna-optimised `SmaStrategy` with `long_window > 719`), the warm-up will be partial — the existing `warm_up()` validation already handles this by logging a warning and continuing. Solving warm-up beyond 720 candles (e.g., from stored local trades) is deferred to a future task; it does not affect `PrecisionTrendStrategy` whose maximum warm-up requirement is 237 candles.
-    - **`_fetch_balances(self) -> Balances`**: Private method. Fetches balances via `BalanceConnector`, looks up symbols using `pair_symbols`, converts string values to `Decimal`, handles missing keys (zero balance). Returns a `Balances(base=..., quote=...)` frozen dataclass instance.
+    - **`_fetch_balances(self) -> PairBalances`**: Private method. Fetches balances via `BalanceConnector`, looks up `self.pair_symbols.base` and `self.pair_symbols.quote` in Kraken's response, converts string values to `Decimal`, handles missing keys (zero balance). Returns a `PairBalances(base_symbol=..., quote_symbol=..., base=..., quote=...)` frozen dataclass instance — all balance and symbol information for the pair in one object.
     - **`warm_up(self) -> None`**: Fetches historical OHLC candles via `self._fetch_ohlc_history()`, feeds them sequentially through `strategy.generate_signal()` to warm up indicators. Logs progress but does **not** persist ticks during warm-up.
         - **Warm-up validation**: After fetching, check that candle count meets `self.strategy.warmup_candles`. If insufficient (e.g., new trading pair), log a warning that signals may be unreliable for the first N intervals. Bot starts anyway (warn and continue).
     - **`_reconcile_placed_orders(self) -> None`**: Queries outstanding PLACED orders via `bot_order_repo.get_placed_by_bot_id(bot.id)`. For each, queries Kraken via `QueryOrdersConnector.fetch([order.txid])`. If Kraken reports `closed` → update to FILLED with fill details and `filled_at`. If Kraken reports `cancelled` → update to FAILED. If still `open` → leave as PLACED (will retry next interval). Logs each resolution.
@@ -135,7 +137,7 @@
       4. Call `strategy.generate_signal(ohlc)` → extract post-suppression `Signal` from result dict
       5. If signal is `BUY` or `SELL`:
           - Fetch balances via `self._fetch_balances()` (before order, to calculate volume)
-          - Calculate volume via `position_sizer.calculate_volume(signal, balances, pair_symbols)`
+          - Calculate volume via `position_sizer.calculate_volume(signal, balances)` — `balances` is a `PairBalances` instance containing both amounts and symbol names
           - Place order via `AddOrderConnector.place(pair, signal, volume, validate=self.dry_run)` → get `OrderResult`
           - **If `self.dry_run`:** Log the validated order description from `OrderResult`. Skip order persistence, QueryOrders, and post-trade balance fetch — no real order was placed.
           - **If live (not dry run):**
@@ -157,7 +159,7 @@
     - **No `load_env()`** or `logging.basicConfig()` — these stay in the entry-point script only.
     - **No internal connector instantiation** — all injected via constructor.
 
-28. **Update `trade_executor/__init__.py`**. Export `TradeExecutor`, `PositionSizer`, `AllInPositionSizer`, `Balances`.
+28. **Update `trade_executor/__init__.py`**. Export `TradeExecutor`, `PositionSizer`, `AllInPositionSizer`, `PairBalances`.
 
 ## Phase 6: Scheduler + Entry Point
 
@@ -401,7 +403,7 @@ WHERE completed_at IS NULL;
 - **APScheduler with CronTrigger and BlockingScheduler:** Battle-tested scheduling library. `BlockingScheduler` is the correct choice for a single-purpose script — it blocks the main thread after `start()` and integrates cleanly with signal handlers via `shutdown(wait=True)`. `CronTrigger` provides wall-clock alignment (fires at `:00`, `:05`, etc.), unlike `IntervalTrigger` which fires relative to start time. 5-second offset handles Kraken data propagation delay. Jitter (3s) prevents simultaneous API calls from multiple bots.
 - **Misfire protection (`misfire_grace_time=0`, `max_instances=1`):** If `execute_interval()` for one bot runs long (Kraken slow, network issues), the next scheduled execution is skipped rather than queued. `max_instances=1` ensures only one instance runs per bot at a time. Critical for trading safety — prevents stacking intervals that could cause double-orders or stale data.
 - **IntervalContext removed:** Too thin to justify as a class — just two wrapper methods over connectors. Transformation logic (extracting latest closed candle, balance key lookup, string→Decimal conversion) lives in private `TradeExecutor` methods (`_fetch_ohlc()`, `_fetch_balances()`). Less indirection, one fewer class.
-- **PositionSizer abstraction:** Injectable component with `AllInPositionSizer` default (buy → `balances.quote`, sell → `balances.base`). Enables future strategies (grid trading, DCA, partial fills) without modifying `TradeExecutor`. Interface: `calculate_volume(signal, balances: Balances, pair_symbols) -> Decimal`. `Balances` is a frozen dataclass (fields: `base: Decimal`, `quote: Decimal`) defined in `trade_executor/position_sizer.py` — consistent with project conventions and makes ordering unambiguous at call sites.
+- **PositionSizer abstraction:** Injectable component with `AllInPositionSizer` default (buy → `balances.quote`, sell → `balances.base`). Enables future strategies (grid trading, DCA, partial fills) without modifying `TradeExecutor`. Interface: `calculate_volume(signal, balances: PairBalances) -> Decimal`. `PairBalances` is a frozen dataclass (fields: `base_symbol: str`, `quote_symbol: str`, `base: Decimal`, `quote: Decimal`) defined in `trade_executor/position_sizer.py`. It merges the symbol lookup from `get_kraken_pair_symbols()` with the actual balance amounts — `_fetch_balances()` constructs one per interval and `pair_symbols` never needs to travel beyond the executor. Consistent with project frozen dataclass conventions; field names make ordering unambiguous at call sites.
 - **BotOrder status lifecycle (PLACED → FILLED) with `placed_at` and `filled_at`:** After `AddOrderConnector.place()` succeeds, extract `txid` from `order_result.txid[0]` (Kraken returns a list; simple market orders always produce a single-element list). Immediately persist a partial `BotOrder` with txid, status=PLACED, `placed_at=datetime.now(utc)`, fill fields nullable, `filled_at=None`. Then retry QueryOrders up to 3 times (1s apart) checking for Kraken's `status='closed'`. On fill confirmation: update with price/volume/fee, `filled_at=datetime.now(utc)`, status=FILLED via `dataclasses.replace()` (frozen dataclass). If still `open` after 3 attempts: leave as PLACED — will be reconciled at the start of the next interval. If `cancelled`: mark FAILED. `placed_at` records submission time directly on the order (independent of tick persistence — if the process crashes between order placement and tick persist, placement time is still recorded). `filled_at` records when fill confirmation arrived from QueryOrders.
 - **Per-interval order reconciliation:** Every `execute_interval` starts by querying for outstanding PLACED orders and checking their status via QueryOrders. This handles market orders that take slightly longer than expected and naturally supports future limit orders (which may take minutes/hours to fill or be cancelled). No order stays in PLACED limbo indefinitely.
 - **State recovery from latest directional tick:** On startup (before warm-up), query `bot_tick_repo.get_latest_action_by_bot_id()` which filters for `signal IN ('buy', 'sell')`. `strategy.last_action` is only ever `BUY` or `SELL` (never `HOLD`) — it tracks the last directional action for consecutive-signal suppression. Recovering from a HOLD tick would corrupt this: e.g., bot buys → holds for 20 intervals → crash → recovery sets `last_action=HOLD` → next BUY signal passes suppression → double buy. The filtered query ensures `last_action` is always restored to a valid directional state.
@@ -431,7 +433,7 @@ The following capabilities are **not in scope** for this plan but are **not bloc
 
 - **Stop-losses / take-profits:** Would require a position monitor component that runs between intervals (not just interval-based decisions). The `BotOrder` model and `QueryOrdersConnector` provide the foundation for tracking open positions.
 - **Multi-timeframe strategies:** Would require signal aggregation across multiple `TradeExecutor` instances (e.g., 1m and 15m charts for the same pair). The single-bot `execute_interval` model would need a coordinator layer.
-- **Risk-aware position sizing:** `PositionSizer.calculate_volume()` currently receives balances and pair symbols. A future `RiskAwarePositionSizer` (e.g., Kelly criterion, volatility-scaled sizing) would need additional context such as open orders, position history, or unrealised P&L. The interface can be extended without modifying `TradeExecutor`.
+- **Risk-aware position sizing:** `PositionSizer.calculate_volume()` currently receives a `PairBalances` instance (amounts + symbol names). A future `RiskAwarePositionSizer` (e.g., Kelly criterion, volatility-scaled sizing) would need additional context such as open orders, position history, or unrealised P&L. The interface can be extended without modifying `TradeExecutor`.
 
 ---
 
