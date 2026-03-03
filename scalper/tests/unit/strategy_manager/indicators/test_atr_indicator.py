@@ -17,14 +17,14 @@ class TestAtrIndicator:
         return pd.DataFrame({
             'high': np.random.uniform(100, 110, n),
             'low':  np.random.uniform(90, 100, n),
-            'price': np.random.uniform(95, 105, n)
+            'close': np.random.uniform(95, 105, n)
         })
 
     def test_reset_clears_state(self):
         # Given
         indicator = AtrIndicator(window=3)
-        indicator.update(pd.Series({'high': 105, 'low': 95, 'price': 100}))
-        indicator.update(pd.Series({'high': 110, 'low': 90, 'price': 102}))
+        indicator.update(pd.Series({'high': 105, 'low': 95, 'close': 100}))
+        indicator.update(pd.Series({'high': 110, 'low': 90, 'close': 102}))
         assert indicator.prev_close is not None
         assert indicator.smoothed_tr is not None
 
@@ -38,7 +38,7 @@ class TestAtrIndicator:
     def test_update_returns_none_initially(self):
         # Given
         indicator = AtrIndicator(window=3)
-        ohlc = pd.Series({'high': 105, 'low': 95, 'price': 100})
+        ohlc = pd.Series({'high': 105, 'low': 95, 'close': 100})
 
         # When
         result = indicator.update(ohlc)
@@ -49,10 +49,10 @@ class TestAtrIndicator:
     def test_update_returns_ratio_after_initialization(self):
         # Given
         indicator = AtrIndicator(window=3)
-        indicator.update(pd.Series({'high': 105, 'low': 95, 'price': 100}))
+        indicator.update(pd.Series({'high': 105, 'low': 95, 'close': 100}))
 
         # When
-        ohlc = pd.Series({'high': 110, 'low': 90, 'price': 102})
+        ohlc = pd.Series({'high': 110, 'low': 90, 'close': 102})
         result = indicator.update(ohlc)
 
         # Then
@@ -66,7 +66,7 @@ class TestAtrIndicator:
         df = pd.DataFrame({
             'high': [105, 110, 115, 120],
             'low':  [95, 90,  100, 110],
-            'price': [100, 102, 107, 115]
+            'close': [100, 102, 107, 115]
         }, index=pd.date_range('2024-01-01', periods=4, freq='min'))
 
         # When

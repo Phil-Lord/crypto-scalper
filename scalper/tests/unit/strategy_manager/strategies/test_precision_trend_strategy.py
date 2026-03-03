@@ -167,7 +167,7 @@ class TestPrecisionTrendStrategy:
         np.random.seed(42)
         n = 50
         ohlc = pd.DataFrame({
-            'price': np.linspace(100, 120, n),
+            'close': np.linspace(100, 120, n),
             'high': np.linspace(101, 121, n),
             'low': np.linspace(99, 119, n)
         })
@@ -213,7 +213,7 @@ class TestPrecisionTrendStrategy:
             mock_rule.check.return_value = Signal.BUY
             strategy.rules[rule_name] = mock_rule
 
-        ohlc = pd.Series({'price': 100.0, 'high': 101.0, 'low': 99.0})
+        ohlc = pd.Series({'close': 100.0, 'high': 101.0, 'low': 99.0})
 
         # When
         result = strategy.generate_signal(ohlc)

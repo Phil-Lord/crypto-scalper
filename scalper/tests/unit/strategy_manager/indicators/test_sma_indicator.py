@@ -13,12 +13,12 @@ class TestSmaIndicator:
     def sample_prices(self) -> pd.DataFrame:
         np.random.seed(42)
         prices = np.random.uniform(90, 110, 100)
-        return pd.DataFrame({'price': prices})
+        return pd.DataFrame({'close': prices})
 
     def test_update_returns_none_initially(self):
         # Given
         indicator = SmaIndicator(window=5)
-        ohlc = pd.Series({'price': 100.0})
+        ohlc = pd.Series({'close': 100.0})
 
         # When
         result = indicator.update(ohlc)
@@ -34,7 +34,7 @@ class TestSmaIndicator:
         # When
         results = []
         for price in prices:
-            results.append(indicator.update(pd.Series({'price': price})))
+            results.append(indicator.update(pd.Series({'close': price})))
 
         # Then
         assert results[0] is None
@@ -61,7 +61,7 @@ class TestSmaIndicator:
     def test_compute_vectorised_handles_nan_input(self):
         # Given
         prices = [100, 102, np.nan, 106, 108, 110]
-        ohlc = pd.DataFrame({'price': prices})
+        ohlc = pd.DataFrame({'close': prices})
 
         # When
         sma = SmaIndicator(window=3).compute_vectorised(ohlc)
@@ -75,7 +75,7 @@ class TestSmaIndicator:
     def test_compute_vectorised_constant_price_equals_price(self):
         # Given
         prices = [100] * 20
-        ohlc = pd.DataFrame({'price': prices})
+        ohlc = pd.DataFrame({'close': prices})
 
         # When
         sma = SmaIndicator(window=5).compute_vectorised(ohlc)
@@ -86,7 +86,7 @@ class TestSmaIndicator:
     def test_compute_vectorised_increasing_prices_is_monotonic(self):
         # Given
         prices = list(range(1, 51))
-        ohlc = pd.DataFrame({'price': prices})
+        ohlc = pd.DataFrame({'close': prices})
 
         # When
         sma = SmaIndicator(window=5).compute_vectorised(ohlc)
@@ -98,7 +98,7 @@ class TestSmaIndicator:
     def test_compute_vectorised_short_window(self):
         # Given
         prices = [10, 20, 30]
-        ohlc = pd.DataFrame({'price': prices})
+        ohlc = pd.DataFrame({'close': prices})
 
         # When
         sma = SmaIndicator(window=3).compute_vectorised(ohlc)
@@ -115,12 +115,12 @@ class TestSmaIndicator:
         # Given
         indicator = SmaIndicator(window=3)
         for price in [100.0, 102.0, 104.0]:
-            indicator.update(pd.Series({'price': price}))
-        assert indicator.update(pd.Series({'price': 106.0})) is not None
+            indicator.update(pd.Series({'close': price}))
+        assert indicator.update(pd.Series({'close': 106.0})) is not None
 
         # When
         indicator.reset()
 
         # Then
         assert len(indicator.prices) == 0
-        assert indicator.update(pd.Series({'price': 100.0})) is None
+        assert indicator.update(pd.Series({'close': 100.0})) is None

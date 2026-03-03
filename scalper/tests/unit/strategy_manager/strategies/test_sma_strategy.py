@@ -19,7 +19,7 @@ class TestSmaStrategy:
 
     @pytest.fixture
     def sample_ohlc(self) -> pd.Series:
-        return pd.Series({'price': 100.0})
+        return pd.Series({'close': 100.0})
 
     def test_initialisation_registers_indicators_and_rules(self, strategy: SmaStrategy):
         assert 'short_sma' in strategy.indicators
@@ -90,7 +90,7 @@ class TestSmaStrategy:
 
         strategy.rules['crossover'] = mock_crossover_rule
 
-        ohlc = pd.Series({'price': 105.0})
+        ohlc = pd.Series({'close': 105.0})
 
         # When
         result = strategy.generate_signal(ohlc)
@@ -119,7 +119,7 @@ class TestSmaStrategy:
 
         strategy.rules['crossover'] = mock_crossover_rule
 
-        ohlc = pd.Series({'price': 105.0})
+        ohlc = pd.Series({'close': 105.0})
 
         # When - Generate first buy signal
         result1 = strategy.generate_signal(ohlc)
@@ -138,7 +138,7 @@ class TestSmaStrategy:
         # Create simple trending data
         np.random.seed(42)
         prices = np.linspace(100, 120, 20)
-        ohlc = pd.DataFrame({'price': prices})
+        ohlc = pd.DataFrame({'close': prices})
 
         # When
         result = strategy.vectorised_compute(ohlc)
@@ -159,7 +159,7 @@ class TestSmaStrategy:
         strategy = SmaStrategy(config)
         prices = [100.0, 102.0, 104.0, 106.0, 108.0]
         for price in prices:
-            strategy.generate_signal(pd.Series({'price': price}))
+            strategy.generate_signal(pd.Series({'close': price}))
         assert strategy.last_action != Signal.SELL or strategy.prev_indicator_values != {}
 
         # When
@@ -175,7 +175,7 @@ class TestSmaStrategy:
         strategy = SmaStrategy(config)
         prices = [100.0, 102.0, 104.0, 106.0, 108.0]
         for price in prices:
-            strategy.generate_signal(pd.Series({'price': price}))
+            strategy.generate_signal(pd.Series({'close': price}))
         assert len(strategy.indicators['short_sma'].prices) > 0
 
         # When
@@ -191,19 +191,19 @@ class TestSmaStrategy:
         strategy = SmaStrategy(config)
         prices = [100.0, 102.0, 104.0, 106.0, 108.0, 110.0, 108.0, 106.0]
         for price in prices:
-            strategy.generate_signal(pd.Series({'price': price}))
+            strategy.generate_signal(pd.Series({'close': price}))
 
         # When
         strategy.reset()
         reset_results = [
-            strategy.generate_signal(pd.Series({'price': p}))
+            strategy.generate_signal(pd.Series({'close': p}))
             for p in prices
         ]
 
         # Then
         fresh_strategy = SmaStrategy(config)
         fresh_results = [
-            fresh_strategy.generate_signal(pd.Series({'price': p}))
+            fresh_strategy.generate_signal(pd.Series({'close': p}))
             for p in prices
         ]
         for reset_r, fresh_r in zip(reset_results, fresh_results):

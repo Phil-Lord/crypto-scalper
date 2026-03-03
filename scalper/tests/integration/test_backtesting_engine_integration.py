@@ -128,7 +128,7 @@ class TestBacktestingEngineIntegration:
         assert 'open' in engine.ohlc_full.columns
         assert 'high' in engine.ohlc_full.columns
         assert 'low' in engine.ohlc_full.columns
-        assert 'price' in engine.ohlc_full.columns
+        assert 'close' in engine.ohlc_full.columns
 
         # Verify index is datetime
         assert isinstance(engine.ohlc_full.index, pd.DatetimeIndex)
@@ -604,8 +604,8 @@ class TestBacktestingEngineIntegration:
 
         # Then
         assert not engine.ohlc_full.isnull().any().any()  # No NaN values
-        assert (engine.ohlc_full['high'] >= engine.ohlc_full['price']).all()
-        assert (engine.ohlc_full['low'] <= engine.ohlc_full['price']).all()
+        assert (engine.ohlc_full['high'] >= engine.ohlc_full['close']).all()
+        assert (engine.ohlc_full['low'] <= engine.ohlc_full['close']).all()
         assert (engine.ohlc_full['high'] >= engine.ohlc_full['low']).all()
 
     def test_multiple_strategies_on_same_data(self, mock_trade_repository: Mock, sma_strategy: SmaStrategy):

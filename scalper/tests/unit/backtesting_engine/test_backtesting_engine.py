@@ -200,7 +200,7 @@ class TestBacktestingEngine:
         assert 'open' in engine.ohlc_full.columns
         assert 'high' in engine.ohlc_full.columns
         assert 'low' in engine.ohlc_full.columns
-        assert 'price' in engine.ohlc_full.columns  # renamed from 'close'
+        assert 'close' in engine.ohlc_full.columns
 
     @pytest.mark.load_ohlc_data
     def test_load_ohlc_data_with_custom_interval(self, mock_strategy, sample_trades, mocker):

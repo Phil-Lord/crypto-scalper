@@ -13,12 +13,12 @@ class TestEmaIndicator:
     def sample_prices(self) -> pd.DataFrame:
         np.random.seed(0)
         prices = np.random.uniform(10, 20, 100)
-        return pd.DataFrame({'price': prices})
+        return pd.DataFrame({'close': prices})
 
     def test_update_returns_initial_value_on_first_call(self):
         # Given
         indicator = EmaIndicator(window=10)
-        ohlc = pd.Series({'price': 100.0})
+        ohlc = pd.Series({'close': 100.0})
 
         # When
         result = indicator.update(ohlc)
@@ -44,7 +44,7 @@ class TestEmaIndicator:
 
     def test_compute_vectorised_flat_price(self):
         # Given
-        ohlc = pd.DataFrame({'price': [100] * 50})
+        ohlc = pd.DataFrame({'close': [100] * 50})
 
         # When
         ema = EmaIndicator(window=10).compute_vectorised(ohlc)
@@ -55,7 +55,7 @@ class TestEmaIndicator:
     def test_compute_vectorised_increasing_price(self):
         # Given
         prices = np.arange(1, 101)
-        ohlc = pd.DataFrame({'price': prices})
+        ohlc = pd.DataFrame({'close': prices})
 
         # When
         ema = EmaIndicator(window=10).compute_vectorised(ohlc)
@@ -66,21 +66,21 @@ class TestEmaIndicator:
     def test_compute_vectorised_handles_nan_gracefully(self):
         # Given
         prices = [100, 101, np.nan, 103, 104]
-        ohlc = pd.DataFrame({'price': prices})
+        ohlc = pd.DataFrame({'close': prices})
 
         # When
         ema = EmaIndicator(window=3).compute_vectorised(ohlc)
 
         # Then
         assert not pd.isna(ema.iloc[2])
-        assert pd.isna(ohlc['price'].iloc[2])
+        assert pd.isna(ohlc['close'].iloc[2])
         assert not pd.isna(ema.iloc[4])
 
     def test_reset_clears_state(self):
         # Given
         indicator = EmaIndicator(window=5)
         for price in [100.0, 102.0, 104.0]:
-            indicator.update(pd.Series({'price': price}))
+            indicator.update(pd.Series({'close': price}))
         assert indicator.ema is not None
 
         # When

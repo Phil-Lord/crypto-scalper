@@ -45,7 +45,7 @@ class TestStrategyManagerIntegration:
 
         prices = np.array(prices)
         return pd.DataFrame({
-            'price': prices,
+            'close': prices,
             'high': prices + 0.5,
             'low': prices - 0.5
         })
@@ -67,7 +67,7 @@ class TestStrategyManagerIntegration:
 
         prices = np.array(prices)
         return pd.DataFrame({
-            'price': prices,
+            'close': prices,
             'high': prices + 0.5,
             'low': prices - 0.5
         })
@@ -80,7 +80,7 @@ class TestStrategyManagerIntegration:
         prices = 100 + np.random.normal(0, 2, n)
 
         return pd.DataFrame({
-            'price': prices,
+            'close': prices,
             'high': prices + 0.5,
             'low': prices - 0.5
         })
@@ -221,7 +221,7 @@ class TestStrategyManagerIntegration:
         n = 50
         prices = np.linspace(100, 110, n)
         data = pd.DataFrame({
-            'price': prices,
+            'close': prices,
             'high': prices + 0.5,
             'low': prices - 0.5
         })
@@ -283,7 +283,7 @@ class TestStrategyManagerIntegration:
         np.random.seed(42)
         n = 50
         data = pd.DataFrame({
-            'price': np.linspace(100, 110, n),
+            'close': np.linspace(100, 110, n),
             'high': np.linspace(101, 111, n),
             'low': np.linspace(99, 109, n)
         })
@@ -320,7 +320,7 @@ class TestStrategyManagerIntegration:
 
         # Then - Both strategies should be functional
         test_data = pd.DataFrame({
-            'price': [100, 101, 102, 103, 104],
+            'close': [100, 101, 102, 103, 104],
             'high': [100.5, 101.5, 102.5, 103.5, 104.5],
             'low': [99.5, 100.5, 101.5, 102.5, 103.5]
         })
@@ -341,7 +341,7 @@ class TestStrategyManagerIntegration:
         strategy2 = SmaStrategy(config)
 
         # When - Generate signal on strategy1
-        ohlc = pd.Series({'price': 100.0})
+        ohlc = pd.Series({'close': 100.0})
         strategy1.generate_signal(ohlc)
 
         # Then - strategy2 should still have initial state

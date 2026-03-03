@@ -13,14 +13,14 @@ class TestRsiIndicator:
     def sample_prices(self) -> pd.DataFrame:
         np.random.seed(42)
         prices = np.random.uniform(100, 110, 300)
-        return pd.DataFrame({'price': prices})
+        return pd.DataFrame({'close': prices})
 
     def test_reset_clears_state(self):
         # Given
         indicator = RsiIndicator(window=14)
         prices = np.linspace(100, 120, 30)
         for price in prices:
-            indicator.update(pd.Series({'price': price}))
+            indicator.update(pd.Series({'close': price}))
         assert indicator.prev_price is not None
         assert indicator.avg_gain is not None
 
@@ -37,7 +37,7 @@ class TestRsiIndicator:
         # Given
         indicator = RsiIndicator(window=14)
         prices = np.linspace(100, 105, 10)
-        ohlc = pd.DataFrame({'price': prices})
+        ohlc = pd.DataFrame({'close': prices})
 
         # When
         outputs = [indicator.update(row) for _, row in ohlc.iterrows()]
@@ -67,7 +67,7 @@ class TestRsiIndicator:
     def test_compute_vectorised_overbought_condition(self):
         # Given
         prices = np.linspace(100, 120, 30)
-        ohlc = pd.DataFrame({'price': prices})
+        ohlc = pd.DataFrame({'close': prices})
 
         # When
         rsi = RsiIndicator(window=14)
@@ -79,7 +79,7 @@ class TestRsiIndicator:
     def test_compute_vectorised_oversold_condition(self):
         # Given
         prices = np.linspace(120, 100, 30)
-        ohlc = pd.DataFrame({'price': prices})
+        ohlc = pd.DataFrame({'close': prices})
 
         # When
         rsi = RsiIndicator(window=14)
@@ -91,7 +91,7 @@ class TestRsiIndicator:
     def test_compute_vectorised_flat_market(self):
         # Given
         prices = [100.0] * 50
-        ohlc = pd.DataFrame({'price': prices})
+        ohlc = pd.DataFrame({'close': prices})
 
         # When
         rsi = RsiIndicator(window=14).compute_vectorised(ohlc)
@@ -102,7 +102,7 @@ class TestRsiIndicator:
     def test_compute_vectorised_handles_nan(self):
         # Given
         prices = [100, 101, np.nan, 103, 104, 105, 106, 107, 108, 109, 110]
-        ohlc = pd.DataFrame({'price': prices})
+        ohlc = pd.DataFrame({'close': prices})
         window = 3
 
         # When

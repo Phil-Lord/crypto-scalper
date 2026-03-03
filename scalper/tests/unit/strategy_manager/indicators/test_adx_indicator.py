@@ -16,7 +16,7 @@ class TestAdxIndicator:
         return pd.DataFrame({
             'high': np.random.uniform(10, 20, n),
             'low': np.random.uniform(5, 10, n),
-            'price': np.random.uniform(7, 18, n)
+            'close': np.random.uniform(7, 18, n)
         })
 
     def test_reset_clears_state(self):
@@ -25,7 +25,7 @@ class TestAdxIndicator:
         ohlc = pd.DataFrame({
             'high': [11, 12, 13, 14],
             'low': [9, 10, 11, 12],
-            'price': [10, 11, 12, 13],
+            'close': [10, 11, 12, 13],
         })
         for _, row in ohlc.iterrows():
             indicator.update(row)
@@ -48,7 +48,7 @@ class TestAdxIndicator:
         ohlc = pd.DataFrame({
             'high': [11, 12],
             'low': [9, 10],
-            'price': [10, 11],
+            'close': [10, 11],
         })
         indicator = AdxIndicator(window=3)
 
@@ -65,7 +65,7 @@ class TestAdxIndicator:
         ohlc = pd.DataFrame({
             'high': [10] * 20,
             'low': [10] * 20,
-            'price': [10] * 20,
+            'close': [10] * 20,
         })
         indicator = AdxIndicator(window=5)
 
@@ -81,7 +81,7 @@ class TestAdxIndicator:
         ohlc = pd.DataFrame({
             'high': np.linspace(10, 20, 100),
             'low': np.linspace(9, 19, 100),
-            'price': np.linspace(9.5, 19.5, 100),
+            'close': np.linspace(9.5, 19.5, 100),
         })
 
         # When
@@ -117,7 +117,7 @@ class TestAdxIndicator:
         ohlc = pd.DataFrame({
             'high': np.arange(10, 30),
             'low': np.arange(9, 29),
-            'price': np.arange(9.5, 29.5),
+            'close': np.arange(9.5, 29.5),
         })
 
         # When
@@ -132,7 +132,7 @@ class TestAdxIndicator:
         highs = [10, 12, 10, 12, 10, 12, 10, 12, 10, 12]
         lows = [9,  11, 9,  11, 9,  11, 9,  11, 9,  11]
         closes = [9.5, 11.5, 9.5, 11.5, 9.5, 11.5, 9.5, 11.5, 9.5, 11.5]
-        ohlc = pd.DataFrame({'high': highs, 'low': lows, 'price': closes})
+        ohlc = pd.DataFrame({'high': highs, 'low': lows, 'close': closes})
 
         # When
         indicator = AdxIndicator(window=3)
