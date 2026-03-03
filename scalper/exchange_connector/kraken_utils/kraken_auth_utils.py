@@ -7,7 +7,7 @@ import urllib
 
 
 def get_nonce() -> str:
-    return str(int(time.time() * 1000))
+    return str(time.time_ns())
 
 
 def get_headers(params: dict, endpoint: str) -> dict[str, str]:

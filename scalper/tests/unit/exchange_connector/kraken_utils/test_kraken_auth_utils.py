@@ -15,13 +15,13 @@ class TestKrakenAuthUtils:
         # Then
         assert isinstance(nonce, str)
 
-    def test_get_nonce_returns_millisecond_timestamp(self):
+    def test_get_nonce_returns_nanosecond_timestamp(self):
         # When
         nonce = get_nonce()
 
         # Then
-        # Should be 13 digits (milliseconds since epoch)
-        assert len(nonce) >= 13
+        # Should be 19 digits (nanoseconds since epoch)
+        assert len(nonce) >= 19
 
     def test_get_nonce_is_increasing(self):
         # When
