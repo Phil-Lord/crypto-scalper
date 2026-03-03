@@ -14,16 +14,16 @@ class RsiIndicator(Indicator):
 
     def update(self, ohlc: pd.Series) -> float | None:
         if self.prev_price is None:
-            self.prev_price = ohlc['price']
+            self.prev_price = ohlc['close']
             return None
 
-        delta = ohlc['price'] - self.prev_price
-        self.prev_price = ohlc['price']
+        delta = ohlc['close'] - self.prev_price
+        self.prev_price = ohlc['close']
         gain = max(delta, 0)
         loss = max(-delta, 0)
 
         if len(self.prices) < self.window + 1:
-            self.prices.append(ohlc['price'])
+            self.prices.append(ohlc['close'])
             return None
 
         if self.avg_gain is None:
@@ -45,7 +45,7 @@ class RsiIndicator(Indicator):
         return rsi
 
     def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
-        prices = ohlc['price']
+        prices = ohlc['close']
         delta = prices.diff()
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)

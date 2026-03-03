@@ -12,7 +12,7 @@ class AtrIndicator(Indicator):
     def update(self, ohlc: pd.Series) -> float | None:
         high = ohlc['high']
         low = ohlc['low']
-        close = ohlc['price']
+        close = ohlc['close']
 
         if self.prev_close is None:
             self.prev_close = close
@@ -32,7 +32,7 @@ class AtrIndicator(Indicator):
     def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
         highs = ohlc['high']
         lows = ohlc['low']
-        closes = ohlc['price']
+        closes = ohlc['close']
 
         tr1 = highs - lows
         tr2 = (highs - closes.shift()).abs()

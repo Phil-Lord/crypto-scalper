@@ -11,13 +11,13 @@ class SmaIndicator(Indicator):
         self.prices = deque(maxlen=window)
 
     def update(self, ohlc: pd.Series) -> float | None:
-        self.prices.append(ohlc['price'])
+        self.prices.append(ohlc['close'])
         if len(self.prices) < self.window:
             return None
         return sum(self.prices) / self.window
 
     def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
-        return ohlc['price'].rolling(self.window).mean()
+        return ohlc['close'].rolling(self.window).mean()
 
     def reset(self) -> None:
         self.prices = deque(maxlen=self.window)

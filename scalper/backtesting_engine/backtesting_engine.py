@@ -85,6 +85,5 @@ class BacktestingEngine:
 
         ohlc = trades['price'].resample(f'{self.interval}min').ohlc()
         ohlc = ohlc.bfill()
-        ohlc.rename(columns={'close': 'price'}, inplace=True)
         self.ohlc_full = ohlc
         self.ohlc_window = ohlc

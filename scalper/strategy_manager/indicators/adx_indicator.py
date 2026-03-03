@@ -19,7 +19,7 @@ class AdxIndicator(Indicator):
     def update(self, ohlc: pd.Series) -> float | None:
         high = ohlc['high']
         low = ohlc['low']
-        close = ohlc['price']  # Assuming 'price' is close
+        close = ohlc['close']
 
         if self.prev_high is None:
             # First update: cannot compute anything yet
@@ -60,7 +60,7 @@ class AdxIndicator(Indicator):
     def compute_vectorised(self, ohlc: pd.DataFrame) -> pd.Series:
         highs = ohlc['high']
         lows = ohlc['low']
-        closes = ohlc['price']
+        closes = ohlc['close']
 
         # Directional movement
         up_move = highs - highs.shift()

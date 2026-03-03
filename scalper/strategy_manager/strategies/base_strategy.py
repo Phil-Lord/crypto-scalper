@@ -46,7 +46,7 @@ class Strategy(ABC):
             if signal in (Signal.BUY, Signal.SELL):
                 self.last_action = signal
 
-        return {'price': ohlc['price'], **indicator_results, **rule_results, 'signal': signal}
+        return {'price': ohlc['close'], **indicator_results, **rule_results, 'signal': signal}
 
     def vectorised_compute(self, ohlc: pd.DataFrame) -> pd.DataFrame:
         ''' Compute indicators and rules for a series of ohlc data, then generate signals. '''
@@ -54,7 +54,7 @@ class Strategy(ABC):
             name: indicator.compute_vectorised(ohlc)
             for name, indicator in self.indicators.items()
         }
-        results = pd.DataFrame({'price': ohlc['price'], **indicator_results})
+        results = pd.DataFrame({'price': ohlc['close'], **indicator_results})
 
         for rule_name, rule in self.rules.items():
             results[rule_name] = rule.compute_vectorised(results)
