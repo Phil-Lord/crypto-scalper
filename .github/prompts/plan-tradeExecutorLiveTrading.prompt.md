@@ -227,9 +227,9 @@
     ```
     Only `scalper/` production modules (`data_system`, `exchange_connector`, `strategy_manager`, `trade_executor`, `utils`, `scripts`), `requirements.txt`, and `entrypoint.sh` are copied into the image. Test code, analysis tools, local storage, docs, and secrets are excluded.
 
-36. **Secrets management**: Kraken API keys and Supabase credentials stored as Fly.io secrets (`fly secrets set KRAKEN_API_KEY=... KRAKEN_API_SECRET=... SUPABASE_URL=... SUPABASE_KEY=...`). These become environment variables in the container — the existing `SupabaseConfig` metaclass and `os.getenv` patterns already handle this.
+36. **Secrets management**: Kraken API keys and Supabase credentials stored as Fly.io secrets (`fly secrets set KRAKEN_TRADING_API_KEY=... KRAKEN_TRADING_API_SECRET=... SUPABASE_URL=... SUPABASE_KEY=...`). These become environment variables in the container — the existing `SupabaseConfig` metaclass and `os.getenv` patterns already handle this.
 
-36b. **Nonce thread-safety**: Update `get_nonce()` in `exchange_connector/kraken_utils/kraken_auth_utils.py` to use `time.time_ns()` (nanosecond precision). The current implementation uses `int(time.time() * 1000)` (millisecond precision) — two bots hitting private Kraken endpoints in the same millisecond from APScheduler's thread pool would produce identical nonces → `EAPI:Invalid nonce`. Nanosecond precision makes collisions effectively impossible. One-line change, no lock needed.
+36b. **Nonce thread-safety**: `get_nonce()` in `exchange_connector/kraken_utils/kraken_auth_utils.py` has been updated to use `time.time_ns()` (nanosecond precision) rather than `int(time.time() * 1000)` (millisecond precision). Two bots hitting private Kraken endpoints in the same millisecond from APScheduler's thread pool would produce identical nonces → `EAPI:Invalid nonce`. Nanosecond precision makes collisions effectively impossible.
 
 36c. **Supabase client thread-safety**: Each `TradeExecutor` should receive its own `SupabaseClient` instance (constructed in the entry-point script per bot). The underlying `httpx` client used by the Supabase SDK may not be thread-safe for concurrent writes from APScheduler's thread pool. One client per executor avoids shared-state issues.
 
