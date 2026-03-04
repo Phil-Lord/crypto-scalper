@@ -1,5 +1,3 @@
-from typing import List
-
 from .base_connectors import FetchConnector
 from exchange_connector.api import KrakenApiClient
 from exchange_connector.models import QueryOrderResult
@@ -11,7 +9,7 @@ class QueryOrdersConnector(FetchConnector):
         self.client = client or KrakenApiClient()
         self.service = QueryOrdersService(self.client)
 
-    def fetch(self, txids: List[str]) -> List[QueryOrderResult]:
+    def fetch(self, txids: list[str]) -> list[QueryOrderResult]:
         '''
         Fetch order details.
 
@@ -21,7 +19,7 @@ class QueryOrdersConnector(FetchConnector):
         raw_result = self.service.fetch_orders(','.join(txids))
         return self._to_domain(raw_result)
 
-    def _to_domain(self, raw_result: dict) -> List[QueryOrderResult]:
+    def _to_domain(self, raw_result: dict) -> list[QueryOrderResult]:
         '''
         Convert raw Kraken QueryOrders response to QueryOrderResult domain objects.
 
