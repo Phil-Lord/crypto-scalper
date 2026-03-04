@@ -1,14 +1,16 @@
-from .connectors.add_order_connector import AddOrderConnector
-from .connectors.asset_pairs_connector import AssetPairsConnector
-from .connectors.balance_connector import BalanceConnector
-from .connectors.ohlc_connector import OhlcConnector
-from .connectors.query_orders_connector import QueryOrdersConnector
-from .connectors.ticker_connector import TickerConnector
-from .connectors.trades_connector import TradesConnector
+from .connectors import (
+    AddOrderConnector,
+    AssetPairsConnector,
+    BalanceConnector,
+    OhlcConnector,
+    QueryOrdersConnector,
+    TickerConnector,
+    TradesConnector
+)
 
 from .models import AddOrderResult, QueryOrderResult
 
-from .api.exceptions import (
+from .api import (
     KrakenApiError,
     KrakenTooManyRequestsError,
     KrakenApiResponseError,
