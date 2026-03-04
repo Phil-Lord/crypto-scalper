@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from .base_connectors import FetchConnector
 from exchange_connector.api import KrakenApiClient
 from exchange_connector.models import QueryOrderResult
@@ -32,11 +34,11 @@ class QueryOrdersConnector(FetchConnector):
             for order_id, order_data in raw_result.items():
                 results.append(QueryOrderResult(
                     txid=order_id,
-                    price=order_data.get('price'),
-                    volume=order_data.get('vol_exec'),
-                    fee=order_data.get('fee'),
-                    status=order_data.get('status'),
+                    price=Decimal(order_data['price']),
+                    volume=Decimal(order_data['vol_exec']),
+                    fee=Decimal(order_data['fee']),
+                    status=order_data['status'],
                 ))
             return results
-        except (AttributeError, TypeError) as e:
+        except (AttributeError, KeyError, TypeError) as e:
             raise ValueError(f'Failed to parse order result: {raw_result}. Error: {e}')
