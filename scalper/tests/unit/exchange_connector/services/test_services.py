@@ -643,7 +643,6 @@ class TestQueryOrdersService:
 
     def test_fetch_orders_passes_txid_as_param(self, mock_client):
         # Given
-        from unittest.mock import patch
         from exchange_connector.services.query_orders_service import QueryOrdersService
         service = QueryOrdersService(mock_client)
         mock_client.make_request.return_value = {
