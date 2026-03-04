@@ -5,7 +5,7 @@ from .connectors.ohlc_connector import OhlcConnector
 from .connectors.ticker_connector import TickerConnector
 from .connectors.trades_connector import TradesConnector
 
-from .models import OrderResult
+from .models import OrderResult, QueryOrderResult
 
 from .api.exceptions import (
     KrakenApiError,
