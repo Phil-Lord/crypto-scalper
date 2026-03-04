@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from .base_connectors import FetchConnector
 from exchange_connector.api import KrakenApiClient
@@ -40,5 +40,5 @@ class QueryOrdersConnector(FetchConnector):
                     status=order_data['status'],
                 ))
             return results
-        except (AttributeError, KeyError, TypeError) as e:
+        except (AttributeError, KeyError, TypeError, InvalidOperation) as e:
             raise ValueError(f'Failed to parse order result: {raw_result}. Error: {e}')
