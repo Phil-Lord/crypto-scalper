@@ -9,7 +9,7 @@ from exchange_connector.connectors.balance_connector import BalanceConnector
 from exchange_connector.connectors.ohlc_connector import OhlcConnector
 from exchange_connector.connectors.ticker_connector import TickerConnector
 from exchange_connector.connectors.trades_connector import TradesConnector
-from exchange_connector.models import AddOrderResult
+from exchange_connector.models import AddOrderResult, QueryOrderStatus
 from data_system.models.trade_model import Trade
 
 
@@ -567,7 +567,7 @@ class TestQueryOrdersConnector:
         assert result.price == Decimal('50000.50')
         assert result.volume == Decimal('0.00200000')
         assert result.fee == Decimal('0.10000000')
-        assert result.status == 'closed'
+        assert result.status == QueryOrderStatus.CLOSED
 
     def test_to_domain_returns_correct_types(self, mock_client, raw_order_response):
         # Given
@@ -584,7 +584,7 @@ class TestQueryOrdersConnector:
         assert isinstance(result.volume, Decimal)
         assert isinstance(result.fee, Decimal)
         assert isinstance(result.txid, str)
-        assert isinstance(result.status, str)
+        assert isinstance(result.status, QueryOrderStatus)
 
     def test_to_domain_handles_multi_order_response(self, mock_client, raw_multi_order_response):
         # Given
