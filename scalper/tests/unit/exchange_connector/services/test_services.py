@@ -651,11 +651,31 @@ class TestQueryOrdersService:
         }
 
         # When
-        service.fetch_orders('ORDER-456')
+        with patch('exchange_connector.services.query_orders_service.get_nonce', return_value='123456'):
+            service.fetch_orders('ORDER-456')
 
         # Then
         call_args = mock_client.make_request.call_args
-        assert call_args[0][2] == {'txid': 'ORDER-456'}
+        params = call_args[0][2]
+        assert params['txid'] == 'ORDER-456'
+
+    def test_fetch_orders_includes_nonce(self, mock_client):
+        # Given
+        from exchange_connector.services.query_orders_service import QueryOrdersService
+        service = QueryOrdersService(mock_client)
+        mock_client.make_request.return_value = {
+            'result': {'ORDER-789': {'price': '48000.0', 'vol_exec': '0.003', 'fee': '0.2'}},
+            'error': []
+        }
+
+        # When
+        with patch('exchange_connector.services.query_orders_service.get_nonce', return_value='999888'):
+            service.fetch_orders('ORDER-789')
+
+        # Then
+        call_args = mock_client.make_request.call_args
+        params = call_args[0][2]
+        assert params['nonce'] == '999888'
 
     def test_fetch_orders_returns_result(self, mock_client):
         # Given
