@@ -31,7 +31,7 @@
 
 1. **Add `QueryOrdersService`** at `exchange_connector/services/query_orders_service.py`. Inherits `KrakenService`. Calls Kraken's `POST /0/private/QueryOrders` endpoint with `txid` param. Returns raw dict of order details keyed by txid. Kraken response includes `price` (average executed price), `vol_exec` (volume executed), and `fee`.
 
-2. **Add `QueryOrderResult` domain model** at `exchange_connector/models/query_order_result.py`. Frozen dataclass with fields: `txid: str`, `price: Decimal`, `volume: Decimal`, `fee: Decimal`, `status: str`. This is the typed representation of a filled order's execution details.
+2. **Add `QueryOrderResult` domain model** at `exchange_connector/models/query_order_result.py`. Frozen dataclass with fields: `txid: str`, `price: Decimal`, `volume: Decimal`, `fee: Decimal`, `status: str`. This is the typed representation of a filled order's execution details. `price`, `volume`, and `fee` should not be nullable, 
 
 3. **Add `QueryOrdersConnector`** at `exchange_connector/connectors/query_orders_connector.py`. Inherits `FetchConnector`. Method: `fetch(txids: list[str]) -> list[QueryOrderResult]`. Delegates to `QueryOrdersService`, transforms raw response into `QueryOrderResult` domain objects by extracting `price`, `vol_exec`, and `fee` from each order entry.
 
