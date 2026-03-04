@@ -320,6 +320,27 @@
 
 ## Operational Workflows
 
+### Running locally via Docker
+
+Build and run the container locally to verify the image before deploying, or to run a dry run against production Kraken/Supabase from your machine.
+
+**Build the image:**
+```sh
+docker build -t crypto-scalper .
+```
+
+**Run with env file (recommended):** Your existing `.env` file contains all required credentials — pass it at runtime via `--env-file`. The `.dockerignore` excludes `.env` from the image; it is only injected at runtime.
+```sh
+docker run --env-file .env -e BOT_IDS=btc_1m_001 crypto-scalper
+```
+
+**Run dry run:**
+```sh
+docker run --env-file .env -e BOT_IDS=btc_1m_001 -e DRY_RUN=true crypto-scalper
+```
+
+`BOT_IDS` is not in `.env` (it's a Fly.io env var, not a secret), so pass it separately with `-e`. All other vars (`KRAKEN_TRADING_API_KEY`, `KRAKEN_TRADING_API_SECRET`, `SUPABASE_URL`, `SUPABASE_KEY`) come from `.env`.
+
 ### Deploying code updates
 
 `fly deploy` is the only deployment command. The full lifecycle:
