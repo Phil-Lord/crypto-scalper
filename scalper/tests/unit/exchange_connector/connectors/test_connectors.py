@@ -619,3 +619,15 @@ class TestQueryOrdersConnector:
         # When / Then
         with pytest.raises(ValueError, match='Failed to parse order result'):
             connector._to_domain({'ORDER-001': None})
+
+    def test_to_domain_raises_on_invalid_decimal(self, mock_client):
+        # Given
+        from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
+        connector = QueryOrdersConnector(client=mock_client)
+        invalid_decimal_response = {
+            'ORDER-001': {'price': 'not_a_number', 'vol_exec': '0.001', 'fee': '0.001', 'status': 'closed'}
+        }
+
+        # When / Then
+        with pytest.raises(ValueError, match='Failed to parse order result'):
+            connector._to_domain(invalid_decimal_response)
