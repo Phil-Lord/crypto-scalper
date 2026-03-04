@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-from exchange_connector.models import OrderResult
+from exchange_connector.models import AddOrderResult
 from trade_executor.trade_executor import TradeExecutor
 
 
@@ -37,7 +37,7 @@ class TestTradeExecutor:
         ticker_connector_patch.fetch.return_value = {'c': [50]}
         mock_strategy.generate_signal.return_value = {'signal': 'buy'}
         balance_connector_patch.fetch.return_value = {'ZGBP': 100, 'XXBT': 0}
-        add_order_connector_patch.place.return_value = OrderResult(
+        add_order_connector_patch.place.return_value = AddOrderResult(
             txid=['testId'],
             order_description='buy 0.002 BTC at 50 GBP'
         )
@@ -69,7 +69,7 @@ class TestTradeExecutor:
         ticker_connector_patch.fetch.return_value = {'c': [50]}
         mock_strategy.generate_signal.return_value = {'signal': 'sell'}
         balance_connector_patch.fetch.return_value = {'ZGBP': 0, 'XXBT': 1}
-        add_order_connector_patch.place.return_value = OrderResult(
+        add_order_connector_patch.place.return_value = AddOrderResult(
             txid=['testId'],
             order_description='sell 1 BTC at 50 GBP'
         )

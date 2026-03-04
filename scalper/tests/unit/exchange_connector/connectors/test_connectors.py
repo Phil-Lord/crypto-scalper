@@ -9,7 +9,7 @@ from exchange_connector.connectors.balance_connector import BalanceConnector
 from exchange_connector.connectors.ohlc_connector import OhlcConnector
 from exchange_connector.connectors.ticker_connector import TickerConnector
 from exchange_connector.connectors.trades_connector import TradesConnector
-from exchange_connector.models import OrderResult
+from exchange_connector.models import AddOrderResult
 from data_system.models.trade_model import Trade
 
 
@@ -174,7 +174,7 @@ class TestAddOrderConnector:
 
         # Then
         connector.service.add_order.assert_called_once_with('XXBTZGBP', 'buy', 100.0, False)
-        assert isinstance(result, OrderResult)
+        assert isinstance(result, AddOrderResult)
         assert result.txid == ['ORDER-123']
         assert result.order_description == 'buy 100.00000000 XXBTZGBP @ market'
 
@@ -243,7 +243,8 @@ class TestAddOrderConnector:
         # Given
         connector = AddOrderConnector(client=mock_client)
         connector.service = Mock()
-        connector.service.add_order.return_value = {'txid': ['ORDER-123'], 'descr': {'order': 'test'}}
+        connector.service.add_order.return_value = {
+            'txid': ['ORDER-123'], 'descr': {'order': 'test'}}
 
         # When
         connector.place('XETHZUSD', 'sell', 5.5)
