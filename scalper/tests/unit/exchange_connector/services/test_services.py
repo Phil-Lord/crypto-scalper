@@ -599,3 +599,76 @@ class TestTradesService:
         # When / Then
         with pytest.raises(ValueError, match='Invalid trading pair'):
             service.fetch_trades('BTC', 1704067200000000000, 1704153600000000000)
+
+
+@pytest.mark.exchange_connector
+@pytest.mark.services
+@pytest.mark.query_orders_service
+class TestQueryOrdersService:
+    @pytest.fixture
+    def mock_client(self):
+        return Mock(spec=KrakenApiClient)
+
+    def test_fetch_orders_uses_post_method(self, mock_client):
+        # Given
+        from exchange_connector.services.query_orders_service import QueryOrdersService
+        service = QueryOrdersService(mock_client)
+        mock_client.make_request.return_value = {
+            'result': {'ORDER-123': {'price': '50000.0', 'vol_exec': '0.001', 'fee': '0.5'}},
+            'error': []
+        }
+
+        # When
+        service.fetch_orders('ORDER-123')
+
+        # Then
+        call_args = mock_client.make_request.call_args
+        assert call_args[0][0] == 'POST'
+
+    def test_fetch_orders_uses_correct_endpoint(self, mock_client):
+        # Given
+        from exchange_connector.services.query_orders_service import QueryOrdersService
+        service = QueryOrdersService(mock_client)
+        mock_client.make_request.return_value = {
+            'result': {'ORDER-123': {'price': '50000.0', 'vol_exec': '0.001', 'fee': '0.5'}},
+            'error': []
+        }
+
+        # When
+        service.fetch_orders('ORDER-123')
+
+        # Then
+        call_args = mock_client.make_request.call_args
+        assert call_args[0][1] == '/0/private/QueryOrders'
+
+    def test_fetch_orders_passes_txid_as_param(self, mock_client):
+        # Given
+        from exchange_connector.services.query_orders_service import QueryOrdersService
+        service = QueryOrdersService(mock_client)
+        mock_client.make_request.return_value = {
+            'result': {'ORDER-456': {'price': '49000.0', 'vol_exec': '0.002', 'fee': '0.3'}},
+            'error': []
+        }
+
+        # When
+        service.fetch_orders('ORDER-456')
+
+        # Then
+        call_args = mock_client.make_request.call_args
+        assert call_args[0][2] == {'txid': 'ORDER-456'}
+
+    def test_fetch_orders_returns_result(self, mock_client):
+        # Given
+        from exchange_connector.services.query_orders_service import QueryOrdersService
+        service = QueryOrdersService(mock_client)
+        order_data = {'price': '50000.0', 'vol_exec': '0.001', 'fee': '0.5'}
+        mock_client.make_request.return_value = {
+            'result': {'ORDER-123': order_data},
+            'error': []
+        }
+
+        # When
+        result = service.fetch_orders('ORDER-123')
+
+        # Then
+        assert result == {'ORDER-123': order_data}
