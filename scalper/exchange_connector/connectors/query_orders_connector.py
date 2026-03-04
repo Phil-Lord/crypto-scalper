@@ -2,7 +2,7 @@ from decimal import Decimal, InvalidOperation
 
 from .base_connectors import FetchConnector
 from exchange_connector.api import KrakenApiClient
-from exchange_connector.models import QueryOrderResult
+from exchange_connector.models import QueryOrderResult, QueryOrderStatus
 from exchange_connector.services import QueryOrdersService
 
 
@@ -37,7 +37,7 @@ class QueryOrdersConnector(FetchConnector):
                     price=Decimal(order_data['price']),
                     volume=Decimal(order_data['vol_exec']),
                     fee=Decimal(order_data['fee']),
-                    status=order_data['status'],
+                    status=QueryOrderStatus(order_data['status']),
                 ))
             return results
         except (AttributeError, KeyError, TypeError, InvalidOperation) as e:

@@ -1,5 +1,14 @@
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import Enum
+
+
+class QueryOrderStatus(str, Enum):
+    PENDING = 'pending'
+    OPEN = 'open'
+    CLOSED = 'closed'
+    CANCELED = 'canceled'
+    EXPIRED = 'expired'
 
 
 @dataclass(frozen=True)
@@ -15,10 +24,10 @@ class QueryOrderResult:
         price (Decimal): Average price at which the order was executed.
         volume (Decimal): Volume of the order in the base currency.
         fee (Decimal): Fee charged for the order in the quote currency.
-        status (str): Status of the order ("pending", "closed", "open", "canceled", or "expired").
+        status (QueryOrderStatus): Status of the order.
     '''
     txid: str
     price: Decimal
     volume: Decimal
     fee: Decimal
-    status: str
+    status: QueryOrderStatus

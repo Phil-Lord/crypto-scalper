@@ -8,7 +8,7 @@ from .connectors import (
     TradesConnector
 )
 
-from .models import AddOrderResult, QueryOrderResult
+from .models import AddOrderResult, QueryOrderResult, QueryOrderStatus
 
 from .api import (
     KrakenApiError,
