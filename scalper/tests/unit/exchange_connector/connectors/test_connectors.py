@@ -467,3 +467,155 @@ class TestOhlcConnector:
         # When / Then
         with pytest.raises(ValueError, match='Invalid interval'):
             connector.fetch('XXBTZGBP', -1, 1704067200)
+
+
+@pytest.mark.exchange_connector
+@pytest.mark.connectors
+@pytest.mark.query_orders_connector
+class TestQueryOrdersConnector:
+    @pytest.fixture
+    def mock_client(self):
+        return Mock(spec=KrakenApiClient)
+
+    @pytest.fixture
+    def raw_order_response(self):
+        return {
+            'ORDER-001': {
+                'price': '50000.50',
+                'vol_exec': '0.00200000',
+                'fee': '0.10000000',
+                'status': 'closed',
+            }
+        }
+
+    @pytest.fixture
+    def raw_multi_order_response(self):
+        return {
+            'TXID-AAA': {
+                'price': '50000.00',
+                'vol_exec': '0.00100000',
+                'fee': '0.05000000',
+                'status': 'closed',
+            },
+            'TXID-BBB': {
+                'price': '51000.00',
+                'vol_exec': '0.00050000',
+                'fee': '0.02500000',
+                'status': 'open',
+            },
+        }
+
+    def test_init_with_injected_client(self, mock_client):
+        # When
+        from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
+        connector = QueryOrdersConnector(client=mock_client)
+
+        # Then
+        assert connector.client == mock_client
+
+    def test_init_creates_default_client(self):
+        # When
+        from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
+        connector = QueryOrdersConnector()
+
+        # Then
+        assert connector.client is not None
+        assert isinstance(connector.client, KrakenApiClient)
+
+    def test_fetch_returns_query_order_results(self, mock_client, raw_order_response):
+        # Given
+        from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
+        from exchange_connector.models import QueryOrderResult
+        connector = QueryOrdersConnector(client=mock_client)
+        connector.service = Mock()
+        connector.service.fetch_orders.return_value = raw_order_response
+
+        # When
+        results = connector.fetch(['ORDER-001'])
+
+        # Then
+        connector.service.fetch_orders.assert_called_once_with('ORDER-001')
+        assert len(results) == 1
+        assert isinstance(results[0], QueryOrderResult)
+
+    def test_fetch_joins_multiple_txids_with_comma(self, mock_client, raw_multi_order_response):
+        # Given
+        from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
+        connector = QueryOrdersConnector(client=mock_client)
+        connector.service = Mock()
+        connector.service.fetch_orders.return_value = raw_multi_order_response
+
+        # When
+        connector.fetch(['TXID-AAA', 'TXID-BBB'])
+
+        # Then
+        connector.service.fetch_orders.assert_called_once_with('TXID-AAA,TXID-BBB')
+
+    def test_to_domain_converts_fields_correctly(self, mock_client, raw_order_response):
+        # Given
+        from decimal import Decimal
+        from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
+        connector = QueryOrdersConnector(client=mock_client)
+
+        # When
+        results = connector._to_domain(raw_order_response)
+
+        # Then
+        assert len(results) == 1
+        result = results[0]
+        assert result.txid == 'ORDER-001'
+        assert result.price == Decimal('50000.50')
+        assert result.volume == Decimal('0.00200000')
+        assert result.fee == Decimal('0.10000000')
+        assert result.status == 'closed'
+
+    def test_to_domain_returns_correct_types(self, mock_client, raw_order_response):
+        # Given
+        from decimal import Decimal
+        from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
+        connector = QueryOrdersConnector(client=mock_client)
+
+        # When
+        results = connector._to_domain(raw_order_response)
+
+        # Then
+        result = results[0]
+        assert isinstance(result.price, Decimal)
+        assert isinstance(result.volume, Decimal)
+        assert isinstance(result.fee, Decimal)
+        assert isinstance(result.txid, str)
+        assert isinstance(result.status, str)
+
+    def test_to_domain_handles_multi_order_response(self, mock_client, raw_multi_order_response):
+        # Given
+        from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
+        connector = QueryOrdersConnector(client=mock_client)
+
+        # When
+        results = connector._to_domain(raw_multi_order_response)
+
+        # Then
+        assert len(results) == 2
+        txids = {r.txid for r in results}
+        assert txids == {'TXID-AAA', 'TXID-BBB'}
+
+    def test_to_domain_raises_on_missing_price(self, mock_client):
+        # Given
+        from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
+        connector = QueryOrdersConnector(client=mock_client)
+        incomplete_response = {
+            'ORDER-001': {'vol_exec': '0.001', 'fee': '0.001', 'status': 'closed'}
+        }
+
+        # When / Then
+        with pytest.raises(ValueError, match='Failed to parse order result'):
+            connector._to_domain(incomplete_response)
+
+    def test_to_domain_raises_on_invalid_structure(self, mock_client):
+        # Given
+        from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
+        connector = QueryOrdersConnector(client=mock_client)
+
+        # When / Then
+        with pytest.raises(ValueError, match='Failed to parse order result'):
+            connector._to_domain({'ORDER-001': None})
