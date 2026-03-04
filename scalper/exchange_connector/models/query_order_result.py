@@ -22,7 +22,7 @@ class QueryOrderResult:
     Attributes:
         txid (str): Transaction ID for the queried order.
         price (Decimal): Average price at which the order was executed.
-        volume (Decimal): Volume of the order in the base currency.
+        volume (Decimal): Executed volume of the order in the base currency.
         fee (Decimal): Fee charged for the order in the quote currency.
         status (QueryOrderStatus): Status of the order.
     '''
