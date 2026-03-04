@@ -650,12 +650,13 @@ class TestQueryOrdersService:
             'error': []
         }
 
-        # When
-        service.fetch_orders('ORDER-456')
+        with patch('exchange_connector.services.query_orders_service.get_nonce', return_value='123456'):
+            # When
+            service.fetch_orders('ORDER-456')
 
         # Then
         call_args = mock_client.make_request.call_args
-        assert call_args[0][2] == {'txid': 'ORDER-456'}
+        assert call_args[0][2] == {'nonce': '123456', 'txid': 'ORDER-456'}
 
     def test_fetch_orders_returns_result(self, mock_client):
         # Given

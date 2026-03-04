@@ -1,6 +1,6 @@
 from .base_connectors import PlaceConnector
 from exchange_connector.api import KrakenApiClient
-from exchange_connector.models import OrderResult
+from exchange_connector.models import AddOrderResult
 from exchange_connector.services import AddOrderService
 
 
@@ -9,7 +9,7 @@ class AddOrderConnector(PlaceConnector):
         self.client = client or KrakenApiClient()
         self.service = AddOrderService(self.client)
 
-    def place(self, pair: str, signal: str, volume: float, validate: bool = False) -> OrderResult:
+    def place(self, pair: str, signal: str, volume: float, validate: bool = False) -> AddOrderResult:
         '''
         Place a market order.
 
@@ -17,17 +17,17 @@ class AddOrderConnector(PlaceConnector):
         :param signal: Order direction - 'buy' or 'sell'.
         :param volume: Order volume (quote currency for buy, base for sell).
         :param validate: If True, validate order without executing. Default is False.
-        :return: OrderResult domain object containing transaction IDs and order description.
+        :return: AddOrderResult domain object containing transaction IDs and order description.
         '''
         raw_result = self.service.add_order(pair, signal, volume, validate)
         return self._to_domain(raw_result)
 
-    def _to_domain(self, raw_result: dict) -> OrderResult:
+    def _to_domain(self, raw_result: dict) -> AddOrderResult:
         '''
-        Convert raw Kraken AddOrder response to OrderResult domain object.
+        Convert raw Kraken AddOrder response to AddOrderResult domain object.
 
         :param raw_result: Raw API response from Kraken.
-        :return: OrderResult domain object.
+        :return: AddOrderResult domain object.
         :raises ValueError: If response structure is invalid.
         '''
         try:
@@ -38,9 +38,6 @@ class AddOrderConnector(PlaceConnector):
             if not order_description:
                 raise ValueError('Missing order description in response')
 
-            return OrderResult(
-                txid=txid,
-                order_description=order_description
-            )
+            return AddOrderResult(txid=txid, order_description=order_description)
         except (AttributeError, TypeError) as e:
             raise ValueError(f'Failed to parse order result: {raw_result}. Error: {e}')

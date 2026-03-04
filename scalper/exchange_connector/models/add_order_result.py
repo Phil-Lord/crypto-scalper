@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class OrderResult:
+class AddOrderResult:
     '''
     Dataclass representing the result of placing an order on the exchange.
 
