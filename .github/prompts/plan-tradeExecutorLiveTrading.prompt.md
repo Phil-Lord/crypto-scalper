@@ -31,11 +31,11 @@
 
 1. **Add `QueryOrdersService`** at `exchange_connector/services/query_orders_service.py`. Inherits `KrakenService`. Calls Kraken's `POST /0/private/QueryOrders` endpoint with `txid` param. Returns raw dict of order details keyed by txid. Kraken response includes `price` (average executed price), `vol_exec` (volume executed), and `fee`.
 
-2. **Add `OrderFill` domain model** at `exchange_connector/models/order_fill.py`. Frozen dataclass with fields: `txid: str`, `price: Decimal`, `volume: Decimal`, `fee: Decimal`, `status: str`. This is the typed representation of a filled order's execution details.
+2. **Add `QueryOrderResult` domain model** at `exchange_connector/models/query_order_result.py`. Frozen dataclass with fields: `txid: str`, `price: Decimal`, `volume: Decimal`, `fee: Decimal`, `status: str`. This is the typed representation of a filled order's execution details.
 
-3. **Add `QueryOrdersConnector`** at `exchange_connector/connectors/query_orders_connector.py`. Inherits `FetchConnector`. Method: `fetch(txids: list[str]) -> list[OrderFill]`. Delegates to `QueryOrdersService`, transforms raw response into `OrderFill` domain objects by extracting `price`, `vol_exec`, and `fee` from each order entry.
+3. **Add `QueryOrdersConnector`** at `exchange_connector/connectors/query_orders_connector.py`. Inherits `FetchConnector`. Method: `fetch(txids: list[str]) -> list[QueryOrderResult]`. Delegates to `QueryOrdersService`, transforms raw response into `QueryOrderResult` domain objects by extracting `price`, `vol_exec`, and `fee` from each order entry.
 
-4. **Export new symbols** from `exchange_connector/__init__.py` — add `QueryOrdersConnector` and `OrderFill`. Also export from `exchange_connector/models/__init__.py` and `exchange_connector/connectors/__init__.py`.
+4. **Export new symbols** from `exchange_connector/__init__.py` — add `QueryOrdersConnector` and `QueryOrderResult`. Also export from `exchange_connector/models/__init__.py` and `exchange_connector/connectors/__init__.py`.
 
 5. **Unit tests** for `QueryOrdersService` and `QueryOrdersConnector` in `tests/unit/exchange_connector/`. Follow existing patterns (e.g., `TestAddOrderConnector`). Test happy path, error parsing, multi-txid response, and `_to_domain` conversion. Register markers `query_orders_service` and `query_orders_connector` in `pytest.ini`.
 
@@ -138,8 +138,8 @@
       5. If signal is `BUY` or `SELL`:
           - Fetch balances via `self._fetch_balances()` (before order, to calculate volume)
           - Calculate volume via `position_sizer.calculate_volume(signal, balances)` — `balances` is a `PairBalances` instance containing both amounts and symbol names
-          - Place order via `AddOrderConnector.place(pair, signal, volume, validate=self.dry_run)` → get `OrderResult`
-          - **If `self.dry_run`:** Log the validated order description from `OrderResult`. Skip order persistence, QueryOrders, and post-trade balance fetch — no real order was placed.
+          - Place order via `AddOrderConnector.place(pair, signal, volume, validate=self.dry_run)` → get `AddOrderResult`
+          - **If `self.dry_run`:** Log the validated order description from `AddOrderResult`. Skip order persistence, QueryOrders, and post-trade balance fetch — no real order was placed.
           - **If live (not dry run):**
               - Extract `txid = order_result.txid[0]` (guard for `None` — should not happen outside `validate=True` mode)
               - **Immediately persist** partial `BotOrder` with txid, status=`PLACED`, fill fields=`None`, `filled_at=None`
@@ -301,7 +301,7 @@
     - Chose graceful drain shutdown over immediate shutdown
     - Chose dry run mode via Kraken's `validate=True` for zero-cost production verification
 
-46. **Update `docs/exchange-connector/api-reference.md`** to document `QueryOrdersConnector` and `OrderFill`.
+46. **Update `docs/exchange-connector/api-reference.md`** to document `QueryOrdersConnector` and `QueryOrderResult`.
 
 ---
 
@@ -445,7 +445,7 @@ WHERE completed_at IS NULL;
 - **Entrypoint script for multi-bot Docker:** `entrypoint.sh` parses comma-separated `BOT_IDS` env var into `--bot-id` flags, with validation that `BOT_IDS` is set and non-empty. Cleaner than embedding CLI flag format in env vars.
 - **`auto_stop_machines = false` in `fly.toml`:** Explicitly prevents Fly.io from stopping the machine when it detects no inbound HTTP traffic. Critical for an always-on trading bot that only makes outbound API calls.
 - **Post-trade balance recording:** For BUY/SELL intervals, balances are fetched *after* the order flow so `BotTick` records reflect the bot's actual position after acting on its signal. For HOLD intervals, balances are fetched directly (no order flow).
-- **Dry run mode via Kraken's `validate=True`:** `AddOrderConnector.place()` already accepts a `validate` parameter — Kraken validates the order (pair, volume, balance) without executing it, returning an `OrderResult` with `txid=None` and the order description. In dry run mode: orders are validated but not placed, no `BotOrder` is persisted (no txid to track), `QueryOrdersConnector` is not called, and **no ticks are persisted** — all tick data is logged instead. This prevents dry run data from polluting `bot_ticks` and, critically, from corrupting `_recover_state()` when switching to live: if the last dry run tick recorded signal=BUY, the live bot would think it already holds a position it never bought, skipping its first real entry. Logs include a `[DRY RUN]` prefix on all output lines. This enables verifying the full OHLC → signal → order-validation loop in production before risking real money. Zero additional API cost — Kraken's validate endpoint is free. Activated via `--dry-run` CLI flag or `DRY_RUN=true` env var in Docker.
+- **Dry run mode via Kraken's `validate=True`:** `AddOrderConnector.place()` already accepts a `validate` parameter — Kraken validates the order (pair, volume, balance) without executing it, returning an `AddOrderResult` with `txid=None` and the order description. In dry run mode: orders are validated but not placed, no `BotOrder` is persisted (no txid to track), `QueryOrdersConnector` is not called, and **no ticks are persisted** — all tick data is logged instead. This prevents dry run data from polluting `bot_ticks` and, critically, from corrupting `_recover_state()` when switching to live: if the last dry run tick recorded signal=BUY, the live bot would think it already holds a position it never bought, skipping its first real entry. Logs include a `[DRY RUN]` prefix on all output lines. This enables verifying the full OHLC → signal → order-validation loop in production before risking real money. Zero additional API cost — Kraken's validate endpoint is free. Activated via `--dry-run` CLI flag or `DRY_RUN=true` env var in Docker.
 - **Current executor requires full rewrite regardless of platform:** The existing `TradeExecutor` calls `generate_signal(price)` with a `float`, but `Strategy.generate_signal()` expects a `pd.Series` with `open`, `high`, `low`, `close` keys. No persistence, no warm-up, no DI. Both stateless and always-on approaches require the same rewrite scope — platform choice doesn't affect implementation effort.
 
 ### Future extension points
