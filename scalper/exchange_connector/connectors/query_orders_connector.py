@@ -18,6 +18,8 @@ class QueryOrdersConnector(FetchConnector):
         :param txids: List of transaction IDs to query.
         :return: List of QueryOrderResult domain objects containing order details.
         '''
+        if not txids:
+            return []
         raw_result = self.service.fetch_orders(','.join(txids))
         return self._to_domain(raw_result)
 

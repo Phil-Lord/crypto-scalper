@@ -551,6 +551,19 @@ class TestQueryOrdersConnector:
         # Then
         connector.service.fetch_orders.assert_called_once_with('TXID-AAA,TXID-BBB')
 
+    def test_fetch_returns_empty_list_when_no_txids(self, mock_client):
+        # Given
+        from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
+        connector = QueryOrdersConnector(client=mock_client)
+        connector.service = Mock()
+
+        # When
+        results = connector.fetch([])
+
+        # Then
+        assert results == []
+        assert not connector.service.fetch_orders.called
+
     def test_to_domain_converts_fields_correctly(self, mock_client, raw_order_response):
         # Given
         from decimal import Decimal
