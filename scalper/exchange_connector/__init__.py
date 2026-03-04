@@ -6,7 +6,7 @@ from .connectors.query_orders_connector import QueryOrdersConnector
 from .connectors.ticker_connector import TickerConnector
 from .connectors.trades_connector import TradesConnector
 
-from .models import OrderResult, QueryOrderResult
+from .models import AddOrderResult, QueryOrderResult
 
 from .api.exceptions import (
     KrakenApiError,
