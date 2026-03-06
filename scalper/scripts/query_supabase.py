@@ -85,11 +85,14 @@ def bot_order(action: str, client: SupabaseClient):
             bot_id=ask('bot_id:'),
             run_id=ask('bot_run_id:'),
             tick_id=ask('tick_id:'),
+            txid=ask('txid:'),
             side=ask('side:'),
+            status=ask('status:'),
+            placed_at=ask_datetime('placed_at:'),
+            filled_at=ask_datetime('filled_at:'),
             price=ask('price:'),
             volume=ask('volume:'),
-            fee=ask('fee:'),
-            executed_at=ask_datetime('executed_at:')
+            fee=ask('fee:')
         ))
         print('Added bot order:', bot_order)
     elif action == 'get':
