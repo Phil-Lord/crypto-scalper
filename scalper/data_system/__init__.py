@@ -2,7 +2,7 @@ from .clients.sqlalchemy_client import SQLAlchemyClient
 from .clients.supabase_client import SupabaseClient
 
 from .models.bot_model import Bot
-from .models.bot_order_model import BotOrder, Side
+from .models.bot_order_model import BotOrder, OrderStatus, Side
 from .models.bot_run_model import BotRun
 from .models.bot_tick_model import BotTick, Signal
 from .models.generalisation_evaluation_model import GeneralisationEvaluation
