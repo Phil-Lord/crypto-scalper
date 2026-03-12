@@ -39,8 +39,8 @@ class SupabaseBotTickRepository(BotTickRepository):
     def _to_bot_tick(self, data: dict) -> BotTick:
         data['run_id'] = UUID(data['run_id'])
         data['timestamp'] = datetime.fromisoformat(data['timestamp'])
-        data['price'] = Decimal(data['price'])
-        data['balance_base'] = Decimal(data['balance_base'])
-        data['balance_quote'] = Decimal(data['balance_quote'])
+        data['price'] = Decimal(str(data['price']))
+        data['balance_base'] = Decimal(str(data['balance_base']))
+        data['balance_quote'] = Decimal(str(data['balance_quote']))
         data['signal'] = Signal(data['signal'])
         return BotTick(**data)

@@ -47,8 +47,8 @@ class SupabaseBotOrderRepository(BotOrderRepository):
         data['placed_at'] = datetime.fromisoformat(data['placed_at'])
 
         data['filled_at'] = datetime.fromisoformat(data['filled_at']) if data['filled_at'] else None
-        data['price'] = Decimal(data['price']) if data['price'] is not None else None
-        data['volume'] = Decimal(data['volume']) if data['volume'] is not None else None
-        data['fee'] = Decimal(data['fee']) if data['fee'] is not None else None
+        data['price'] = Decimal(str(data['price'])) if data['price'] is not None else None
+        data['volume'] = Decimal(str(data['volume'])) if data['volume'] is not None else None
+        data['fee'] = Decimal(str(data['fee'])) if data['fee'] is not None else None
 
         return BotOrder(**data)
