@@ -27,9 +27,9 @@ class BotTick:
         balance_base (Decimal): Balance of the base currency at this tick, hit API on buy/sell.
         balance_quote (Decimal): Balance of the quote currency at this tick, hit API on buy/sell.
 
-        error (Optional[str]): Error message if any issue occurred during this tick.
+        error (str | None): Error message if any issue occurred during this tick.
 
-        id (Optional[int]): Primary key for database storage, none if not yet saved.
+        id (int | None): Primary key for database storage, none if not yet saved.
     '''
     # Identifiers
     bot_id: str

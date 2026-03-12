@@ -25,17 +25,17 @@ class BotOrder:
         id (UUID): Unique order identifier.
         bot_id (str): Identifier of the bot which placed the order, e.g., `btc_1m_001`.
         run_id (UUID): Identifier of the bot run associated with the order.
-        tick_id (int): Identifier of the bot tick associated with the order.
+        tick_id (int | None): Identifier of the bot tick associated with the order.
 
         txid (str): Order ID returned by the exchange when the order was placed.
         side (Side): Side of the order (buy/sell).
         status (OrderStatus): Status of the order (defaults to `placed`).
         placed_at (datetime): Timestamp when the order was placed (defaults to current time).
 
-        filled_at (datetime): Timestamp when the order was filled.
-        price (Decimal): Average price at which the order was executed.
-        volume (Decimal): Order volume.
-        fee (Decimal): Fee paid.
+        filled_at (datetime | None): Timestamp when the order was filled.
+        price (Decimal | None): Average price at which the order was executed.
+        volume (Decimal | None): Order volume.
+        fee (Decimal | None): Fee paid.
     '''
     bot_id: str
     run_id: UUID
