@@ -14,9 +14,7 @@ class SupabaseBotRepository(BotRepository):
         self.client = client
 
     def add(self, bot: Bot) -> Bot:
-        record = asdict(bot)
-        record['created_at'] = bot.created_at.isoformat()
-        response = (self.client.table(self.TABLE_NAME).insert(record).execute())
+        response = self.client.table(self.TABLE_NAME).insert(self._to_record(bot)).execute()
         return self._to_bot(response.data[0])
 
     def get(self, id: str) -> Bot | None:
@@ -30,6 +28,11 @@ class SupabaseBotRepository(BotRepository):
         if not response.data:
             return None
         return self._to_bot(response.data[0])
+
+    def _to_record(self, bot: Bot) -> dict:
+        record = asdict(bot)
+        record['created_at'] = bot.created_at.isoformat()
+        return record
 
     def _to_bot(self, data: dict) -> Bot:
         data['created_at'] = datetime.fromisoformat(data['created_at'])
