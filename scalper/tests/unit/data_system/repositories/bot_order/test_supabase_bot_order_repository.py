@@ -23,7 +23,7 @@ class TestSupabaseBotOrderRepository:
             bot_id='btc_1m_001',
             run_id=uuid4(),
             tick_id=1,
-            txid='OFLMR7-XXXXX-XXXXXX',
+            exchange_order_id='OFLMR7-XXXXX-XXXXXX',
             side=Side.BUY,
             status=OrderStatus.FILLED,
             price=Decimal('50000.00'),
@@ -38,7 +38,7 @@ class TestSupabaseBotOrderRepository:
         return BotOrder(
             bot_id='btc_1m_001',
             run_id=uuid4(),
-            txid='OFLMR7-XXXXX-XXXXXX',
+            exchange_order_id='OFLMR7-XXXXX-XXXXXX',
             side=Side.BUY,
         )
 
@@ -50,7 +50,7 @@ class TestSupabaseBotOrderRepository:
             'bot_id': sample_order.bot_id,
             'run_id': str(sample_order.run_id),
             'tick_id': sample_order.tick_id,
-            'txid': sample_order.txid,
+            'exchange_order_id': sample_order.exchange_order_id,
             'side': sample_order.side.value,
             'status': sample_order.status.value,
             'placed_at': sample_order.placed_at.isoformat(),
@@ -68,7 +68,7 @@ class TestSupabaseBotOrderRepository:
             'bot_id': sample_placed_order.bot_id,
             'run_id': str(sample_placed_order.run_id),
             'tick_id': None,
-            'txid': sample_placed_order.txid,
+            'exchange_order_id': sample_placed_order.exchange_order_id,
             'side': sample_placed_order.side.value,
             'status': sample_placed_order.status.value,
             'placed_at': sample_placed_order.placed_at.isoformat(),

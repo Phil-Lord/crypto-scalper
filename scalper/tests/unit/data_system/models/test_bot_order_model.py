@@ -18,13 +18,13 @@ class TestBotOrder:
         return BotOrder(
             bot_id='btc_1m_001',
             run_id=uuid4(),
-            txid='OFLMR7-XXXXX-XXXXXX',
+            exchange_order_id='OFLMR7-XXXXX-XXXXXX',
             side=Side.BUY,
         )
 
     def test_creates_bot_order_with_required_fields(self, sample_order: BotOrder):
         assert sample_order.bot_id == 'btc_1m_001'
-        assert sample_order.txid == 'OFLMR7-XXXXX-XXXXXX'
+        assert sample_order.exchange_order_id == 'OFLMR7-XXXXX-XXXXXX'
         assert sample_order.side == Side.BUY
         assert isinstance(sample_order.run_id, UUID)
 
@@ -37,8 +37,18 @@ class TestBotOrder:
         run_id = uuid4()
 
         # When
-        order1 = BotOrder(bot_id='btc_1m_001', run_id=run_id, txid='TX1', side=Side.BUY)
-        order2 = BotOrder(bot_id='btc_1m_001', run_id=run_id, txid='TX2', side=Side.BUY)
+        order1 = BotOrder(
+            bot_id='btc_1m_001',
+            run_id=run_id,
+            exchange_order_id='TX1',
+            side=Side.BUY
+        )
+        order2 = BotOrder(
+            bot_id='btc_1m_001',
+            run_id=run_id,
+            exchange_order_id='TX2',
+            side=Side.BUY
+        )
 
         # Then
         assert order1.id != order2.id
@@ -102,7 +112,7 @@ class TestBotOrder:
         assert filled.volume == Decimal('0.001')
         assert filled.fee == Decimal('0.50')
         assert filled.filled_at == filled_at
-        assert filled.txid == sample_order.txid
+        assert filled.exchange_order_id == sample_order.exchange_order_id
         assert filled.id == sample_order.id
 
 
