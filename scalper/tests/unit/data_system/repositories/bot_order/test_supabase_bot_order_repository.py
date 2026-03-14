@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from data_system.models.bot_order_model import BotOrder, Side
+from data_system.models.bot_order_model import BotOrder, OrderStatus, Side
 from data_system.repositories.bot_order.supabase_bot_order_repository import SupabaseBotOrderRepository
 
 
@@ -18,30 +18,64 @@ class TestSupabaseBotOrderRepository:
 
     @pytest.fixture
     def sample_order(self) -> BotOrder:
+        ''' A fully-filled order with all fields populated. '''
         return BotOrder(
             bot_id='btc_1m_001',
             run_id=uuid4(),
             tick_id=1,
+            txid='OFLMR7-XXXXX-XXXXXX',
             side=Side.BUY,
+            status=OrderStatus.FILLED,
             price=Decimal('50000.00'),
             volume=Decimal('0.001'),
             fee=Decimal('0.50'),
-            executed_at=datetime.now(timezone.utc)
+            filled_at=datetime.now(timezone.utc),
+        )
+
+    @pytest.fixture
+    def sample_placed_order(self) -> BotOrder:
+        ''' A freshly-placed order — fill fields not yet populated. '''
+        return BotOrder(
+            bot_id='btc_1m_001',
+            run_id=uuid4(),
+            txid='OFLMR7-XXXXX-XXXXXX',
+            side=Side.BUY,
         )
 
     @pytest.fixture
     def mock_response_data(self, sample_order: BotOrder) -> dict:
-        ''' Returns data as Supabase would - strings for UUIDs, datetimes, decimals. '''
+        ''' Returns data as Supabase would — strings for UUIDs, datetimes, and decimals. '''
         return {
             'id': str(sample_order.id),
             'bot_id': sample_order.bot_id,
             'run_id': str(sample_order.run_id),
             'tick_id': sample_order.tick_id,
+            'txid': sample_order.txid,
             'side': sample_order.side.value,
+            'status': sample_order.status.value,
+            'placed_at': sample_order.placed_at.isoformat(),
+            'filled_at': sample_order.filled_at.isoformat(),
             'price': str(sample_order.price),
             'volume': str(sample_order.volume),
             'fee': str(sample_order.fee),
-            'executed_at': sample_order.executed_at.isoformat()
+        }
+
+    @pytest.fixture
+    def mock_placed_response_data(self, sample_placed_order: BotOrder) -> dict:
+        ''' Returns data for a PLACED order — fill fields are null. '''
+        return {
+            'id': str(sample_placed_order.id),
+            'bot_id': sample_placed_order.bot_id,
+            'run_id': str(sample_placed_order.run_id),
+            'tick_id': None,
+            'txid': sample_placed_order.txid,
+            'side': sample_placed_order.side.value,
+            'status': sample_placed_order.status.value,
+            'placed_at': sample_placed_order.placed_at.isoformat(),
+            'filled_at': None,
+            'price': None,
+            'volume': None,
+            'fee': None,
         }
 
     def _set_select_ordered_response(self, client, data: list) -> None:
@@ -77,7 +111,7 @@ class TestSupabaseBotOrderRepository:
         assert result[0] == sample_order
         mock_supabase_client.table.assert_called_once_with('bot_orders')
 
-    def test_get_by_bot_id_orders_by_executed_at_descending(self, mock_supabase_client):
+    def test_get_by_bot_id_orders_by_placed_at_descending(self, mock_supabase_client):
         # Given
         self._set_select_ordered_response(mock_supabase_client, [])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
@@ -87,7 +121,7 @@ class TestSupabaseBotOrderRepository:
 
         # Then
         mock_supabase_client.table.return_value.select.return_value.eq.return_value.order.assert_called_once_with(
-            'executed_at', desc=True
+            'placed_at', desc=True
         )
 
     def test_add_inserts_order_and_returns_result(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
@@ -111,12 +145,11 @@ class TestSupabaseBotOrderRepository:
         repository.add(sample_order)
 
         # Then
-        insert_call = mock_supabase_client.table.return_value.insert
-        inserted_record = insert_call.call_args[0][0]
-        assert inserted_record['id'] == str(sample_order.id)
-        assert inserted_record['run_id'] == str(sample_order.run_id)
+        inserted = mock_supabase_client.table.return_value.insert.call_args[0][0]
+        assert inserted['id'] == str(sample_order.id)
+        assert inserted['run_id'] == str(sample_order.run_id)
 
-    def test_add_converts_executed_at_to_iso_format(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
+    def test_add_converts_placed_at_to_iso_format(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
         # Given
         self._set_insert_response(mock_supabase_client, [mock_response_data])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
@@ -125,9 +158,35 @@ class TestSupabaseBotOrderRepository:
         repository.add(sample_order)
 
         # Then
-        insert_call = mock_supabase_client.table.return_value.insert
-        inserted_record = insert_call.call_args[0][0]
-        assert inserted_record['executed_at'] == sample_order.executed_at.isoformat()
+        inserted = mock_supabase_client.table.return_value.insert.call_args[0][0]
+        assert inserted['placed_at'] == sample_order.placed_at.isoformat()
+
+    def test_add_converts_filled_at_to_iso_format_when_set(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
+        # Given
+        self._set_insert_response(mock_supabase_client, [mock_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        repository.add(sample_order)
+
+        # Then
+        inserted = mock_supabase_client.table.return_value.insert.call_args[0][0]
+        assert inserted['filled_at'] == sample_order.filled_at.isoformat()
+
+    def test_add_serialises_null_fill_fields_as_none(self, mock_supabase_client, sample_placed_order: BotOrder, mock_placed_response_data: dict):
+        # Given
+        self._set_insert_response(mock_supabase_client, [mock_placed_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        repository.add(sample_placed_order)
+
+        # Then
+        inserted = mock_supabase_client.table.return_value.insert.call_args[0][0]
+        assert inserted['filled_at'] is None
+        assert inserted['price'] is None
+        assert inserted['volume'] is None
+        assert inserted['fee'] is None
 
     def test_add_parses_response_uuids_to_uuid_objects(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
         # Given
@@ -143,7 +202,7 @@ class TestSupabaseBotOrderRepository:
         assert result.id == sample_order.id
         assert result.run_id == sample_order.run_id
 
-    def test_add_parses_response_executed_at_to_datetime(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
+    def test_add_parses_response_placed_at_to_datetime(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
         # Given
         self._set_insert_response(mock_supabase_client, [mock_response_data])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
@@ -152,8 +211,31 @@ class TestSupabaseBotOrderRepository:
         result = repository.add(sample_order)
 
         # Then
-        assert isinstance(result.executed_at, datetime)
-        assert result.executed_at == sample_order.executed_at
+        assert isinstance(result.placed_at, datetime)
+        assert result.placed_at == sample_order.placed_at
+
+    def test_add_parses_response_filled_at_to_datetime(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
+        # Given
+        self._set_insert_response(mock_supabase_client, [mock_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.add(sample_order)
+
+        # Then
+        assert isinstance(result.filled_at, datetime)
+        assert result.filled_at == sample_order.filled_at
+
+    def test_add_parses_null_filled_at_as_none(self, mock_supabase_client, sample_placed_order: BotOrder, mock_placed_response_data: dict):
+        # Given
+        self._set_insert_response(mock_supabase_client, [mock_placed_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.add(sample_placed_order)
+
+        # Then
+        assert result.filled_at is None
 
     def test_add_parses_response_decimals_to_decimal_objects(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
         # Given
@@ -165,11 +247,26 @@ class TestSupabaseBotOrderRepository:
 
         # Then
         assert isinstance(result.price, Decimal)
+        assert isinstance(result.volume, Decimal)
         assert isinstance(result.fee, Decimal)
         assert result.price == sample_order.price
+        assert result.volume == sample_order.volume
         assert result.fee == sample_order.fee
 
-    def test_add_parses_response_side_to_enum(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
+    def test_add_parses_null_decimals_as_none(self, mock_supabase_client, sample_placed_order: BotOrder, mock_placed_response_data: dict):
+        # Given
+        self._set_insert_response(mock_supabase_client, [mock_placed_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.add(sample_placed_order)
+
+        # Then
+        assert result.price is None
+        assert result.volume is None
+        assert result.fee is None
+
+    def test_add_parses_response_enums(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
         # Given
         self._set_insert_response(mock_supabase_client, [mock_response_data])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
@@ -179,7 +276,9 @@ class TestSupabaseBotOrderRepository:
 
         # Then
         assert isinstance(result.side, Side)
+        assert isinstance(result.status, OrderStatus)
         assert result.side == Side.BUY
+        assert result.status == OrderStatus.FILLED
 
     def test_get_by_bot_id_parses_response_types_correctly(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
         # Given
@@ -194,7 +293,10 @@ class TestSupabaseBotOrderRepository:
         order = result[0]
         assert isinstance(order.id, UUID)
         assert isinstance(order.run_id, UUID)
-        assert isinstance(order.executed_at, datetime)
+        assert isinstance(order.placed_at, datetime)
+        assert isinstance(order.filled_at, datetime)
         assert isinstance(order.price, Decimal)
+        assert isinstance(order.volume, Decimal)
         assert isinstance(order.fee, Decimal)
         assert isinstance(order.side, Side)
+        assert isinstance(order.status, OrderStatus)
