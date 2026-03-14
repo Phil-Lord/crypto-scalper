@@ -27,7 +27,8 @@ class BotOrder:
         run_id (UUID): Identifier of the bot run associated with the order.
         tick_id (int | None): Identifier of the bot tick associated with the order.
 
-        txid (str): Order ID returned by the exchange when the order was placed.
+        exchange_order_id (str): Order ID returned by the exchange when the order was placed.
+            Named explicitly to distinguish from Kraken trade IDs and ledger IDs.
         side (Side): Side of the order (buy/sell).
         status (OrderStatus): Status of the order (defaults to `placed`).
         placed_at (datetime): Timestamp when the order was placed (defaults to current time).
@@ -40,7 +41,7 @@ class BotOrder:
     bot_id: str
     run_id: UUID
 
-    txid: str
+    exchange_order_id: str
     side: Side
     status: OrderStatus = OrderStatus.PLACED
     placed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

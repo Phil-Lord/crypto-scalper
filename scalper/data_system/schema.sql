@@ -63,7 +63,7 @@ CREATE TABLE bot_orders (
     tick_id BIGINT REFERENCES bot_ticks(id),
 
     -- Order Details
-    txid TEXT NOT NULL,
+    exchange_order_id TEXT NOT NULL,
     side TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'placed',
     placed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

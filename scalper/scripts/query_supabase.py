@@ -87,7 +87,7 @@ def bot_order(action: str, client: SupabaseClient):
             bot_id=ask('bot_id:', required=True),
             run_id=UUID(ask('run_id:', required=True)),
             tick_id=int(v) if (v := ask('tick_id (optional):')) else None,
-            txid=ask('txid:', required=True),
+            exchange_order_id=ask('exchange_order_id:', required=True),
             side=Side(questionary.select('side:', choices=['buy', 'sell']).ask()),
             filled_at=datetime.strptime(v, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc) if (
                 v := ask('filled_at (optional, YYYY-MM-DD HH:MM:SS):')) else None,
