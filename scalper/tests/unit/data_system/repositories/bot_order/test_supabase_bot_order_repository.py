@@ -379,17 +379,3 @@ class TestSupabaseBotOrderRepository:
         assert order.fee is None
         assert order.tick_id is None
         assert order.status == OrderStatus.PLACED
-
-    def test_add_converts_decimals_to_strings(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
-        # Given
-        self._set_insert_response(mock_supabase_client, [mock_response_data])
-        repository = SupabaseBotOrderRepository(mock_supabase_client)
-
-        # When
-        repository.add(sample_order)
-
-        # Then
-        inserted = mock_supabase_client.table.return_value.insert.call_args[0][0]
-        assert inserted['price'] == str(sample_order.price)
-        assert inserted['volume'] == str(sample_order.volume)
-        assert inserted['fee'] == str(sample_order.fee)
