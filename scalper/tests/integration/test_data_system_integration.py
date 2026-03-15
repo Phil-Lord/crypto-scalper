@@ -454,7 +454,7 @@ class TestDataSystemIntegration:
     def test_supabase_bot_run_get_full_stack(self, sample_bot_run: BotRun):
         '''
         Test full Supabase stack for bot_runs queries.
-        Verifies deserialistion from Supabase response to domain object.
+        Verifies deserialisation from Supabase response to domain object.
         '''
         # Given
         with patch('data_system.clients.supabase_client.create_client') as mock_create_client:
