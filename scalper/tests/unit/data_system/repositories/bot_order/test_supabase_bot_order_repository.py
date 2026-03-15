@@ -300,3 +300,35 @@ class TestSupabaseBotOrderRepository:
         assert isinstance(order.fee, Decimal)
         assert isinstance(order.side, Side)
         assert isinstance(order.status, OrderStatus)
+
+    def test_get_by_bot_id_parses_null_fill_fields(self, mock_supabase_client, sample_placed_order: BotOrder, mock_placed_response_data: dict):
+        # Given
+        self._set_select_ordered_response(mock_supabase_client, [mock_placed_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.get_by_bot_id(sample_placed_order.bot_id)
+
+        # Then
+        assert len(result) == 1
+        order = result[0]
+        assert order.filled_at is None
+        assert order.price is None
+        assert order.volume is None
+        assert order.fee is None
+        assert order.tick_id is None
+        assert order.status == OrderStatus.PLACED
+
+    def test_add_converts_decimals_to_strings(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
+        # Given
+        self._set_insert_response(mock_supabase_client, [mock_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        repository.add(sample_order)
+
+        # Then
+        inserted = mock_supabase_client.table.return_value.insert.call_args[0][0]
+        assert inserted['price'] == str(sample_order.price)
+        assert inserted['volume'] == str(sample_order.volume)
+        assert inserted['fee'] == str(sample_order.fee)
