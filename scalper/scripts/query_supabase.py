@@ -57,7 +57,7 @@ def bot_run(action: str, client: SupabaseClient):
         ))
         print('Added bot run:', bot_run)
     elif action == 'get':
-        bot_run = repository.get(ask('bot_run_id:', required=True))
+        bot_run = repository.get(UUID(ask('bot_run_id:', required=True)))
         print('Retrieved bot run:', bot_run)
 
 
