@@ -1,6 +1,6 @@
 ---
 agent: agent
-description: "Manually test the add and get paths for the four live-trading Supabase repos and models using query_supabase.py"
+description: "Manually test the add and get paths for the four live-trading Supabase repos and models, ensuring correct type serialisation, FK constraints, and error handling."
 ---
 
 # Test Supabase Repos
