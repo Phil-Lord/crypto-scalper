@@ -188,6 +188,20 @@ class TestSupabaseBotOrderRepository:
         assert inserted['volume'] is None
         assert inserted['fee'] is None
 
+    def test_add_serialises_decimal_fields_as_strings(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
+        # Given
+        self._set_insert_response(mock_supabase_client, [mock_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        repository.add(sample_order)
+
+        # Then
+        inserted = mock_supabase_client.table.return_value.insert.call_args[0][0]
+        assert inserted['price'] == str(sample_order.price)
+        assert inserted['volume'] == str(sample_order.volume)
+        assert inserted['fee'] == str(sample_order.fee)
+
     def test_add_parses_response_uuids_to_uuid_objects(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
         # Given
         self._set_insert_response(mock_supabase_client, [mock_response_data])
@@ -266,6 +280,50 @@ class TestSupabaseBotOrderRepository:
         assert result.volume is None
         assert result.fee is None
 
+    def test_add_preserves_full_decimal_precision_on_round_trip(self, mock_supabase_client):
+        # Given — values with 12 decimal places; float conversion would silently corrupt them
+        order = BotOrder(
+            bot_id='btc_1m_001',
+            run_id=uuid4(),
+            tick_id=1,
+            exchange_order_id='OFLMR7-XXXXX-XXXXXX',
+            side=Side.BUY,
+            status=OrderStatus.FILLED,
+            price=Decimal('50000.123456789012'),
+            volume=Decimal('0.001234567890'),
+            fee=Decimal('0.500000000001'),
+            filled_at=datetime.now(timezone.utc),
+        )
+        response_data = {
+            'id': str(order.id),
+            'bot_id': order.bot_id,
+            'run_id': str(order.run_id),
+            'tick_id': order.tick_id,
+            'exchange_order_id': order.exchange_order_id,
+            'side': order.side.value,
+            'status': order.status.value,
+            'placed_at': order.placed_at.isoformat(),
+            'filled_at': order.filled_at.isoformat(),
+            'price': '50000.123456789012',
+            'volume': '0.001234567890',
+            'fee': '0.500000000001',
+        }
+        self._set_insert_response(mock_supabase_client, [response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.add(order)
+
+        # Then — serialised as exact strings without float loss
+        inserted = mock_supabase_client.table.return_value.insert.call_args[0][0]
+        assert inserted['price'] == '50000.123456789012'
+        assert inserted['volume'] == '0.001234567890'
+        assert inserted['fee'] == '0.500000000001'
+        # And deserialised back to Decimal with full precision
+        assert result.price == Decimal('50000.123456789012')
+        assert result.volume == Decimal('0.001234567890')
+        assert result.fee == Decimal('0.500000000001')
+
     def test_add_parses_response_enums(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
         # Given
         self._set_insert_response(mock_supabase_client, [mock_response_data])
@@ -298,6 +356,9 @@ class TestSupabaseBotOrderRepository:
         assert isinstance(order.price, Decimal)
         assert isinstance(order.volume, Decimal)
         assert isinstance(order.fee, Decimal)
+        assert order.price == sample_order.price
+        assert order.volume == sample_order.volume
+        assert order.fee == sample_order.fee
         assert isinstance(order.side, Side)
         assert isinstance(order.status, OrderStatus)
 
