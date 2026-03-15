@@ -7,8 +7,8 @@ from uuid import UUID
 import questionary
 
 from data_system import (
-    Bot, BotOrder, BotRun, BotTick, Side, Signal, SupabaseBotOrderRepository, SupabaseBotRepository,
-    SupabaseBotRunRepository, SupabaseBotTickRepository, SupabaseClient,
+    Bot, BotOrder, BotRun, BotTick, OrderStatus, Side, Signal, SupabaseBotOrderRepository, SupabaseBotRepository,
+    SupabaseBotRunRepository, SupabaseBotTickRepository, SupabaseClient
 )
 from utils import load_env, LOG_FORMAT
 
@@ -89,6 +89,8 @@ def bot_order(action: str, client: SupabaseClient):
             tick_id=int(v) if (v := ask('tick_id (optional):')) else None,
             exchange_order_id=ask('exchange_order_id:', required=True),
             side=Side(questionary.select('side:', choices=['buy', 'sell']).ask()),
+            status=OrderStatus(questionary.select(
+                'status:', choices=['placed', 'filled', 'failed']).ask()),
             filled_at=datetime.strptime(v, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc) if (
                 v := ask('filled_at (optional, YYYY-MM-DD HH:MM:SS):')) else None,
             price=Decimal(v) if (v := ask('price (optional):')) else None,
