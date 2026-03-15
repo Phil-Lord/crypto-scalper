@@ -76,7 +76,7 @@ Tests mirror source: `strategy_manager/foo.py` → `tests/unit/strategy_manager/
 **Ask first:**
 
 - Changing public APIs (method signatures exported by `__init__.py`)
-- Adding new dependencies to `requirements.txt`
+- Adding new dependencies to `pyproject.toml` (use `uv add <package>`)
 - Changes that touch both `data_system` schema and application code simultaneously
 - Anything that touches live trading paths (`trade_executor/`, `scripts/start_scalping.py`)
 
@@ -96,8 +96,8 @@ Reusable prompts in `.github/prompts/`:
 
 ## Environment
 
-- Python 3.12+
-- Dependencies: `requirements.txt`
+- Python 3.13.4 (managed by uv, see `.python-version`)
+- Dependencies: `pyproject.toml` + `uv.lock` (use `uv sync` to install)
 - Local DB: SQLite at `scalper/local_storage/scalper.db`
 - Cloud DB: Supabase (requires `SUPABASE_URL` + `SUPABASE_KEY` in `.env`)
 - Exchange: Kraken (requires `KRAKEN_API_KEY` + `KRAKEN_API_SECRET` in `.env`)
