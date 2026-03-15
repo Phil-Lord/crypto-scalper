@@ -1,5 +1,5 @@
 import dataclasses
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -67,13 +67,23 @@ class TestBotOrder:
         # When / Then
         assert sample_order.status == OrderStatus.PLACED
 
-    def test_placed_at_defaults_to_current_utc_time(self, sample_order: BotOrder):
-        assert isinstance(sample_order.placed_at, datetime)
-        assert sample_order.placed_at.tzinfo is not None
+    def test_placed_at_defaults_to_current_utc_time(self):
+        # Given
+        before = datetime.now(timezone.utc)
 
-        one_millisecond_ago = datetime.now(timezone.utc) - timedelta(milliseconds=1)
-        now = datetime.now(timezone.utc)
-        assert one_millisecond_ago <= sample_order.placed_at <= now
+        # When
+        order = BotOrder(
+            bot_id='btc_1m_001',
+            run_id=uuid4(),
+            exchange_order_id='OFLMR7-XXXXX-XXXXXX',
+            side=Side.BUY,
+        )
+        after = datetime.now(timezone.utc)
+
+        # Then
+        assert isinstance(order.placed_at, datetime)
+        assert order.placed_at.tzinfo is not None
+        assert before <= order.placed_at <= after
 
     def test_fill_fields_default_to_none(self, sample_order: BotOrder):
         assert sample_order.filled_at is None
