@@ -12,7 +12,7 @@ class BotRun:
         bot_id (str): Identifier of the bot associated with this run.
         id (UUID): Unique identifier for the bot run.
         started_at (datetime): Timestamp when the bot run started, defaults to current UTC time.
-        completed_at (datetime): Timestamp when the bot run ended, if applicable.
+        completed_at (datetime | None): Timestamp when the bot run ended, if applicable.
     '''
     bot_id: str
     id: UUID = field(default_factory=uuid4)

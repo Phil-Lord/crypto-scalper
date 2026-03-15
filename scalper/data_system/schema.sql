@@ -63,13 +63,19 @@ CREATE TABLE bot_orders (
     tick_id BIGINT REFERENCES bot_ticks(id),
 
     -- Order Details
+    exchange_order_id TEXT NOT NULL,
     side TEXT NOT NULL,
-    price DECIMAL(32, 12) NOT NULL,
-    volume DECIMAL(32, 12) NOT NULL,
-    fee DECIMAL(32, 12) NOT NULL,
-    executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status TEXT NOT NULL DEFAULT 'placed',
+    placed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT chk_side CHECK (side IN ('buy', 'sell'))
+    -- Order Fill Details
+    filled_at TIMESTAMPTZ,
+    price DECIMAL(32, 12),
+    volume DECIMAL(32, 12),
+    fee DECIMAL(32, 12),
+
+    CONSTRAINT chk_side CHECK (side IN ('buy', 'sell')),
+    CONSTRAINT chk_status CHECK (status IN ('placed', 'filled', 'failed'))
 );
 
 

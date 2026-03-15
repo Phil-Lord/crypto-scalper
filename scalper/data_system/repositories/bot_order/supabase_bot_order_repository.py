@@ -6,7 +6,7 @@ from uuid import UUID
 from supabase import Client
 
 from data_system.models import BotOrder
-from data_system.models.bot_order_model import Side
+from data_system.models.bot_order_model import OrderStatus, Side
 from .bot_order_repository import BotOrderRepository
 
 
@@ -17,13 +17,7 @@ class SupabaseBotOrderRepository(BotOrderRepository):
         self.client = client
 
     def add(self, bot_order: BotOrder) -> BotOrder:
-        # Convert UUIDs to strings and datetime to ISO format
-        record = asdict(bot_order)
-        record['id'] = str(bot_order.id)
-        record['run_id'] = str(bot_order.run_id)
-        record['executed_at'] = bot_order.executed_at.isoformat()
-
-        response = (self.client.table(self.TABLE_NAME).insert(record).execute())
+        response = self.client.table(self.TABLE_NAME).insert(self._to_record(bot_order)).execute()
         return self._to_bot_order(response.data[0])
 
     def get_by_bot_id(self, bot_id: str) -> list[BotOrder]:
@@ -32,17 +26,40 @@ class SupabaseBotOrderRepository(BotOrderRepository):
             .table(self.TABLE_NAME)
             .select('*')
             .eq('bot_id', bot_id)
-            .order('executed_at', desc=True)
+            .order('placed_at', desc=True)
             .execute()
         )
         return [self._to_bot_order(row) for row in response.data]
 
+    def _to_record(self, bot_order: BotOrder) -> dict:
+        record = asdict(bot_order)
+
+        # UUIDs to strings
+        record['id'] = str(bot_order.id)
+        record['run_id'] = str(bot_order.run_id)
+
+        # Datetimes to ISO format strings
+        record['placed_at'] = bot_order.placed_at.isoformat()
+        record['filled_at'] = bot_order.filled_at.isoformat() if bot_order.filled_at else None
+
+        # Decimals to strings to avoid floating point issues in JSON
+        record['price'] = str(bot_order.price) if bot_order.price is not None else None
+        record['volume'] = str(bot_order.volume) if bot_order.volume is not None else None
+        record['fee'] = str(bot_order.fee) if bot_order.fee is not None else None
+
+        return record
+
     def _to_bot_order(self, data: dict) -> BotOrder:
         data['id'] = UUID(data['id'])
         data['run_id'] = UUID(data['run_id'])
-        data['executed_at'] = datetime.fromisoformat(data['executed_at'])
-        data['price'] = Decimal(data['price'])
-        data['volume'] = Decimal(data['volume'])
-        data['fee'] = Decimal(data['fee'])
+
         data['side'] = Side(data['side'])
+        data['status'] = OrderStatus(data['status'])
+        data['placed_at'] = datetime.fromisoformat(data['placed_at'])
+
+        data['filled_at'] = datetime.fromisoformat(data['filled_at']) if data['filled_at'] else None
+        data['price'] = Decimal(str(data['price'])) if data['price'] is not None else None
+        data['volume'] = Decimal(str(data['volume'])) if data['volume'] is not None else None
+        data['fee'] = Decimal(str(data['fee'])) if data['fee'] is not None else None
+
         return BotOrder(**data)

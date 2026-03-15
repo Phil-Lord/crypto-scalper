@@ -139,6 +139,21 @@ class TestSupabaseBotTickRepository:
         inserted_record = insert_call.call_args[0][0]
         assert inserted_record['timestamp'] == sample_tick.timestamp.isoformat()
 
+    def test_add_serialises_decimal_fields_as_strings(self, mock_supabase_client, sample_tick: BotTick, mock_response_data: dict):
+        # Given
+        self._set_insert_response(mock_supabase_client, [mock_response_data])
+        repository = SupabaseBotTickRepository(mock_supabase_client)
+
+        # When
+        repository.add(sample_tick)
+
+        # Then
+        insert_call = mock_supabase_client.table.return_value.insert
+        inserted_record = insert_call.call_args[0][0]
+        assert inserted_record['price'] == str(sample_tick.price)
+        assert inserted_record['balance_base'] == str(sample_tick.balance_base)
+        assert inserted_record['balance_quote'] == str(sample_tick.balance_quote)
+
     def test_add_parses_response_uuid_to_uuid_object(self, mock_supabase_client, sample_tick: BotTick, mock_response_data: dict):
         # Given
         self._set_insert_response(mock_supabase_client, [mock_response_data])
@@ -179,6 +194,44 @@ class TestSupabaseBotTickRepository:
         assert result.balance_base == sample_tick.balance_base
         assert result.balance_quote == sample_tick.balance_quote
 
+    def test_add_preserves_full_decimal_precision_on_round_trip(self, mock_supabase_client):
+        # Given — values with 12 decimal places; float conversion would silently corrupt them
+        tick = BotTick(
+            bot_id='test_bot_id',
+            run_id=uuid4(),
+            timestamp=datetime.now(timezone.utc),
+            price=Decimal('50000.123456789012'),
+            signal=Signal.HOLD,
+            balance_base=Decimal('0.001234567890'),
+            balance_quote=Decimal('100.000000000001'),
+        )
+        response_data = {
+            'id': 1,
+            'bot_id': tick.bot_id,
+            'run_id': str(tick.run_id),
+            'timestamp': tick.timestamp.isoformat(),
+            'price': '50000.123456789012',
+            'signal': tick.signal.value,
+            'balance_base': '0.001234567890',
+            'balance_quote': '100.000000000001',
+            'error': None,
+        }
+        self._set_insert_response(mock_supabase_client, [response_data])
+        repository = SupabaseBotTickRepository(mock_supabase_client)
+
+        # When
+        result = repository.add(tick)
+
+        # Then — serialised as exact strings without float loss
+        inserted_record = mock_supabase_client.table.return_value.insert.call_args[0][0]
+        assert inserted_record['price'] == '50000.123456789012'
+        assert inserted_record['balance_base'] == '0.001234567890'
+        assert inserted_record['balance_quote'] == '100.000000000001'
+        # And deserialised back to Decimal with full precision
+        assert result.price == Decimal('50000.123456789012')
+        assert result.balance_base == Decimal('0.001234567890')
+        assert result.balance_quote == Decimal('100.000000000001')
+
     def test_add_parses_response_signal_to_enum(self, mock_supabase_client, sample_tick: BotTick, mock_response_data: dict):
         # Given
         self._set_insert_response(mock_supabase_client, [mock_response_data])
@@ -208,3 +261,6 @@ class TestSupabaseBotTickRepository:
         assert isinstance(tick.balance_base, Decimal)
         assert isinstance(tick.balance_quote, Decimal)
         assert isinstance(tick.signal, Signal)
+        assert tick.price == sample_tick.price
+        assert tick.balance_base == sample_tick.balance_base
+        assert tick.balance_quote == sample_tick.balance_quote

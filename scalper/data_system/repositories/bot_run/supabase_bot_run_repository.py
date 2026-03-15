@@ -15,14 +15,7 @@ class SupabaseBotRunRepository(BotRunRepository):
         self.client = client
 
     def add(self, bot_run: BotRun) -> BotRun:
-        # Convert UUID to string and datetimes to ISO format
-        record = asdict(bot_run)
-        record['id'] = str(bot_run.id)
-        record['started_at'] = bot_run.started_at.isoformat()
-        if bot_run.completed_at:
-            record['completed_at'] = bot_run.completed_at.isoformat()
-
-        response = (self.client.table(self.TABLE_NAME).insert(record).execute())
+        response = self.client.table(self.TABLE_NAME).insert(self._to_record(bot_run)).execute()
         return self._to_bot_run(response.data[0])
 
     def get(self, id: UUID) -> BotRun | None:
@@ -36,6 +29,14 @@ class SupabaseBotRunRepository(BotRunRepository):
         if not response.data:
             return None
         return self._to_bot_run(response.data[0])
+
+    def _to_record(self, bot_run: BotRun) -> dict:
+        record = asdict(bot_run)
+        record['id'] = str(bot_run.id)
+        record['started_at'] = bot_run.started_at.isoformat()
+        if bot_run.completed_at:
+            record['completed_at'] = bot_run.completed_at.isoformat()
+        return record
 
     def _to_bot_run(self, data: dict) -> BotRun:
         data['id'] = UUID(data['id'])
