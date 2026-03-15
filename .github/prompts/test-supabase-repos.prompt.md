@@ -1,17 +1,30 @@
 ---
 agent: agent
-description: "Manually test the add and get paths for all four Supabase repos and models using query_supabase.py"
+description: "Manually test the add and get paths for the four live-trading Supabase repos and models using query_supabase.py"
 ---
 
 # Test Supabase Repos
 
-Use the [query_supabase.py](../../scalper/scripts/query_supabase.py) script to manually test the **add** and **get** paths for each of the four repos and models in Supabase.
+Use [query_supabase.py](../../scalper/scripts/query_supabase.py) to manually test the **add** and **get** paths for the four live-trading Supabase tables.
+
+## ⚠️ Important: Scope Restriction
+
+**Only touch the following four Supabase tables:**
+
+| Table        | Purpose               |
+|--------------|-----------------------|
+| `bots`       | Live trading bots     |
+| `bot_runs`   | Individual bot runs   |
+| `bot_ticks`  | Tick data per run     |
+| `bot_orders` | Orders placed per run |
+
+**Do NOT read from, write to, or modify any other tables or repos** — in particular `trades` and `generalisation_evaluation`, which contain large volumes of local backtesting data that must be left completely untouched.
 
 ## Instructions
 
-- The real Supabase tables have not been used for live trading yet, so it is safe to insert whatever test data is needed.
+- The real Supabase tables have not been used for live trading yet, so it is safe to insert whatever test data is needed into the four tables above.
 - Cover edge cases thoroughly — test that inserted, fetched, and returned records are **exactly correct**, do not cause errors, and are persisted accurately.
-- If useful, also run your own Python scripts or shell commands to inspect the repos, table schemas, dataclasses, or any related behaviour.
+- If useful, also run your own Python scripts or shell commands to inspect the repos, table schemas, dataclasses, or any related behaviour, as long as they stay within the four tables listed above.
 
 ## Scope
 
