@@ -86,7 +86,7 @@ class Strategy(ABC):
                 suppressed[i] = signal
                 last_action = signal
 
-        return pd.Series(suppressed, index=signals.index)
+        return pd.Series(suppressed, index=signals.index, dtype=object)
 
     def reset(self) -> None:
         ''' Reset strategy and all registered indicators to initial state. '''
