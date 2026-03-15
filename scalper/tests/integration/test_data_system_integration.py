@@ -636,7 +636,7 @@ class TestDataSystemIntegration:
     def test_supabase_bot_order_get_by_bot_id_full_stack(self, sample_bot_run: BotRun):
         '''
         Test full Supabase stack for bot_orders query.
-        Verifies that mixed PLACED/FILLED orders in the response are all deserialisated correctly.
+        Verifies that mixed PLACED/FILLED orders in the response are all deserialised correctly.
         '''
         # Given
         run_id_str = str(sample_bot_run.id)
