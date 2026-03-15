@@ -4,12 +4,14 @@
 
     // Python settings
     "[python]": {
+        "editor.defaultFormatter": "ms-python.autopep8",
         "editor.formatOnSave": true,
         "editor.insertSpaces": true,
         "editor.formatOnPaste": false,
         "diffEditor.ignoreTrimWhitespace": false,
     },
     "autopep8.args": ["--max-line-length", "100"],
+    "autopep8.interpreter": ["/Users/phil/repos/crypto-scalper/.venv/bin/python"],
 
     // yaml, md, and css settings
     "[yaml][markdown][css]": {

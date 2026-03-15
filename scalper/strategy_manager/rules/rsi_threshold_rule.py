@@ -32,4 +32,4 @@ class RsiThresholdRule(Rule):
         signals = np.full(len(results), 'hold', dtype=object)
         signals[cross_above_oversold] = 'buy'
         signals[cross_below_overbought] = 'sell'
-        return pd.Series(signals, index=results.index)
+        return pd.Series(signals, index=results.index, dtype=object)

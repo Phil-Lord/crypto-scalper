@@ -36,4 +36,4 @@ class MaCrossoverRule(Rule):
         signals = np.full(len(results), 'hold', dtype=object)
         signals[cross_above] = 'buy'
         signals[cross_below] = 'sell'
-        return pd.Series(signals, index=results.index)
+        return pd.Series(signals, index=results.index, dtype=object)

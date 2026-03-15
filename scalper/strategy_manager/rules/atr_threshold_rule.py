@@ -18,4 +18,8 @@ class AtrThresholdRule(Rule):
         return Signal.BUY if atr_ratio >= self.threshold else Signal.HOLD
 
     def compute_vectorised(self, results: pd.DataFrame) -> pd.Series:
-        return pd.Series(np.where(results[self.atr_name] >= self.threshold, 'buy', 'hold'), index=results.index)
+        return pd.Series(
+            np.where(results[self.atr_name] >= self.threshold, 'buy', 'hold'),
+            index=results.index,
+            dtype=object
+        )
