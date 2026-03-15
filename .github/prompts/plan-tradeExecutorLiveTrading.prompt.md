@@ -163,7 +163,7 @@
 
 ## Phase 6: Scheduler + Entry Point
 
-29. **Add `apscheduler>=3.10,<4.0` and `supabase` to `requirements.txt`**. Pin APScheduler to 3.x — version 4.x is a complete async rewrite with an incompatible API. (`supabase` is currently missing despite being imported by Supabase repositories.)
+29. **Add `apscheduler` to `pyproject.toml`** by running `uv add "apscheduler>=3.10,<4.0"`. The `<4.0` upper bound is necessary — version 4.x is a complete async rewrite that removed `BlockingScheduler` and `CronTrigger` entirely; without the pin, uv would resolve 4.x and the script would not run. (`supabase` is already present in `pyproject.toml` from the uv migration.)
 
 30. **Rewrite `start_scalping.py`** at `scripts/start_scalping.py`. New flow:
     - `load_env()` + `logging.basicConfig()` (entry-point responsibilities)
@@ -188,8 +188,13 @@
 ## Phase 7: Deployment — Fly.io
 
 32. **Create `Dockerfile`** at project root. Multi-stage build:
-    - Base: `python:3.12-slim`
-    - Install dependencies from `requirements.txt`
+    - Base: `python:3.13-slim`
+    - Copy `pyproject.toml` and `uv.lock` first, then install dependencies:
+      ```dockerfile
+      COPY pyproject.toml uv.lock ./
+      RUN pip install uv && uv sync --frozen --no-group dev --no-group docs
+      ```
+      `--frozen` ensures the lockfile is used exactly (no re-resolution at build time). `--no-group dev --no-group docs` keeps test and docs tooling out of the image.
     - Copy `scalper/` source
     - Copy `entrypoint.sh`
     - `ENTRYPOINT ["./entrypoint.sh"]`
@@ -225,7 +230,7 @@
     scalper/backtesting_engine/
     scalper/study_analyser/
     ```
-    Only `scalper/` production modules (`data_system`, `exchange_connector`, `strategy_manager`, `trade_executor`, `utils`, `scripts`), `requirements.txt`, and `entrypoint.sh` are copied into the image. Test code, analysis tools, local storage, docs, and secrets are excluded.
+    Only `scalper/` production modules (`data_system`, `exchange_connector`, `strategy_manager`, `trade_executor`, `utils`, `scripts`), `pyproject.toml`, `uv.lock`, and `entrypoint.sh` are copied into the image. Test code, analysis tools, local storage, docs, and secrets are excluded.
 
 36. **Secrets management**: Kraken API keys and Supabase credentials stored as Fly.io secrets (`fly secrets set KRAKEN_TRADING_API_KEY=... KRAKEN_TRADING_API_SECRET=... SUPABASE_URL=... SUPABASE_KEY=...`). These become environment variables in the container — the existing `SupabaseConfig` metaclass and `os.getenv` patterns already handle this.
 
