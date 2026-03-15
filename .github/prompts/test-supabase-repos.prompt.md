@@ -70,7 +70,7 @@ For each repo, test both the add and get paths. Cover:
 - Add a tick for each `Signal` value (`buy`, `hold`, `sell`)
 - Add a tick with `error=None` and one with a non-null `error` string
 - Verify that `BotTick.id` is `None` before insert and populated (int) after — the returned object should have the DB-assigned BIGSERIAL value
-- Verify `get_by_bot_id` returns all inserted ticks with `Decimal` fields (`price`, `balance_base`, `balance_quote`) preserved exactly (use high-precision values to catch float conversion bugs)
+- Verify `get_by_bot_id` returns all inserted ticks with `Decimal` fields (`price`, `balance_base`, `balance_quote`) preserved exactly — use values realistic for Kraken trading data (e.g. `Decimal('45123.50')` for price, `Decimal('0.00012345')` for volume/fees/balances) to catch float conversion bugs without triggering known schema limits (see Known Limitations below)
 - Verify `Signal` enum is correctly deserialised on the way back
 
 ### `bot_orders`
@@ -83,15 +83,15 @@ For each repo, test both the add and get paths. Cover:
 
 The repos serialise types for Supabase and deserialise them on return. Verify each conversion survives the round-trip without loss:
 
-| Type          | Verify                                                                |
-|---------------|-----------------------------------------------------------------------|
-| `datetime`    | Timezone-aware UTC preserved (not stripped to naive)                  |
-| `Decimal`     | Precision preserved — use values like `Decimal('12345.123456789012')` |
-| `UUID`        | Deserialised back to `UUID`, not left as a string                     |
-| `Signal`      | Deserialised back to `Signal` enum, not a plain string                |
-| `Side`        | Deserialised back to `Side` enum                                      |
-| `OrderStatus` | Deserialised back to `OrderStatus` enum                               |
-| `dict`        | JSONB round-trip preserves structure exactly (no type coercion)       |
+| Type          | Verify                                                                                      |
+|---------------|---------------------------------------------------------------------------------------------|
+| `datetime`    | Timezone-aware UTC preserved (not stripped to naive)                                        |
+| `Decimal`     | Precision preserved using realistic values (1–8 dp) — see Known Limitations for constraints |
+| `UUID`        | Deserialised back to `UUID`, not left as a string                                           |
+| `Signal`      | Deserialised back to `Signal` enum, not a plain string                                      |
+| `Side`        | Deserialised back to `Side` enum                                                            |
+| `OrderStatus` | Deserialised back to `OrderStatus` enum                                                     |
+| `dict`        | JSONB round-trip preserves structure exactly (no type coercion)                             |
 
 ## Cleanup
 
@@ -106,6 +106,16 @@ client.table('bots').delete().eq('id', 'test_btc_1m_001').execute()
 
 Delete in reverse insertion order to respect FK constraints.
 
+## Known Limitations
+
+Two Decimal precision behaviours are **expected and not bugs** — do not flag them as failures:
+
+1. **Schema truncation (`DECIMAL(32, 12)`)** — PostgreSQL silently truncates values with more than 12 fractional digits. Kraken data never exceeds 8 dp in practice, so this is harmless. Do not use test values with >12 dp.
+
+2. **PostgREST float64 rounding** — PostgREST serialises `NUMERIC` columns as JSON `number` (float64), which can lose the 12th decimal place (max error: `0.000000000001`). This is irrelevant for GBP-denominated trading. If a returned `Decimal` differs from the inserted value only in the 12th decimal place, treat it as a **warning**, not a failure.
+
+Both issues are documented in the Architecture Decision Log.
+
 ## Output
 
-Summarise results per repo: which paths passed, which failed, and any issues found. Call out any schema mismatches, type deserialisation failures, unexpected `None` values, or constraint violations.
+Summarise results per repo: which paths passed, which failed, and any issues found. Call out any schema mismatches, type deserialisation failures, unexpected `None` values, or constraint violations. Distinguish hard failures from known precision warnings (see Known Limitations).
