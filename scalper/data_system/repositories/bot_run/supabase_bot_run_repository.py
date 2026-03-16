@@ -30,6 +30,18 @@ class SupabaseBotRunRepository(BotRunRepository):
             return None
         return self._to_bot_run(response.data[0])
 
+    def complete(self, id: UUID, completed_at: datetime) -> BotRun | None:
+        response = (
+            self.client
+            .table(self.TABLE_NAME)
+            .update({'completed_at': completed_at.isoformat()})
+            .eq('id', str(id))
+            .execute()
+        )
+        if not response.data:
+            return None
+        return self._to_bot_run(response.data[0])
+
     def _to_record(self, bot_run: BotRun) -> dict:
         record = asdict(bot_run)
         record['id'] = str(bot_run.id)
