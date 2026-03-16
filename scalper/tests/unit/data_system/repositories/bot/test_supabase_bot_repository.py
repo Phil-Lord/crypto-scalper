@@ -85,7 +85,8 @@ class TestSupabaseBotRepository:
         repository.get(bot_id)
 
         # Then
-        mock_supabase_client.table.return_value.select.return_value.eq.assert_called_once_with('id', bot_id)
+        mock_supabase_client.table.return_value.select.return_value.eq.assert_called_once_with(
+            'id', bot_id)
 
     def test_add_inserts_bot_and_returns_result(self, mock_supabase_client, sample_bot: Bot, mock_response_data: dict):
         # Given
@@ -117,3 +118,12 @@ class TestSupabaseBotRepository:
         insert_call = mock_supabase_client.table.return_value.insert
         inserted_record = insert_call.call_args[0][0]
         assert inserted_record['created_at'] == sample_bot.created_at.isoformat()
+
+    def test_add_raises_error_when_response_is_empty(self, mock_supabase_client, sample_bot: Bot):
+        # Given
+        self._set_insert_response(mock_supabase_client, [])
+        repository = SupabaseBotRepository(mock_supabase_client)
+
+        # When / Then
+        with pytest.raises(RuntimeError):
+            repository.add(sample_bot)

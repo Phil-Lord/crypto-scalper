@@ -310,6 +310,15 @@ class TestSupabaseBotOrderRepository:
         assert result.side == Side.BUY
         assert result.status == OrderStatus.FILLED
 
+    def test_add_raises_error_when_response_is_empty(self, mock_supabase_client, sample_order: BotOrder):
+        # Given
+        self._set_insert_response(mock_supabase_client, [])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When / Then
+        with pytest.raises(RuntimeError):
+            repository.add(sample_order)
+
     # --- update ---
 
     def test_update_returns_updated_order(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
@@ -494,6 +503,15 @@ class TestSupabaseBotOrderRepository:
         assert isinstance(result.status, OrderStatus)
         assert result.side == Side.BUY
         assert result.status == OrderStatus.FILLED
+
+    def test_update_raises_error_when_order_not_found(self, mock_supabase_client, sample_order: BotOrder):
+        # Given
+        self._set_update_response(mock_supabase_client, [])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When / Then
+        with pytest.raises(ValueError):
+            repository.update(sample_order)
 
     # --- get_by_bot_id ---
 
