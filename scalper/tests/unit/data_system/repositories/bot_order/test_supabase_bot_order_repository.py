@@ -82,6 +82,10 @@ class TestSupabaseBotOrderRepository:
         ''' Sets response for: table().select().eq().order().execute() '''
         client.table.return_value.select.return_value.eq.return_value.order.return_value.execute.return_value.data = data
 
+    def _set_select_double_eq_ordered_response(self, client, data: list) -> None:
+        ''' Sets response for: table().select().eq().eq().order().execute() '''
+        client.table.return_value.select.return_value.eq.return_value.eq.return_value.order.return_value.execute.return_value.data = data
+
     def _set_insert_response(self, client, data: list) -> None:
         ''' Sets response for: table().insert().execute() '''
         client.table.return_value.insert.return_value.execute.return_value.data = data
@@ -568,3 +572,92 @@ class TestSupabaseBotOrderRepository:
         assert order.fee is None
         assert order.tick_id is None
         assert order.status == OrderStatus.PLACED
+
+    # --- get_placed_by_bot_id ---
+
+    def test_get_placed_by_bot_id_returns_empty_list_when_no_orders(self, mock_supabase_client):
+        # Given
+        self._set_select_double_eq_ordered_response(mock_supabase_client, [])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.get_placed_by_bot_id('nonexistent_bot')
+
+        # Then
+        assert result == []
+        mock_supabase_client.table.assert_called_once_with('bot_orders')
+
+    def test_get_placed_by_bot_id_returns_placed_orders_when_found(self, mock_supabase_client, sample_placed_order: BotOrder, mock_placed_response_data: dict):
+        # Given
+        self._set_select_double_eq_ordered_response(
+            mock_supabase_client, [mock_placed_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.get_placed_by_bot_id(sample_placed_order.bot_id)
+
+        # Then
+        assert len(result) == 1
+        assert result[0] == sample_placed_order
+
+    def test_get_placed_by_bot_id_filters_by_bot_id(self, mock_supabase_client):
+        # Given
+        self._set_select_double_eq_ordered_response(mock_supabase_client, [])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        repository.get_placed_by_bot_id('btc_1m_001')
+
+        # Then
+        mock_supabase_client.table.return_value.select.return_value.eq.assert_called_once_with(
+            'bot_id', 'btc_1m_001'
+        )
+
+    def test_get_placed_by_bot_id_filters_by_placed_status(self, mock_supabase_client):
+        # Given
+        self._set_select_double_eq_ordered_response(mock_supabase_client, [])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        repository.get_placed_by_bot_id('btc_1m_001')
+
+        # Then
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.eq.assert_called_once_with(
+            'status', OrderStatus.PLACED.value
+        )
+
+    def test_get_placed_by_bot_id_orders_by_placed_at_descending(self, mock_supabase_client):
+        # Given
+        self._set_select_double_eq_ordered_response(mock_supabase_client, [])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        repository.get_placed_by_bot_id('btc_1m_001')
+
+        # Then
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.eq.return_value.order.assert_called_once_with(
+            'placed_at', desc=True
+        )
+
+    def test_get_placed_by_bot_id_parses_response_types_correctly(self, mock_supabase_client, sample_placed_order: BotOrder, mock_placed_response_data: dict):
+        # Given
+        self._set_select_double_eq_ordered_response(
+            mock_supabase_client, [mock_placed_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.get_placed_by_bot_id(sample_placed_order.bot_id)
+
+        # Then
+        assert len(result) == 1
+        order = result[0]
+        assert isinstance(order.id, UUID)
+        assert isinstance(order.run_id, UUID)
+        assert isinstance(order.placed_at, datetime)
+        assert isinstance(order.side, Side)
+        assert isinstance(order.status, OrderStatus)
+        assert order.status == OrderStatus.PLACED
+        assert order.filled_at is None
+        assert order.price is None
+        assert order.volume is None
+        assert order.fee is None
