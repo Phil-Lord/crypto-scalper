@@ -31,6 +31,16 @@ class SupabaseBotOrderRepository(BotOrderRepository):
         )
         return [self._to_bot_order(row) for row in response.data]
 
+    def update(self, bot_order: BotOrder) -> BotOrder:
+        response = (
+            self.client
+            .table(self.TABLE_NAME)
+            .update(self._to_record(bot_order))
+            .eq('id', str(bot_order.id))
+            .execute()
+        )
+        return self._to_bot_order(response.data[0])
+
     def _to_record(self, bot_order: BotOrder) -> dict:
         record = asdict(bot_order)
 
