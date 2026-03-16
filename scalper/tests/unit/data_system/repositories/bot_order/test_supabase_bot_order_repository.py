@@ -346,7 +346,7 @@ class TestSupabaseBotOrderRepository:
             'id', str(sample_order.id)
         )
 
-    def test_update_converts_uuids_to_strings(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
+    def test_update_payload_contains_only_mutable_fields(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
         # Given
         self._set_update_response(mock_supabase_client, [mock_response_data])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
@@ -354,22 +354,9 @@ class TestSupabaseBotOrderRepository:
         # When
         repository.update(sample_order)
 
-        # Then
+        # Then — identity fields must not be sent; only mutable fields are included
         sent = mock_supabase_client.table.return_value.update.call_args[0][0]
-        assert sent['id'] == str(sample_order.id)
-        assert sent['run_id'] == str(sample_order.run_id)
-
-    def test_update_converts_placed_at_to_iso_format(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
-        # Given
-        self._set_update_response(mock_supabase_client, [mock_response_data])
-        repository = SupabaseBotOrderRepository(mock_supabase_client)
-
-        # When
-        repository.update(sample_order)
-
-        # Then
-        sent = mock_supabase_client.table.return_value.update.call_args[0][0]
-        assert sent['placed_at'] == sample_order.placed_at.isoformat()
+        assert set(sent.keys()) == {'status', 'tick_id', 'filled_at', 'price', 'volume', 'fee'}
 
     def test_update_converts_filled_at_to_iso_format_when_set(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
         # Given
