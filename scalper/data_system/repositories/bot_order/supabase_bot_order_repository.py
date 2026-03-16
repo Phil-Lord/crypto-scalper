@@ -18,6 +18,8 @@ class SupabaseBotOrderRepository(BotOrderRepository):
 
     def add(self, bot_order: BotOrder) -> BotOrder:
         response = self.client.table(self.TABLE_NAME).insert(self._to_record(bot_order)).execute()
+        if not response.data:
+            raise RuntimeError(f'Insert into {self.TABLE_NAME} returned no data')
         return self._to_bot_order(response.data[0])
 
     def get_by_bot_id(self, bot_id: str) -> list[BotOrder]:
@@ -26,6 +28,38 @@ class SupabaseBotOrderRepository(BotOrderRepository):
             .table(self.TABLE_NAME)
             .select('*')
             .eq('bot_id', bot_id)
+            .order('placed_at', desc=True)
+            .execute()
+        )
+        return [self._to_bot_order(row) for row in response.data]
+
+    def update(self, bot_order: BotOrder) -> BotOrder:
+        payload = {
+            'status': bot_order.status.value,
+            'tick_id': bot_order.tick_id,
+            'filled_at': bot_order.filled_at.isoformat() if bot_order.filled_at else None,
+            'price': str(bot_order.price) if bot_order.price is not None else None,
+            'volume': str(bot_order.volume) if bot_order.volume is not None else None,
+            'fee': str(bot_order.fee) if bot_order.fee is not None else None,
+        }
+        response = (
+            self.client
+            .table(self.TABLE_NAME)
+            .update(payload)
+            .eq('id', str(bot_order.id))
+            .execute()
+        )
+        if not response.data:
+            raise ValueError(f'BotOrder with id {bot_order.id} not found')
+        return self._to_bot_order(response.data[0])
+
+    def get_placed_by_bot_id(self, bot_id: str) -> list[BotOrder]:
+        response = (
+            self.client
+            .table(self.TABLE_NAME)
+            .select('*')
+            .eq('bot_id', bot_id)
+            .eq('status', OrderStatus.PLACED.value)
             .order('placed_at', desc=True)
             .execute()
         )

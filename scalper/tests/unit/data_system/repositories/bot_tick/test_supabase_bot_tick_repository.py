@@ -244,6 +244,15 @@ class TestSupabaseBotTickRepository:
         assert isinstance(result.signal, Signal)
         assert result.signal == Signal.HOLD
 
+    def test_add_raises_error_when_response_is_empty(self, mock_supabase_client, sample_tick: BotTick):
+        # Given
+        self._set_insert_response(mock_supabase_client, [])
+        repository = SupabaseBotTickRepository(mock_supabase_client)
+
+        # When / Then
+        with pytest.raises(RuntimeError):
+            repository.add(sample_tick)
+
     def test_get_by_bot_id_parses_response_types_correctly(self, mock_supabase_client, sample_tick: BotTick, mock_response_data: dict):
         # Given
         self._set_select_ordered_response(mock_supabase_client, [mock_response_data])

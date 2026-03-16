@@ -15,6 +15,8 @@ class SupabaseBotRepository(BotRepository):
 
     def add(self, bot: Bot) -> Bot:
         response = self.client.table(self.TABLE_NAME).insert(self._to_record(bot)).execute()
+        if not response.data:
+            raise RuntimeError(f'Insert into {self.TABLE_NAME} returned no data')
         return self._to_bot(response.data[0])
 
     def get(self, id: str) -> Bot | None:
