@@ -87,7 +87,7 @@ For each repo, test both the add and get paths. Cover:
 - Verify the returned list is empty when no `placed` orders exist for a given `bot_id`
 
 #### `update`
-- Insert a `placed` order, then call `update` to transition it to `filled` — set `filled_at`, `fill_price`, `fill_volume`, `fee`, and `status = OrderStatus.FILLED`
+- Insert a `placed` order, then call `update` to transition it to `filled` — set `filled_at`, `price`, `volume`, `fee`, and `status = OrderStatus.FILLED`
 - Verify the returned `BotOrder` from `update` reflects all updated values exactly (including `Decimal` precision, `OrderStatus` enum, and timezone-aware `filled_at`)
 - Verify `get_by_bot_id` reflects the updated state (the order appears as `filled`)
 - Verify `get_placed_by_bot_id` no longer returns the order after it has been updated to `filled`
