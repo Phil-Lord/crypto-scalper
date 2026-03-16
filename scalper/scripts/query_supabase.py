@@ -32,7 +32,7 @@ def query_supabase():
         action = questionary.select('Action:', choices=['add', 'get']).ask()
         bot_tick(action, client)
     elif table == 'bot_orders':
-        action = questionary.select('Action:', choices=['add', 'get', 'update']).ask()
+        action = questionary.select('Action:', choices=['add', 'get', 'get_placed', 'update']).ask()
         bot_order(action, client)
 
 
@@ -105,6 +105,9 @@ def bot_order(action: str, client: SupabaseClient):
     elif action == 'get':
         bot_order = repository.get_by_bot_id(ask('bot_id:', required=True))
         print('Retrieved bot orders:', bot_order)
+    elif action == 'get_placed':
+        placed_orders = repository.get_placed_by_bot_id(ask('bot_id:', required=True))
+        print('Retrieved placed bot orders:', placed_orders)
     elif action == 'update':
         existing_orders = repository.get_by_bot_id(ask('bot_id:', required=True))
         if not existing_orders:
