@@ -20,16 +20,19 @@ logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 def query_supabase():
     table = questionary.select(
         'Table:', choices=['bots', 'bot_runs', 'bot_ticks', 'bot_orders']).ask()
-    action = questionary.select('Action:', choices=['add', 'get', 'update']).ask()
-
     client = SupabaseClient()
+
     if table == 'bots':
+        action = questionary.select('Action:', choices=['add', 'get']).ask()
         bot(action, client)
     elif table == 'bot_runs':
+        action = questionary.select('Action:', choices=['add', 'get']).ask()
         bot_run(action, client)
     elif table == 'bot_ticks':
+        action = questionary.select('Action:', choices=['add', 'get']).ask()
         bot_tick(action, client)
     elif table == 'bot_orders':
+        action = questionary.select('Action:', choices=['add', 'get', 'update']).ask()
         bot_order(action, client)
 
 
