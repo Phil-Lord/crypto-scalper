@@ -94,43 +94,7 @@ class TestSupabaseBotOrderRepository:
         ''' Sets response for: table().update().eq().execute() '''
         client.table.return_value.update.return_value.eq.return_value.execute.return_value.data = data
 
-    def test_get_by_bot_id_returns_empty_list_when_no_orders(self, mock_supabase_client):
-        # Given
-        self._set_select_ordered_response(mock_supabase_client, [])
-        repository = SupabaseBotOrderRepository(mock_supabase_client)
-
-        # When
-        result = repository.get_by_bot_id('nonexistent_bot')
-
-        # Then
-        assert result == []
-        mock_supabase_client.table.assert_called_once_with('bot_orders')
-
-    def test_get_by_bot_id_returns_orders_when_found(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
-        # Given
-        self._set_select_ordered_response(mock_supabase_client, [mock_response_data])
-        repository = SupabaseBotOrderRepository(mock_supabase_client)
-
-        # When
-        result = repository.get_by_bot_id(sample_order.bot_id)
-
-        # Then
-        assert len(result) == 1
-        assert result[0] == sample_order
-        mock_supabase_client.table.assert_called_once_with('bot_orders')
-
-    def test_get_by_bot_id_orders_by_placed_at_descending(self, mock_supabase_client):
-        # Given
-        self._set_select_ordered_response(mock_supabase_client, [])
-        repository = SupabaseBotOrderRepository(mock_supabase_client)
-
-        # When
-        repository.get_by_bot_id('test_bot')
-
-        # Then
-        mock_supabase_client.table.return_value.select.return_value.eq.return_value.order.assert_called_once_with(
-            'placed_at', desc=True
-        )
+    # --- add ---
 
     def test_add_inserts_order_and_returns_result(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
         # Given
@@ -530,6 +494,46 @@ class TestSupabaseBotOrderRepository:
         assert isinstance(result.status, OrderStatus)
         assert result.side == Side.BUY
         assert result.status == OrderStatus.FILLED
+
+    # --- get_by_bot_id ---
+
+    def test_get_by_bot_id_returns_empty_list_when_no_orders(self, mock_supabase_client):
+        # Given
+        self._set_select_ordered_response(mock_supabase_client, [])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.get_by_bot_id('nonexistent_bot')
+
+        # Then
+        assert result == []
+        mock_supabase_client.table.assert_called_once_with('bot_orders')
+
+    def test_get_by_bot_id_returns_orders_when_found(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
+        # Given
+        self._set_select_ordered_response(mock_supabase_client, [mock_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.get_by_bot_id(sample_order.bot_id)
+
+        # Then
+        assert len(result) == 1
+        assert result[0] == sample_order
+        mock_supabase_client.table.assert_called_once_with('bot_orders')
+
+    def test_get_by_bot_id_orders_by_placed_at_descending(self, mock_supabase_client):
+        # Given
+        self._set_select_ordered_response(mock_supabase_client, [])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        repository.get_by_bot_id('test_bot')
+
+        # Then
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.order.assert_called_once_with(
+            'placed_at', desc=True
+        )
 
     def test_get_by_bot_id_parses_response_types_correctly(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
         # Given
