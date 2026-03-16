@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from uuid import UUID
 
 from data_system.models import BotRun
@@ -22,5 +23,16 @@ class BotRunRepository(ABC):
 
         :param id: Bot run UUID.
         :return: The bot run record, or None if not found.
+        '''
+        pass
+
+    @abstractmethod
+    def complete(self, id: UUID, completed_at: datetime) -> BotRun | None:
+        '''
+        Marks a bot run as completed.
+
+        :param id: Bot run UUID.
+        :param completed_at: The datetime when the bot run was completed.
+        :return: The updated bot run record, or None if not found.
         '''
         pass
