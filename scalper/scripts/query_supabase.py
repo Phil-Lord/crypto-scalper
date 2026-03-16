@@ -29,7 +29,7 @@ def query_supabase():
         action = questionary.select('Action:', choices=['add', 'get']).ask()
         bot_run(action, client)
     elif table == 'bot_ticks':
-        action = questionary.select('Action:', choices=['add', 'get']).ask()
+        action = questionary.select('Action:', choices=['add', 'get', 'get_latest_action']).ask()
         bot_tick(action, client)
     elif table == 'bot_orders':
         action = questionary.select('Action:', choices=['add', 'get', 'get_placed', 'update']).ask()
@@ -82,6 +82,9 @@ def bot_tick(action: str, client: SupabaseClient):
     elif action == 'get':
         bot_tick = repository.get_by_bot_id(ask('bot_id:', required=True))
         print('Retrieved bot ticks:', bot_tick)
+    elif action == 'get_latest_action':
+        bot_tick = repository.get_latest_action_by_bot_id(ask('bot_id:', required=True))
+        print('Retrieved latest directional bot tick:', bot_tick)
 
 
 def bot_order(action: str, client: SupabaseClient):
