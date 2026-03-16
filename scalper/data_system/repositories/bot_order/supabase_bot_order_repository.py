@@ -41,6 +41,18 @@ class SupabaseBotOrderRepository(BotOrderRepository):
         )
         return self._to_bot_order(response.data[0])
 
+    def get_placed_by_bot_id(self, bot_id: str) -> list[BotOrder]:
+        response = (
+            self.client
+            .table(self.TABLE_NAME)
+            .select('*')
+            .eq('bot_id', bot_id)
+            .eq('status', OrderStatus.PLACED.value)
+            .order('placed_at', desc=True)
+            .execute()
+        )
+        return [self._to_bot_order(row) for row in response.data]
+
     def _to_record(self, bot_order: BotOrder) -> dict:
         record = asdict(bot_order)
 
