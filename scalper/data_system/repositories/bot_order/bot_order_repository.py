@@ -23,3 +23,13 @@ class BotOrderRepository(ABC):
         :return: List of order records.
         '''
         pass
+
+    @abstractmethod
+    def update(self, bot_order: BotOrder) -> BotOrder:
+        '''
+        Updates an existing order record.
+
+        :param bot_order: The order record to update.
+        :return: The updated order record.
+        '''
+        pass
