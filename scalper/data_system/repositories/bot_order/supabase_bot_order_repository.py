@@ -34,10 +34,18 @@ class SupabaseBotOrderRepository(BotOrderRepository):
         return [self._to_bot_order(row) for row in response.data]
 
     def update(self, bot_order: BotOrder) -> BotOrder:
+        payload = {
+            'status': bot_order.status.value,
+            'tick_id': bot_order.tick_id,
+            'filled_at': bot_order.filled_at.isoformat() if bot_order.filled_at else None,
+            'price': str(bot_order.price) if bot_order.price is not None else None,
+            'volume': str(bot_order.volume) if bot_order.volume is not None else None,
+            'fee': str(bot_order.fee) if bot_order.fee is not None else None,
+        }
         response = (
             self.client
             .table(self.TABLE_NAME)
-            .update(self._to_record(bot_order))
+            .update(payload)
             .eq('id', str(bot_order.id))
             .execute()
         )
