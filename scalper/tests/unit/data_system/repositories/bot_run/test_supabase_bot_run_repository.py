@@ -203,6 +203,15 @@ class TestSupabaseBotRunRepository:
         # Then
         assert result.completed_at is None
 
+    def test_add_raises_error_when_response_is_empty(self, mock_supabase_client, sample_run: BotRun):
+        # Given
+        self._set_insert_response(mock_supabase_client, [])
+        repository = SupabaseBotRunRepository(mock_supabase_client)
+
+        # When / Then
+        with pytest.raises(RuntimeError):
+            repository.add(sample_run)
+
     def test_get_parses_response_types_correctly(self, mock_supabase_client, sample_run: BotRun, mock_response_data: dict):
         # Given
         self._set_select_response(mock_supabase_client, [mock_response_data])

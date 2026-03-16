@@ -18,6 +18,8 @@ class SupabaseBotTickRepository(BotTickRepository):
 
     def add(self, bot_tick: BotTick) -> BotTick:
         response = self.client.table(self.TABLE_NAME).insert(self._to_record(bot_tick)).execute()
+        if not response.data:
+            raise RuntimeError(f'Insert into {self.TABLE_NAME} returned no data')
         return self._to_bot_tick(response.data[0])
 
     def get_by_bot_id(self, bot_id: str) -> list[BotTick]:

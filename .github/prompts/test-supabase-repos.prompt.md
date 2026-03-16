@@ -1,11 +1,11 @@
 ---
 agent: agent
-description: "Manually test the add and get paths for the four live-trading Supabase repos and models, ensuring correct type serialisation, FK constraints, and error handling."
+description: "Manually test the add, get, and update paths for the four live-trading Supabase repos and models, ensuring correct type serialisation, FK constraints, and error handling."
 ---
 
 # Test Supabase Repos
 
-Test the **add** and **get** paths for the four live-trading Supabase repositories.
+Test the **add**, **get**, and **update** paths for the four live-trading Supabase repositories.
 
 ## ⚠️ Important: Scope Restriction
 
@@ -41,14 +41,16 @@ Use a consistent test prefix (e.g. `bot_id = 'test_btc_1m_001'`) so test data is
 
 The `get` methods are **not uniform** across repos — note the differences:
 
-| Repo                        | Method                          | Returns            |
-|-----------------------------|---------------------------------|--------------------|
-| `SupabaseBotRepository`     | `get(id: str)`                  | `Bot \| None`      |
-| `SupabaseBotRunRepository`  | `get(id: UUID)`                 | `BotRun \| None`   |
-| `SupabaseBotTickRepository` | `get_by_bot_id(bot_id: str)`    | `list[BotTick]`    |
-| `SupabaseBotOrderRepository`| `get_by_bot_id(bot_id: str)`    | `list[BotOrder]`   |
+| Repo                        | Method                                   | Returns            |
+|-----------------------------|------------------------------------------|--------------------|
+| `SupabaseBotRepository`     | `get(id: str)`                           | `Bot \| None`      |
+| `SupabaseBotRunRepository`  | `get(id: UUID)`                          | `BotRun \| None`   |
+| `SupabaseBotTickRepository` | `get_by_bot_id(bot_id: str)`             | `list[BotTick]`    |
+| `SupabaseBotOrderRepository`| `get_by_bot_id(bot_id: str)`             | `list[BotOrder]`   |
+| `SupabaseBotOrderRepository`| `get_placed_by_bot_id(bot_id: str)`      | `list[BotOrder]`   |
+| `SupabaseBotOrderRepository`| `update(bot_order: BotOrder)`            | `BotOrder`         |
 
-Ticks are returned ordered by `timestamp DESC`; orders are returned ordered by `placed_at DESC`.
+Ticks are returned ordered by `timestamp DESC`; orders (both get methods) are returned ordered by `placed_at DESC`. `get_placed_by_bot_id` filters to `status = 'placed'` only.
 
 ## Test Scenarios
 
@@ -78,6 +80,17 @@ For each repo, test both the add and get paths. Cover:
 - Add a fully-populated order (`filled` status, all Decimal fields set, `filled_at` datetime set)
 - Verify `get_by_bot_id` returns all inserted orders with correct `Side`, `OrderStatus`, `Decimal` precision, and datetime timezone
 - Verify `tick_id` is `None` and populated correctly in each case
+
+#### `get_placed_by_bot_id`
+- Insert one `placed` order and one `filled` order for the same `bot_id`
+- Verify `get_placed_by_bot_id` returns **only** the `placed` order, not the `filled` one
+- Verify the returned list is empty when no `placed` orders exist for a given `bot_id`
+
+#### `update`
+- Insert a `placed` order, then call `update` to transition it to `filled` — set `filled_at`, `price`, `volume`, `fee`, and `status = OrderStatus.FILLED`
+- Verify the returned `BotOrder` from `update` reflects all updated values exactly (including `Decimal` precision, `OrderStatus` enum, and timezone-aware `filled_at`)
+- Verify `get_by_bot_id` reflects the updated state (the order appears as `filled`)
+- Verify `get_placed_by_bot_id` no longer returns the order after it has been updated to `filled`
 
 ## Type Serialisation Round-Trips
 
