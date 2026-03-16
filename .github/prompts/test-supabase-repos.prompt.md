@@ -41,14 +41,15 @@ Use a consistent test prefix (e.g. `bot_id = 'test_btc_1m_001'`) so test data is
 
 The `get` methods are **not uniform** across repos — note the differences:
 
-| Repo                        | Method                                   | Returns            |
-|-----------------------------|------------------------------------------|--------------------|
-| `SupabaseBotRepository`     | `get(id: str)`                           | `Bot \| None`      |
-| `SupabaseBotRunRepository`  | `get(id: UUID)`                          | `BotRun \| None`   |
-| `SupabaseBotTickRepository` | `get_by_bot_id(bot_id: str)`             | `list[BotTick]`    |
-| `SupabaseBotOrderRepository`| `get_by_bot_id(bot_id: str)`             | `list[BotOrder]`   |
-| `SupabaseBotOrderRepository`| `get_placed_by_bot_id(bot_id: str)`      | `list[BotOrder]`   |
-| `SupabaseBotOrderRepository`| `update(bot_order: BotOrder)`            | `BotOrder`         |
+| Repo                        | Method                                     | Returns            |
+|-----------------------------|--------------------------------------------|--------------------|
+| `SupabaseBotRepository`     | `get(id: str)`                             | `Bot \| None`      |
+| `SupabaseBotRunRepository`  | `get(id: UUID)`                            | `BotRun \| None`   |
+| `SupabaseBotTickRepository` | `get_by_bot_id(bot_id: str)`               | `list[BotTick]`    |
+| `SupabaseBotTickRepository` | `get_latest_action_by_bot_id(bot_id: str)` | `BotTick \| None`  |
+| `SupabaseBotOrderRepository`| `get_by_bot_id(bot_id: str)`               | `list[BotOrder]`   |
+| `SupabaseBotOrderRepository`| `get_placed_by_bot_id(bot_id: str)`        | `list[BotOrder]`   |
+| `SupabaseBotOrderRepository`| `update(bot_order: BotOrder)`              | `BotOrder`         |
 
 Ticks are returned ordered by `timestamp DESC`; orders (both get methods) are returned ordered by `placed_at DESC`. `get_placed_by_bot_id` filters to `status = 'placed'` only.
 
@@ -74,6 +75,15 @@ For each repo, test both the add and get paths. Cover:
 - Verify that `BotTick.id` is `None` before insert and populated (int) after — the returned object should have the DB-assigned BIGSERIAL value
 - Verify `get_by_bot_id` returns all inserted ticks with `Decimal` fields (`price`, `balance_base`, `balance_quote`) preserved exactly — use values realistic for Kraken trading data (e.g. `Decimal('45123.50')` for price, `Decimal('0.00012345')` for volume/fees/balances) to catch float conversion bugs without triggering known schema limits (see Known Limitations below)
 - Verify `Signal` enum is correctly deserialised on the way back
+
+#### `get_latest_action_by_bot_id`
+- Insert ticks in order: `buy` (oldest), `hold`, `sell` (newest) — all with different timestamps
+- Verify `get_latest_action_by_bot_id` returns the `sell` tick (most recent non-HOLD), not the `hold` tick
+- Insert an additional `hold` tick with a timestamp newer than the `sell` tick
+- Verify `get_latest_action_by_bot_id` still returns the `sell` tick (HOLD ticks must be skipped)
+- Call `get_latest_action_by_bot_id` with a `bot_id` that has only `hold` ticks — confirm `None` is returned
+- Call `get_latest_action_by_bot_id` with a non-existent `bot_id` — confirm `None` is returned
+- Verify the returned `BotTick` has `Signal.BUY` or `Signal.SELL`, never `Signal.HOLD`
 
 ### `bot_orders`
 - Add an order with all optional fill fields as `None` (default `placed` status)
