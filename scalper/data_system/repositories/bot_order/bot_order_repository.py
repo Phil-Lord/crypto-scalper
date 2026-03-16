@@ -33,3 +33,13 @@ class BotOrderRepository(ABC):
         :return: The updated order record.
         '''
         pass
+
+    @abstractmethod
+    def get_placed_by_bot_id(self, bot_id: str) -> list[BotOrder]:
+        '''
+        Fetches orders with status 'placed' for a certain bot ID.
+
+        :param bot_id: Bot ID.
+        :return: List of order records.
+        '''
+        pass
