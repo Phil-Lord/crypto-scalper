@@ -28,7 +28,7 @@ class BotTickRepository(ABC):
     def get_latest_action_by_bot_id(self, bot_id: str) -> BotTick | None:
         '''
         Fetches the latest directional tick for a certain bot ID.
-        Directional ticks are those with action in [BUY, SELL], ignoring HOLD ticks.
+        Directional ticks are those with signal in ['buy', 'sell'], ignoring 'hold' ticks.
 
         :param bot_id: Bot ID.
         :return: Latest directional tick record or None if not found.
