@@ -23,3 +23,14 @@ class BotTickRepository(ABC):
         :return: List of tick records.
         '''
         pass
+
+    @abstractmethod
+    def get_latest_action_by_bot_id(self, bot_id: str) -> BotTick | None:
+        '''
+        Fetches the latest directional tick for a certain bot ID.
+        Directional ticks are those with action in [BUY, SELL], ignoring HOLD ticks.
+
+        :param bot_id: Bot ID.
+        :return: Latest directional tick record or None if not found.
+        '''
+        pass
