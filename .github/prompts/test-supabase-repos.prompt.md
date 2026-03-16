@@ -41,14 +41,15 @@ Use a consistent test prefix (e.g. `bot_id = 'test_btc_1m_001'`) so test data is
 
 The `get` methods are **not uniform** across repos — note the differences:
 
-| Repo                        | Method                                   | Returns            |
-|-----------------------------|------------------------------------------|--------------------|
-| `SupabaseBotRepository`     | `get(id: str)`                           | `Bot \| None`      |
-| `SupabaseBotRunRepository`  | `get(id: UUID)`                          | `BotRun \| None`   |
-| `SupabaseBotTickRepository` | `get_by_bot_id(bot_id: str)`             | `list[BotTick]`    |
-| `SupabaseBotOrderRepository`| `get_by_bot_id(bot_id: str)`             | `list[BotOrder]`   |
-| `SupabaseBotOrderRepository`| `get_placed_by_bot_id(bot_id: str)`      | `list[BotOrder]`   |
-| `SupabaseBotOrderRepository`| `update(bot_order: BotOrder)`            | `BotOrder`         |
+| Repo                        | Method                                       | Returns            |
+|-----------------------------|----------------------------------------------|--------------------|
+| `SupabaseBotRepository`     | `get(id: str)`                               | `Bot \| None`      |
+| `SupabaseBotRunRepository`  | `get(id: UUID)`                              | `BotRun \| None`   |
+| `SupabaseBotRunRepository`  | `complete(id: UUID, completed_at: datetime)` | `BotRun \| None`   |
+| `SupabaseBotTickRepository` | `get_by_bot_id(bot_id: str)`                 | `list[BotTick]`    |
+| `SupabaseBotOrderRepository`| `get_by_bot_id(bot_id: str)`                 | `list[BotOrder]`   |
+| `SupabaseBotOrderRepository`| `get_placed_by_bot_id(bot_id: str)`          | `list[BotOrder]`   |
+| `SupabaseBotOrderRepository`| `update(bot_order: BotOrder)`                | `BotOrder`         |
 
 Ticks are returned ordered by `timestamp DESC`; orders (both get methods) are returned ordered by `placed_at DESC`. `get_placed_by_bot_id` filters to `status = 'placed'` only.
 
@@ -67,6 +68,12 @@ For each repo, test both the add and get paths. Cover:
 - Add a run with a specific `completed_at` datetime (timezone-aware)
 - Verify `get(id: UUID)` returns the correct `BotRun` — confirm `id` is a `UUID`, `completed_at` is `None` or a timezone-aware `datetime` as appropriate
 - `get` a non-existent `id` and confirm `None` is returned
+
+#### `complete`
+- Insert a run with `completed_at=None`, then call `complete(id, completed_at)` with a timezone-aware UTC datetime
+- Verify the returned `BotRun` has `completed_at` set exactly to the supplied datetime (timezone-aware, not naive)
+- Verify `get(id)` reflects the updated state — `completed_at` is no longer `None`
+- Call `complete` with a non-existent `id` and confirm `None` is returned
 
 ### `bot_ticks`
 - Add a tick for each `Signal` value (`buy`, `hold`, `sell`)
