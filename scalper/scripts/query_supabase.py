@@ -26,7 +26,7 @@ def query_supabase():
         action = questionary.select('Action:', choices=['add', 'get']).ask()
         bot(action, client)
     elif table == 'bot_runs':
-        action = questionary.select('Action:', choices=['add', 'get']).ask()
+        action = questionary.select('Action:', choices=['add', 'get', 'complete']).ask()
         bot_run(action, client)
     elif table == 'bot_ticks':
         action = questionary.select('Action:', choices=['add', 'get', 'get_latest_action']).ask()
@@ -63,6 +63,12 @@ def bot_run(action: str, client: SupabaseClient):
     elif action == 'get':
         bot_run = repository.get(UUID(ask('bot_run_id:', required=True)))
         print('Retrieved bot run:', bot_run)
+    elif action == 'complete':
+        bot_run = repository.complete(
+            UUID(ask('bot_run_id:', required=True)),
+            datetime.now(timezone.utc)
+        )
+        print('Completed bot run:', bot_run)
 
 
 def bot_tick(action: str, client: SupabaseClient):

@@ -54,6 +54,10 @@ class TestSupabaseBotRunRepository:
         ''' Sets response for: table().insert().execute() '''
         client.table.return_value.insert.return_value.execute.return_value.data = data
 
+    def _set_update_response(self, client, data: list) -> None:
+        ''' Sets response for: table().update().eq().execute() '''
+        client.table.return_value.update.return_value.eq.return_value.execute.return_value.data = data
+
     def test_get_returns_none_when_run_not_found(self, mock_supabase_client):
         # Given
         self._set_select_response(mock_supabase_client, [])
@@ -236,4 +240,79 @@ class TestSupabaseBotRunRepository:
 
         # Then
         assert isinstance(result.completed_at, datetime)
+        assert result.completed_at == completed_run.completed_at
+
+    def test_complete_returns_none_when_run_not_found(self, mock_supabase_client):
+        # Given
+        self._set_update_response(mock_supabase_client, [])
+        repository = SupabaseBotRunRepository(mock_supabase_client)
+
+        # When
+        result = repository.complete(uuid4(), datetime.now(timezone.utc))
+
+        # Then
+        assert result is None
+
+    def test_complete_returns_updated_run_when_found(self, mock_supabase_client, completed_run: BotRun, mock_completed_response_data: dict):
+        # Given
+        self._set_update_response(mock_supabase_client, [mock_completed_response_data])
+        repository = SupabaseBotRunRepository(mock_supabase_client)
+
+        # When
+        result = repository.complete(completed_run.id, completed_run.completed_at)
+
+        # Then
+        assert result is not None
+        assert result == completed_run
+
+    def test_complete_calls_table_with_correct_name(self, mock_supabase_client, completed_run: BotRun):
+        # Given
+        self._set_update_response(mock_supabase_client, [])
+        repository = SupabaseBotRunRepository(mock_supabase_client)
+
+        # When
+        repository.complete(completed_run.id, completed_run.completed_at)
+
+        # Then
+        mock_supabase_client.table.assert_called_once_with('bot_runs')
+
+    def test_complete_calls_update_with_iso_formatted_completed_at(self, mock_supabase_client, completed_run: BotRun):
+        # Given
+        self._set_update_response(mock_supabase_client, [])
+        repository = SupabaseBotRunRepository(mock_supabase_client)
+
+        # When
+        repository.complete(completed_run.id, completed_run.completed_at)
+
+        # Then
+        mock_supabase_client.table.return_value.update.assert_called_once_with(
+            {'completed_at': completed_run.completed_at.isoformat()}
+        )
+
+    def test_complete_calls_eq_with_string_id(self, mock_supabase_client, completed_run: BotRun):
+        # Given
+        self._set_update_response(mock_supabase_client, [])
+        repository = SupabaseBotRunRepository(mock_supabase_client)
+
+        # When
+        repository.complete(completed_run.id, completed_run.completed_at)
+
+        # Then
+        mock_supabase_client.table.return_value.update.return_value.eq.assert_called_once_with(
+            'id', str(completed_run.id)
+        )
+
+    def test_complete_parses_response_types_correctly(self, mock_supabase_client, completed_run: BotRun, mock_completed_response_data: dict):
+        # Given
+        self._set_update_response(mock_supabase_client, [mock_completed_response_data])
+        repository = SupabaseBotRunRepository(mock_supabase_client)
+
+        # When
+        result = repository.complete(completed_run.id, completed_run.completed_at)
+
+        # Then
+        assert isinstance(result.id, UUID)
+        assert isinstance(result.started_at, datetime)
+        assert isinstance(result.completed_at, datetime)
+        assert result.id == completed_run.id
         assert result.completed_at == completed_run.completed_at
