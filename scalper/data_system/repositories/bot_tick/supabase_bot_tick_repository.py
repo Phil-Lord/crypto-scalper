@@ -33,6 +33,21 @@ class SupabaseBotTickRepository(BotTickRepository):
         )
         return [self._to_bot_tick(row) for row in response.data]
 
+    def get_latest_action_by_bot_id(self, bot_id: str) -> BotTick | None:
+        response = (
+            self.client
+            .table(self.TABLE_NAME)
+            .select('*')
+            .eq('bot_id', bot_id)
+            .in_('signal', [Signal.BUY.value, Signal.SELL.value])
+            .order('timestamp', desc=True)
+            .limit(1)
+            .execute()
+        )
+        if not response.data:
+            return None
+        return self._to_bot_tick(response.data[0])
+
     def _to_record(self, bot_tick: BotTick) -> dict:
         record = asdict(bot_tick)
 

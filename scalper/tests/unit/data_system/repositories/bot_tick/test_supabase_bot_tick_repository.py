@@ -47,6 +47,10 @@ class TestSupabaseBotTickRepository:
         ''' Sets response for: table().select().eq().order().execute() '''
         client.table.return_value.select.return_value.eq.return_value.order.return_value.execute.return_value.data = data
 
+    def _set_select_filtered_ordered_limited_response(self, client, data: list) -> None:
+        ''' Sets response for: table().select().eq().in_().order().limit().execute() '''
+        client.table.return_value.select.return_value.eq.return_value.in_.return_value.order.return_value.limit.return_value.execute.return_value.data = data
+
     def _set_insert_response(self, client, data: list) -> None:
         ''' Sets response for: table().insert().execute() '''
         client.table.return_value.insert.return_value.execute.return_value.data = data
@@ -273,3 +277,85 @@ class TestSupabaseBotTickRepository:
         assert tick.price == sample_tick.price
         assert tick.balance_base == sample_tick.balance_base
         assert tick.balance_quote == sample_tick.balance_quote
+
+    def test_get_latest_action_by_bot_id_returns_none_when_no_actions(self, mock_supabase_client):
+        # Given
+        self._set_select_filtered_ordered_limited_response(mock_supabase_client, [])
+        repository = SupabaseBotTickRepository(mock_supabase_client)
+
+        # When
+        result = repository.get_latest_action_by_bot_id('nonexistent_bot')
+
+        # Then
+        assert result is None
+
+    def test_get_latest_action_by_bot_id_returns_tick_when_found(self, mock_supabase_client, sample_tick: BotTick, mock_response_data: dict):
+        # Given
+        action_data = {**mock_response_data, 'signal': Signal.BUY.value}
+        self._set_select_filtered_ordered_limited_response(mock_supabase_client, [action_data])
+        repository = SupabaseBotTickRepository(mock_supabase_client)
+
+        # When
+        result = repository.get_latest_action_by_bot_id(sample_tick.bot_id)
+
+        # Then
+        assert result is not None
+        assert result.bot_id == sample_tick.bot_id
+        assert result.signal == Signal.BUY
+
+    def test_get_latest_action_by_bot_id_filters_on_buy_and_sell_signals(self, mock_supabase_client):
+        # Given
+        self._set_select_filtered_ordered_limited_response(mock_supabase_client, [])
+        repository = SupabaseBotTickRepository(mock_supabase_client)
+
+        # When
+        repository.get_latest_action_by_bot_id('test_bot')
+
+        # Then
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.in_.assert_called_once_with(
+            'signal', [Signal.BUY.value, Signal.SELL.value]
+        )
+
+    def test_get_latest_action_by_bot_id_orders_by_timestamp_descending(self, mock_supabase_client):
+        # Given
+        self._set_select_filtered_ordered_limited_response(mock_supabase_client, [])
+        repository = SupabaseBotTickRepository(mock_supabase_client)
+
+        # When
+        repository.get_latest_action_by_bot_id('test_bot')
+
+        # Then
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.in_.return_value.order.assert_called_once_with(
+            'timestamp', desc=True
+        )
+
+    def test_get_latest_action_by_bot_id_limits_to_one_result(self, mock_supabase_client):
+        # Given
+        self._set_select_filtered_ordered_limited_response(mock_supabase_client, [])
+        repository = SupabaseBotTickRepository(mock_supabase_client)
+
+        # When
+        repository.get_latest_action_by_bot_id('test_bot')
+
+        # Then
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.in_.return_value.order.return_value.limit.assert_called_once_with(
+            1)
+
+    def test_get_latest_action_by_bot_id_parses_response_types_correctly(self, mock_supabase_client, sample_tick: BotTick, mock_response_data: dict):
+        # Given
+        action_data = {**mock_response_data, 'signal': Signal.SELL.value}
+        self._set_select_filtered_ordered_limited_response(mock_supabase_client, [action_data])
+        repository = SupabaseBotTickRepository(mock_supabase_client)
+
+        # When
+        result = repository.get_latest_action_by_bot_id(sample_tick.bot_id)
+
+        # Then
+        assert result is not None
+        assert isinstance(result.run_id, UUID)
+        assert isinstance(result.timestamp, datetime)
+        assert isinstance(result.price, Decimal)
+        assert isinstance(result.balance_base, Decimal)
+        assert isinstance(result.balance_quote, Decimal)
+        assert isinstance(result.signal, Signal)
+        assert result.signal == Signal.SELL
