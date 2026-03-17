@@ -1,17 +1,15 @@
 import logging
-import os
 
 from data_system import Bot, BotRun, BotRunRepository, BotTickRepository, BotOrderRepository
 from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector
 from position_sizer import PositionSizer
 from strategy_manager import Strategy
-from utils import load_env, LOG_FORMAT, get_kraken_pair_symbols
+from utils import get_kraken_pair_symbols
 
 
-load_env()
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
-logging.basicConfig(level=getattr(logging, LOG_LEVEL), format=LOG_FORMAT)
-logger = logging.getLogger(__name__)
+class BotLoggerAdapter(logging.LoggerAdapter):
+    def process(self, msg: str, kwargs: dict) -> tuple[str, dict]:
+        return f'[{self.extra["bot_id"]}] {msg}', kwargs
 
 
 class TradeExecutor:
@@ -38,7 +36,8 @@ class TradeExecutor:
         self.bot_run = BotRun(bot_id=bot.id)
         self.bot_run_repo.add(self.bot_run)
 
-        logger.info('Initialised TradeExecutor')
+        self.logger = BotLoggerAdapter(logging.getLogger(__name__), {'bot_id': self.bot.id})
+        self.logger.info('Initialised TradeExecutor')
 
     def execute_interval(self) -> None:
         ''' Runs one trade decision cycle. '''
@@ -49,7 +48,7 @@ class TradeExecutor:
             if signal != 'hold':
                 self.execute_trade(signal)
         except Exception as e:
-            logger.error(f'Error in TradeExecutor: {e}', exc_info=True)
+            self.logger.error(f'Error in TradeExecutor: {e}', exc_info=True)
             # TODO: Add an except which kills the loop when error is minimum balance not met.
 
     def get_price(self) -> float:
@@ -62,7 +61,7 @@ class TradeExecutor:
 
     def log_interval_results(self, price: float, signal: str):
         ''' Log the results of the interval. '''
-        logger.info(f'Interval result: price={price:.2f}, signal={signal}')
+        self.logger.info(f'Interval result: price={price:.2f}, signal={signal}')
 
     def execute_trade(self, signal: str):
         ''' Call exchange connector to add order. '''
@@ -73,10 +72,10 @@ class TradeExecutor:
             volume = balances[self.symbols.base]
 
         try:
-            logger.info(f'Placing {signal.upper()} order: volume={volume}')
+            self.logger.info(f'Placing {signal.upper()} order: volume={volume}')
             order_result = self.add_order_connector.place(self.pair, signal, volume)
-            logger.info(
+            self.logger.info(
                 f'Trade executed: id={order_result.txid[0]}, order={order_result.order_description}')
             # TODO: Log execution price, volume, and fee.
         except Exception as e:
-            logger.error(f'Trade execution failed: {e}', exc_info=True)
+            self.logger.error(f'Trade execution failed: {e}', exc_info=True)
