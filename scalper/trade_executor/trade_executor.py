@@ -1,7 +1,7 @@
 import logging
 import os
 
-from exchange_connector import AddOrderConnector, BalanceConnector, TickerConnector
+from exchange_connector import AddOrderConnector, BalanceConnector
 from strategy_manager import Strategy
 from utils import load_env, LOG_FORMAT, get_kraken_pair_symbols
 
@@ -17,7 +17,6 @@ class TradeExecutor:
         self.pair = pair
         self.symbols = get_kraken_pair_symbols(pair)
         self.interval = interval
-        self.ticker_connector = TickerConnector()
         self.balance_connector = BalanceConnector()
         self.add_order_connector = AddOrderConnector()
         self.strategy = strategy
@@ -36,8 +35,8 @@ class TradeExecutor:
             # TODO: Add an except which kills the loop when error is minimum balance not met.
 
     def get_price(self) -> float:
-        ''' Call exchange connector to get ticker price data. '''
-        return float(self.ticker_connector.fetch(self.pair)['c'][0])
+        ''' Call exchange connector to get price data. '''
+        pass
 
     def run_strategy(self, price: float) -> str:
         ''' Call strategy manager to get trade signal. '''
