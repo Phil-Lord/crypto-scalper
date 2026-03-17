@@ -16,6 +16,11 @@ class Strategy(ABC):
         self.last_action = Signal.SELL
         self.prev_indicator_values = {}
 
+    @property
+    @abstractmethod
+    def warmup_candles(self) -> int:
+        ''' Number of candles required to warm up all indicators for convergence. '''
+
     def register_indicator(self, name: str, indicator: Indicator):
         self.indicators[name] = indicator
 
