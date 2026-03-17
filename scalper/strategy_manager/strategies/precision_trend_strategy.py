@@ -38,6 +38,17 @@ class PrecisionTrendStrategy(Strategy):
         self.register_rule('atr_threshold', AtrThresholdRule('atr', config.atr_threshold))
         self.weight_atr = config.weight_atr / total_weight
 
+    @property
+    def warmup_candles(self) -> int:
+        ''' The 3x multiplier is the standard EMA convergence heuristic. '''
+        return 3 * max(
+            self.config.short_ema,
+            self.config.long_ema,
+            self.config.rsi_window,
+            self.config.adx_window,
+            self.config.atr_window
+        )
+
     def _generate_signal(self, rule_results: dict) -> Signal:
         crossover_signal = rule_results['crossover']
         rsi_threshold_signal = rule_results['rsi_threshold']
