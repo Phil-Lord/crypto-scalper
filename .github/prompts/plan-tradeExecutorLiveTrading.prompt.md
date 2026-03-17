@@ -120,7 +120,8 @@
       - Connectors: `OhlcConnector`, `BalanceConnector`, `AddOrderConnector`, `QueryOrdersConnector`
     - Stores `self.pair_symbols: PairSymbols` from `get_kraken_pair_symbols(bot.pair)` — used internally by `_fetch_balances()` to look up base and quote asset symbols in Kraken's balance response; not passed downstream
     - Creates `run: BotRun` on construction and persists it via `bot_run_repo.add()`
-    - Has `self._shutting_down: bool = False` flag for graceful drain
+    - Has `self._shutting_down = False` flag for graceful drain
+    - **`request_shutdown(self) -> None`**: Sets `self._shutting_down = True`. Called by the signal handler in `start_scalping.py` — keeps mutation of internal state behind a public method rather than reaching into a private attribute from outside the class.
     - Uses a `logging.LoggerAdapter` with `{'bot_id': bot.id}` extra context — all log calls automatically include bot ID, critical for debugging multi-bot processes
     - **`_recover_state(self) -> None`**: Queries latest directional tick via `bot_tick_repo.get_latest_action_by_bot_id(bot.id)` — returns only BUY/SELL ticks, never HOLD. If found, sets `strategy.last_action` from tick's signal. Logs recovery details or 'first run' if no tick exists.
     - **`_fetch_ohlc(self) -> pd.Series`**: Private method. Fetches latest OHLC via `OhlcConnector`, extracts the latest closed candle from the raw array, returns as `pd.Series` with keys `open`, `high`, `low`, `close` matching what `Strategy.generate_signal()` expects. Used by `execute_interval()` for single-candle fetches.
@@ -177,7 +178,7 @@
       6. Call `executor.warm_up()` — blocks until indicators are ready
       7. Schedule `executor.execute_interval` with APScheduler **`BlockingScheduler`** using **`CronTrigger`** aligned to wall-clock + **5-second offset** + **`jitter=3`** + **`misfire_grace_time=0`** + **`max_instances=1`** (e.g., `CronTrigger(minute='*', second=5)` for 1-min interval, `CronTrigger(minute='*/5', second=5)` for 5-min). The 5-second offset handles Kraken data propagation delay. Jitter prevents simultaneous API calls from multiple bots. `misfire_grace_time=0` skips misfired executions rather than stacking them. `max_instances=1` ensures only one `execute_interval` runs per bot at a time.
     - Register signal handlers for `SIGTERM`/`SIGINT`:
-      1. Set `_shutting_down = True` on each executor (prevents new intervals from doing work)
+      1. Call `executor.request_shutdown()` on each executor (sets `_shutting_down = True`, prevents new intervals from doing work)
       2. Call `scheduler.shutdown(wait=True)` — blocks until any currently-running jobs finish
       3. Call `executor.shutdown()` on each executor (marks runs complete)
       4. Exit
@@ -353,7 +354,7 @@ docker run --env-file .env -e BOT_IDS=btc_1m_001 -e DRY_RUN=true crypto-scalper
 
 1. `fly deploy` builds and pushes the new Docker image
 2. Fly.io sends `SIGTERM` to the running container
-3. Signal handler sets `_shutting_down = True` on each executor — any in-flight `execute_interval()` completes (including order placement and fill query), but the next scheduled interval returns immediately
+3. Signal handler calls `executor.request_shutdown()` on each executor — sets `_shutting_down = True`; any in-flight `execute_interval()` completes (including order placement and fill query), but the next scheduled interval returns immediately
 4. `scheduler.shutdown(wait=True)` blocks until running jobs finish
 5. `executor.shutdown()` marks each `BotRun` as completed via `bot_run_repo.complete()`
 6. Process exits, old container is removed
@@ -436,7 +437,7 @@ WHERE completed_at IS NULL;
 - **State recovery from latest directional tick:** On startup (before warm-up), query `bot_tick_repo.get_latest_action_by_bot_id()` which filters for `signal IN ('buy', 'sell')`. `strategy.last_action` is only ever `BUY` or `SELL` (never `HOLD`) — it tracks the last directional action for consecutive-signal suppression. Recovering from a HOLD tick would corrupt this: e.g., bot buys → holds for 20 intervals → crash → recovery sets `last_action=HOLD` → next BUY signal passes suppression → double buy. The filtered query ensures `last_action` is always restored to a valid directional state.
 - **Warm-up via `Strategy.warmup_candles` property:** Each strategy declares its own warm-up requirement as an abstract property computed from its configured indicator windows (e.g., PrecisionTrendStrategy: `3 × max(window sizes)`, SmaStrategy: `long_window + 1`). The 3× multiplier is the standard EMA convergence heuristic — after 3× the window length, the seed value carries ~5% weight in the EMA. Changing indicator windows in `strategy_configs.py` automatically adjusts the warm-up requirement — no strategy code changes needed. `TradeExecutor.warm_up()` calls `_fetch_ohlc_history()` to get the full candle batch, then feeds each candle through `strategy.generate_signal()` sequentially.
 - **Partial error ticks:** If OHLC fetch fails → log error, skip tick (can't construct BotTick without non-nullable price/balance fields). If strategy or order placement fails → persist tick with `error` field set (price data is available). Clean data in `bot_ticks` — every row has real values.
-- **Graceful drain shutdown:** On `SIGTERM`/`SIGINT`, set `_shutting_down` flag on each executor (checked at start of `execute_interval()` — prevents new intervals from doing work). Then call `scheduler.shutdown(wait=True)` which blocks until any currently-running jobs finish. Then call `executor.shutdown()` on each executor to mark runs complete. Prevents interrupted order placements during `fly deploy`.
+- **Graceful drain shutdown:** On `SIGTERM`/`SIGINT`, call `executor.request_shutdown()` on each executor — this sets the internal `_shutting_down` flag (checked at start of `execute_interval()`, prevents new intervals from doing work) without exposing the private attribute to external mutation. Then call `scheduler.shutdown(wait=True)` which blocks until any currently-running jobs finish. Then call `executor.shutdown()` on each executor to mark runs complete. Prevents interrupted order placements during `fly deploy`.
 - **`exchange_order_id` in domain layer, `txid` in exchange connector layer:** Kraken uses `txid` to mean the order ID — distinct from the trade IDs and ledger IDs also visible in the Kraken web UI. In the exchange connector layer (`QueryOrderResult.txid`, `AddOrderResult.txid`, `QueryOrdersService`), `txid` is kept as-is — it matches the Kraken API and that layer is intentionally Kraken-specific. In the domain layer (`BotOrder`, `bot_orders` table), the field is named `exchange_order_id` — self-documenting without requiring Kraken API knowledge, unambiguous when reading the schema alongside trade IDs and ledger IDs. The mapping `exchange_order_id = order_result.txid[0]` happens in `TradeExecutor` at the connector→domain boundary.
 - **`QueryOrdersConnector` for fill data:** `BotOrder` requires `price`, `volume`, `fee` as `Decimal` — estimated values would compromise the data integrity the schema is designed for.
 - **Skip ticks during warm-up:** Warm-up signals are mathematically incomplete (EMA hasn't converged). Recording them would pollute the decision log with unreliable data.
