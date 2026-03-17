@@ -209,3 +209,13 @@ class TestSmaStrategy:
         for reset_r, fresh_r in zip(reset_results, fresh_results):
             assert reset_r['signal'] == fresh_r['signal']
             assert reset_r['price'] == fresh_r['price']
+
+    @pytest.mark.warmup_candles
+    def test_warmup_candles_returns_long_window_plus_one(self, strategy: SmaStrategy):
+        assert strategy.warmup_candles == 11  # long_window=10 + 1
+
+    @pytest.mark.warmup_candles
+    def test_warmup_candles_reflects_config_change(self):
+        config = SmaStrategyConfig(short_window=5, long_window=20)
+        strategy = SmaStrategy(config)
+        assert strategy.warmup_candles == 21  # long_window=20 + 1

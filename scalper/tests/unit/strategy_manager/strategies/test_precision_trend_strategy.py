@@ -220,3 +220,22 @@ class TestPrecisionTrendStrategy:
 
         # Then
         assert result['signal'] == Signal.BUY
+
+    @pytest.mark.warmup_candles
+    def test_warmup_candles_returns_three_times_max_window(self, strategy: PrecisionTrendStrategy):
+        # long_ema=10, rsi_window=14, adx_window=14, atr_window=14 — max is 14
+        assert strategy.warmup_candles == 42  # 3 * 14
+
+    @pytest.mark.warmup_candles
+    def test_warmup_candles_reflects_config_change(self):
+        # Given
+        config = PrecisionTrendStrategyConfig(
+            short_ema=5, long_ema=10, rsi_window=14, rsi_oversold=30, rsi_overbought=70,
+            adx_window=20, adx_threshold=25, atr_window=14, atr_threshold=0.01,
+            weight_crossover=1.0, weight_rsi=1.0, weight_adx=1.0, weight_atr=1.0,
+            buy_threshold=0.5, sell_threshold=-0.5,
+        )
+        strategy = PrecisionTrendStrategy(config)
+
+        # When/Then
+        assert strategy.warmup_candles == 60  # 3 * max(5, 10, 14, 20, 14) = 3 * 20
