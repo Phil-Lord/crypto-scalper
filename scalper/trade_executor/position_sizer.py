@@ -12,15 +12,15 @@ class PairBalances:
     This merges pair symbol information with balance details.
 
     Attributes:
-        base_symbol (str): Symbol of the base asset, e.g., 'BTC'.
-        quote_symbol (str): Symbol of the quote asset, e.g., 'USD'.
-        base (Decimal): Balance of the base asset.
-        quote (Decimal): Balance of the quote asset.
+        symbol_base (str): Symbol of the base asset, e.g., 'XBT'.
+        symbol_quote (str): Symbol of the quote asset, e.g., 'GBP'.
+        balance_base (Decimal): Balance of the base asset.
+        balance_quote (Decimal): Balance of the quote asset.
     '''
-    base_symbol: str
-    quote_symbol: str
-    base: Decimal
-    quote: Decimal
+    symbol_base: str
+    symbol_quote: str
+    balance_base: Decimal
+    balance_quote: Decimal
 
 
 class PositionSizer(ABC):
@@ -34,7 +34,7 @@ class AllInPositionSizer(PositionSizer):
     def calculate_volume(self, signal: Signal, balances: PairBalances) -> Decimal:
         ''' Allocates the entire available balance to the trade. '''
         if signal == Signal.BUY:
-            return balances.quote
+            return balances.balance_quote
         elif signal == Signal.SELL:
-            return balances.base
+            return balances.balance_base
         raise ValueError(f'Cannot calculate volume for signal: {signal}')

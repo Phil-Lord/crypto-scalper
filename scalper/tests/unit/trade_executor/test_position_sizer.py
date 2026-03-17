@@ -12,21 +12,21 @@ class TestPairBalances:
     @pytest.fixture
     def sample_balances(self) -> PairBalances:
         return PairBalances(
-            base_symbol='XBT',
-            quote_symbol='GBP',
-            base=Decimal('0.5'),
-            quote=Decimal('1000.00'),
+            symbol_base='XBT',
+            symbol_quote='GBP',
+            balance_base=Decimal('0.5'),
+            balance_quote=Decimal('1000.00'),
         )
 
     def test_creates_pair_balances_with_correct_fields(self, sample_balances: PairBalances):
-        assert sample_balances.base_symbol == 'XBT'
-        assert sample_balances.quote_symbol == 'GBP'
-        assert sample_balances.base == Decimal('0.5')
-        assert sample_balances.quote == Decimal('1000.00')
+        assert sample_balances.symbol_base == 'XBT'
+        assert sample_balances.symbol_quote == 'GBP'
+        assert sample_balances.balance_base == Decimal('0.5')
+        assert sample_balances.balance_quote == Decimal('1000.00')
 
     def test_pair_balances_is_frozen(self, sample_balances: PairBalances):
         with pytest.raises(AttributeError):
-            sample_balances.base = Decimal('1.0')
+            sample_balances.balance_base = Decimal('1.0')
 
 
 @pytest.mark.trade_executor
@@ -39,10 +39,10 @@ class TestAllInPositionSizer:
     @pytest.fixture
     def balances(self) -> PairBalances:
         return PairBalances(
-            base_symbol='XBT',
-            quote_symbol='GBP',
-            base=Decimal('0.5'),
-            quote=Decimal('1000.00'),
+            symbol_base='XBT',
+            symbol_quote='GBP',
+            balance_base=Decimal('0.5'),
+            balance_quote=Decimal('1000.00'),
         )
 
     def test_buy_returns_full_quote_balance(self, sizer: AllInPositionSizer, balances: PairBalances):
@@ -60,10 +60,10 @@ class TestAllInPositionSizer:
     def test_buy_with_zero_quote_balance(self, sizer: AllInPositionSizer):
         # Given
         balances = PairBalances(
-            base_symbol='XBT',
-            quote_symbol='GBP',
-            base=Decimal('0.5'),
-            quote=Decimal('0'),
+            symbol_base='XBT',
+            symbol_quote='GBP',
+            balance_base=Decimal('0.5'),
+            balance_quote=Decimal('0'),
         )
 
         # When
@@ -75,10 +75,10 @@ class TestAllInPositionSizer:
     def test_sell_with_zero_base_balance(self, sizer: AllInPositionSizer):
         # Given
         balances = PairBalances(
-            base_symbol='XBT',
-            quote_symbol='GBP',
-            base=Decimal('0'),
-            quote=Decimal('1000.00'),
+            symbol_base='XBT',
+            symbol_quote='GBP',
+            balance_base=Decimal('0'),
+            balance_quote=Decimal('1000.00'),
         )
 
         # When
