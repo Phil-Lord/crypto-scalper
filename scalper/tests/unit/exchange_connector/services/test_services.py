@@ -1,7 +1,7 @@
-import pytest
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
+import pytest
 from tenacity import RetryError
 
 from exchange_connector.services.kraken_service import KrakenService

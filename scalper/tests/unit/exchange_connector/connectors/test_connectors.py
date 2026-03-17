@@ -1,6 +1,7 @@
-import pytest
 from decimal import Decimal
 from unittest.mock import Mock
+
+import pytest
 
 from exchange_connector.api.kraken_api_client import KrakenApiClient
 from exchange_connector.api.exceptions import KrakenApiResponseError
