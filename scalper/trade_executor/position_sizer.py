@@ -28,3 +28,13 @@ class PositionSizer(ABC):
     def calculate_volume(self, signal: Signal, balances: PairBalances) -> Decimal:
         ''' Calculates the order volume based on the provided signal and current balances.'''
         pass
+
+
+class AllInPositionSizer(PositionSizer):
+    def calculate_volume(self, signal: Signal, balances: PairBalances) -> Decimal:
+        ''' Allocates the entire available balance to the trade. '''
+        if signal == Signal.BUY:
+            return balances.quote
+        elif signal == Signal.SELL:
+            return balances.base
+        raise ValueError(f'Cannot calculate volume for signal: {signal}')
