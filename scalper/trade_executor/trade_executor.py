@@ -31,6 +31,7 @@ class TradeExecutor:
         self.add_order_connector = add_order_connector
         self.query_orders_connector = query_orders_connector
         self.dry_run = dry_run
+        self._shutting_down = False
 
         self.pair_symbols = get_kraken_pair_symbols(bot.pair)
         self.bot_run = BotRun(bot_id=bot.id)
@@ -79,3 +80,8 @@ class TradeExecutor:
             # TODO: Log execution price, volume, and fee.
         except Exception as e:
             self.logger.error(f'Trade execution failed: {e}', exc_info=True)
+
+    def request_shutdown(self):
+        ''' Signal the executor to stop after the current interval. '''
+        self.logger.info('Shutdown requested')
+        self._shutting_down = True
