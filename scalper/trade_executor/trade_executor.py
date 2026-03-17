@@ -2,7 +2,7 @@ import logging
 
 from data_system import Bot, BotRun, BotRunRepository, BotTickRepository, BotOrderRepository
 from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector
-from position_sizer import PositionSizer
+from .position_sizer import PositionSizer
 from strategy_manager import Strategy
 from utils import get_kraken_pair_symbols
 
