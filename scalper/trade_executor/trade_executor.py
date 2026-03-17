@@ -33,10 +33,10 @@ class TradeExecutor:
         self.dry_run = dry_run
         self._shutting_down = False
 
+        self.logger = BotLoggerAdapter(logging.getLogger(__name__), {'bot_id': bot.id})
         self.pair_symbols = get_kraken_pair_symbols(bot.pair)
         self.run = self.bot_run_repo.add(BotRun(bot_id=bot.id))
 
-        self.logger = BotLoggerAdapter(logging.getLogger(__name__), {'bot_id': self.bot.id})
         self.logger.info('Initialised TradeExecutor')
 
     def execute_interval(self) -> None:
