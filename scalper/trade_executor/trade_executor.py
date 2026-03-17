@@ -34,8 +34,7 @@ class TradeExecutor:
         self._shutting_down = False
 
         self.pair_symbols = get_kraken_pair_symbols(bot.pair)
-        self.bot_run = BotRun(bot_id=bot.id)
-        self.bot_run_repo.add(self.bot_run)
+        self.run = self.bot_run_repo.add(BotRun(bot_id=bot.id))
 
         self.logger = BotLoggerAdapter(logging.getLogger(__name__), {'bot_id': self.bot.id})
         self.logger.info('Initialised TradeExecutor')
