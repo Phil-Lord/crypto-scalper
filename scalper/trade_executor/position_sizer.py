@@ -26,7 +26,17 @@ class PairBalances:
 class PositionSizer(ABC):
     @abstractmethod
     def calculate_volume(self, signal: Signal, balances: PairBalances) -> Decimal:
-        ''' Calculates the order volume based on the provided signal and current balances.'''
+        '''
+        Calculates the order volume based on the signal and current balances.
+
+        Volume units are asymmetric: BUY orders must return quote currency (e.g. GBP),
+        SELL orders must return base currency (e.g. XBT). This matches the Kraken API
+        convention used by AddOrderConnector.place().
+
+        :param signal: BUY or SELL signal. HOLD is not valid and should raise ValueError.
+        :param balances: Current balances for the trading pair.
+        :return: Order volume in quote currency for BUY, or base currency for SELL.
+        '''
         pass
 
 
