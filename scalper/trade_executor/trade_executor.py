@@ -73,14 +73,14 @@ class TradeExecutor:
 
         try:
             self.logger.info(f'Placing {signal.upper()} order: volume={volume}')
-            order_result = self.add_order_connector.place(self.pair, signal, volume)
+            order_result = self.add_order_connector.place(self.bot.pair, signal, volume)
             self.logger.info(
                 f'Trade executed: id={order_result.txid[0]}, order={order_result.order_description}')
             # TODO: Log execution price, volume, and fee.
         except Exception as e:
             self.logger.error(f'Trade execution failed: {e}', exc_info=True)
 
-    def request_shutdown(self):
+    def request_shutdown(self) -> None:
         ''' Signal the executor to stop after the current interval. '''
         self.logger.info('Shutdown requested')
         self._shutting_down = True
