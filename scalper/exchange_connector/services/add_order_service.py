@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Any
 
 from exchange_connector.kraken_utils import get_nonce
@@ -5,7 +6,7 @@ from .kraken_service import KrakenService
 
 
 class AddOrderService(KrakenService):
-    def add_order(self, pair: str, signal: str, volume: float, validate: bool = False) -> dict[str, Any]:
+    def add_order(self, pair: str, signal: str, volume: Decimal, validate: bool = False) -> dict[str, Any]:
         self.validate_pair(pair)
         endpoint = '/0/private/AddOrder'
         params = {

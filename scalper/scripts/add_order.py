@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 
 import click
 
@@ -14,23 +15,23 @@ logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 @click.option('--signal', required=True, help='Signal (e.g. buy or sell)')
 @click.option('--volume', required=True, help='Volume (Buy in quote, sell in base. -1 for all)')
 @click.option('--validate', '-v', is_flag=True, help='Validate order without executing')
-def add_order(pair: str, signal: str, volume: float, validate: bool = False) -> None:
+def add_order(pair: str, signal: str, volume: str, validate: bool = False) -> None:
     kraken_pair = get_kraken_pair(pair)
 
-    if volume == '-1':
-        volume = get_wallet_volume(signal, kraken_pair)
+    decimal_volume = get_wallet_volume(signal, kraken_pair) if volume == '-1' else Decimal(volume)
 
     add_order_connector = AddOrderConnector()
-    result = add_order_connector.place(kraken_pair, signal, volume, validate)
+    result = add_order_connector.place(kraken_pair, signal, decimal_volume, validate)
     print(f'Order placed: {result.txid}')
     print(f'Description: {result.order_description}')
 
 
-def get_wallet_volume(signal: str, kraken_pair: str) -> float:
+def get_wallet_volume(signal: str, kraken_pair: str) -> Decimal:
     balance_connector = BalanceConnector()
     balances = balance_connector.fetch()
     symbols = get_kraken_pair_symbols(kraken_pair)
-    return balances[symbols.quote] if signal == 'buy' else balances[symbols.base]
+    raw_volume = balances[symbols.quote] if signal == 'buy' else balances[symbols.base]
+    return Decimal(str(raw_volume))  # Convert to string to avoid float precision issues
 
 
 if __name__ == '__main__':

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from .base_connectors import PlaceConnector
 from exchange_connector.api import KrakenApiClient
 from exchange_connector.models import AddOrderResult
@@ -9,13 +11,13 @@ class AddOrderConnector(PlaceConnector):
         self.client = client or KrakenApiClient()
         self.service = AddOrderService(self.client)
 
-    def place(self, pair: str, signal: str, volume: float, validate: bool = False) -> AddOrderResult:
+    def place(self, pair: str, signal: str, volume: Decimal, validate: bool = False) -> AddOrderResult:
         '''
         Place a market order.
 
         :param pair: Trading pair in Kraken format, e.g., 'XXBTZGBP'.
         :param signal: Order direction - 'buy' or 'sell'.
-        :param volume: Order volume (quote currency for buy, base for sell).
+        :param volume: Order volume as Decimal (quote currency for buy, base currency for sell).
         :param validate: If True, validate order without executing. Default is False.
         :return: AddOrderResult domain object containing transaction IDs and order description.
         '''
