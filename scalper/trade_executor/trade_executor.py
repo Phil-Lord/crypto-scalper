@@ -1,7 +1,9 @@
 import logging
 import os
 
-from exchange_connector import AddOrderConnector, BalanceConnector
+from data_system import Bot, BotRunRepository, BotTickRepository, BotOrderRepository
+from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector
+from position_sizer import PositionSizer
 from strategy_manager import Strategy
 from utils import load_env, LOG_FORMAT, get_kraken_pair_symbols
 
@@ -13,14 +15,25 @@ logger = logging.getLogger(__name__)
 
 
 class TradeExecutor:
-    def __init__(self, pair: str, interval: int, strategy: Strategy):
-        self.pair = pair
-        self.symbols = get_kraken_pair_symbols(pair)
-        self.interval = interval
-        self.balance_connector = BalanceConnector()
-        self.add_order_connector = AddOrderConnector()
+    def __init__(
+            self, bot: Bot, strategy: Strategy, position_sizer: PositionSizer,
+            bot_run_repo: BotRunRepository, bot_tick_repo: BotTickRepository,
+            bot_order_repo: BotOrderRepository, balance_connector: BalanceConnector,
+            ohlc_connector: OhlcConnector, add_order_connector: AddOrderConnector,
+            query_orders_connector: QueryOrdersConnector, dry_run: bool = False
+    ):
+        self.bot = bot
         self.strategy = strategy
-        logger.info(f'Initialised TradeExecutor: {pair} - {strategy.__class__.__name__}')
+        self.position_sizer = position_sizer
+        self.bot_run_repo = bot_run_repo
+        self.bot_tick_repo = bot_tick_repo
+        self.bot_order_repo = bot_order_repo
+        self.balance_connector = balance_connector
+        self.ohlc_connector = ohlc_connector
+        self.add_order_connector = add_order_connector
+        self.query_orders_connector = query_orders_connector
+        self.dry_run = dry_run
+        logger.info('Initialised TradeExecutor')
 
     def execute_interval(self) -> None:
         ''' Runs one trade decision cycle. '''
