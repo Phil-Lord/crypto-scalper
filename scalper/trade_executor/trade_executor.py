@@ -32,7 +32,7 @@ class TradeExecutor:
         self.query_orders_connector = query_orders_connector
         self.dry_run = dry_run
 
-        self.symbols = get_kraken_pair_symbols(bot.pair)
+        self.pair_symbols = get_kraken_pair_symbols(bot.pair)
         self.bot_run = BotRun(bot_id=bot.id)
         self.bot_run_repo.add(self.bot_run)
 
@@ -67,9 +67,9 @@ class TradeExecutor:
         ''' Call exchange connector to add order. '''
         balances = self.balance_connector.fetch()
         if signal == 'buy':
-            volume = balances[self.symbols.quote]
+            volume = balances[self.pair_symbols.quote]
         elif signal == 'sell':
-            volume = balances[self.symbols.base]
+            volume = balances[self.pair_symbols.base]
 
         try:
             self.logger.info(f'Placing {signal.upper()} order: volume={volume}')
