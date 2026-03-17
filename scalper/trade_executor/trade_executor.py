@@ -1,7 +1,7 @@
 import logging
 import os
 
-from data_system import Bot, BotRunRepository, BotTickRepository, BotOrderRepository
+from data_system import Bot, BotRun, BotRunRepository, BotTickRepository, BotOrderRepository
 from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector
 from position_sizer import PositionSizer
 from strategy_manager import Strategy
@@ -33,6 +33,11 @@ class TradeExecutor:
         self.add_order_connector = add_order_connector
         self.query_orders_connector = query_orders_connector
         self.dry_run = dry_run
+
+        self.symbols = get_kraken_pair_symbols(bot.pair)
+        self.bot_run = BotRun(bot_id=bot.id)
+        self.bot_run_repo.add(self.bot_run)
+
         logger.info('Initialised TradeExecutor')
 
     def execute_interval(self) -> None:
