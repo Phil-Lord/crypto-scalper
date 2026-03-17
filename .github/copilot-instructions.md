@@ -62,6 +62,8 @@ from data_system.models import Trade
 from .trade_repository import TradeRepository
 ```
 
+**Test file imports:** In test files, import from the direct module path rather than the public package `__init__` re-export (e.g., `from data_system.models.bot_tick_model import Signal` not `from data_system import Signal`). This preserves IDE navigation — hover and cmd-click will resolve to the definition rather than the re-export. This is only relevant for test files; production code should always import from the public API.
+
 ### Type Hints
 
 Always use type hints for function signatures:
@@ -293,7 +295,7 @@ When a task becomes repeatable, create a new prompt file for it.
 
 ### Test Structure
 
-Use the **Given/When/Then** pattern with comments:
+Use the **Given/When/Then** pattern with comments for tests that benefit from the structure — multi-step tests, tests with non-trivial setup, or tests where the boundary between action and assertion isn't immediately obvious. Skip the comments when the test is short and self-evident.
 
 ```python
 def test_add_inserts_trades(self, mock_client, mock_session, sample_trade: Trade):
@@ -307,14 +309,11 @@ def test_add_inserts_trades(self, mock_client, mock_session, sample_trade: Trade
     mock_session.execute.assert_called_once()
 ```
 
-For simple tests, `# When / Then` can be combined:
+For simple tests where the structure is obvious, omit the comments entirely:
 
 ```python
 def test_trade_is_frozen(self, sample_trade_data):
-    # Given
     trade = Trade(**sample_trade_data)
-
-    # When / Then
     with pytest.raises(AttributeError):
         trade.price = 60000.0
 ```
