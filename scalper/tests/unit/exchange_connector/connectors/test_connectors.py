@@ -1,4 +1,5 @@
 import pytest
+from decimal import Decimal
 from unittest.mock import Mock
 
 from exchange_connector.api.kraken_api_client import KrakenApiClient
@@ -170,10 +171,11 @@ class TestAddOrderConnector:
         connector.service.add_order.return_value = raw_order_response
 
         # When
-        result = connector.place('XXBTZGBP', 'buy', 100.0)
+        result = connector.place('XXBTZGBP', 'buy', Decimal('100.0'))
 
         # Then
-        connector.service.add_order.assert_called_once_with('XXBTZGBP', 'buy', 100.0, False)
+        connector.service.add_order.assert_called_once_with(
+            'XXBTZGBP', 'buy', Decimal('100.0'), False)
         assert isinstance(result, AddOrderResult)
         assert result.txid == ['ORDER-123']
         assert result.order_description == 'buy 100.00000000 XXBTZGBP @ market'
@@ -247,10 +249,11 @@ class TestAddOrderConnector:
             'txid': ['ORDER-123'], 'descr': {'order': 'test'}}
 
         # When
-        connector.place('XETHZUSD', 'sell', 5.5)
+        connector.place('XETHZUSD', 'sell', Decimal('5.5'))
 
         # Then
-        connector.service.add_order.assert_called_once_with('XETHZUSD', 'sell', 5.5, False)
+        connector.service.add_order.assert_called_once_with(
+            'XETHZUSD', 'sell', Decimal('5.5'), False)
 
     def test_place_passes_validate_parameter(self, mock_client):
         # Given
@@ -259,10 +262,11 @@ class TestAddOrderConnector:
         connector.service.add_order.return_value = {'descr': {'order': 'buy 10.00 XBTGBP @ market'}}
 
         # When
-        connector.place('XXBTZGBP', 'buy', 10.0, validate=True)
+        connector.place('XXBTZGBP', 'buy', Decimal('10.0'), validate=True)
 
         # Then
-        connector.service.add_order.assert_called_once_with('XXBTZGBP', 'buy', 10.0, True)
+        connector.service.add_order.assert_called_once_with(
+            'XXBTZGBP', 'buy', Decimal('10.0'), True)
 
 
 @pytest.mark.exchange_connector

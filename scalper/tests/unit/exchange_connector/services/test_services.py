@@ -1,4 +1,5 @@
 import pytest
+from decimal import Decimal
 from unittest.mock import Mock, patch
 
 from tenacity import RetryError
@@ -176,7 +177,7 @@ class TestAddOrderService:
 
         with patch('exchange_connector.services.add_order_service.get_nonce', return_value='123456'):
             # When
-            service.add_order('XXBTZGBP', 'buy', 100.0)
+            service.add_order('XXBTZGBP', 'buy', Decimal('100.0'))
 
             # Then
             call_args = mock_client.make_request.call_args
@@ -191,7 +192,7 @@ class TestAddOrderService:
 
         with patch('exchange_connector.services.add_order_service.get_nonce', return_value='123456'):
             # When
-            service.add_order('XXBTZGBP', 'sell', 0.001)
+            service.add_order('XXBTZGBP', 'sell', Decimal('0.001'))
 
             # Then
             call_args = mock_client.make_request.call_args
@@ -205,7 +206,7 @@ class TestAddOrderService:
 
         # When / Then
         with pytest.raises(ValueError, match='cannot be empty'):
-            service.add_order('', 'buy', 100.0)
+            service.add_order('', 'buy', Decimal('100.0'))
 
     def test_add_order_includes_correct_params(self, mock_client):
         # Given
@@ -215,14 +216,14 @@ class TestAddOrderService:
 
         with patch('exchange_connector.services.add_order_service.get_nonce', return_value='987654'):
             # When
-            service.add_order('XXBTZGBP', 'buy', 50.0)
+            service.add_order('XXBTZGBP', 'buy', Decimal('50.0'))
 
             # Then
             call_args = mock_client.make_request.call_args
             params = call_args[0][2]
             assert params['pair'] == 'XXBTZGBP'
             assert params['type'] == 'buy'
-            assert params['volume'] == 50.0
+            assert params['volume'] == Decimal('50.0')
             assert params['ordertype'] == 'market'
             assert params['nonce'] == '987654'
 
@@ -234,7 +235,7 @@ class TestAddOrderService:
 
         with patch('exchange_connector.services.add_order_service.get_nonce', return_value='123456'):
             # When
-            service.add_order('XXBTZGBP', 'sell', 0.5)
+            service.add_order('XXBTZGBP', 'sell', Decimal('0.5'))
 
             # Then
             call_args = mock_client.make_request.call_args
@@ -249,7 +250,7 @@ class TestAddOrderService:
 
         with patch('exchange_connector.services.add_order_service.get_nonce', return_value='123456'):
             # When
-            service.add_order('XXBTZGBP', 'buy', 100.0)
+            service.add_order('XXBTZGBP', 'buy', Decimal('100.0'))
 
             # Then
             call_args = mock_client.make_request.call_args
@@ -265,7 +266,7 @@ class TestAddOrderService:
 
         with patch('exchange_connector.services.add_order_service.get_nonce', return_value='123456'):
             # When
-            service.add_order('XXBTZGBP', 'buy', 100.0, validate=True)
+            service.add_order('XXBTZGBP', 'buy', Decimal('100.0'), validate=True)
 
             # Then
             call_args = mock_client.make_request.call_args
