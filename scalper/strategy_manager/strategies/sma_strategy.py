@@ -16,6 +16,14 @@ class SmaStrategy(Strategy):
         self.register_indicator('long_sma', SmaIndicator(config.long_window))
         self.register_rule('crossover', MaCrossoverRule('short_sma', 'long_sma'))
 
+    @property
+    def warmup_candles(self) -> int:
+        '''
+        SMA requires at least long_window candles,
+        plus one for the crossover rule to produce a signal.
+        '''
+        return self.config.long_window + 1
+
     def _generate_signal(self, rule_results: dict) -> Signal:
         return rule_results['crossover']
 
