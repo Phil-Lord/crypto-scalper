@@ -84,3 +84,12 @@ class TradeExecutor:
         ''' Signal the executor to stop after the current interval. '''
         self.logger.info('Shutdown requested')
         self._shutting_down = True
+
+    def _recover_state(self) -> None:
+        ''' Sets latest directional action on strategy from database. '''
+        latest_action = self.bot_tick_repo.get_latest_action_by_bot_id(self.bot.id)
+        if latest_action:
+            self.strategy.last_action = latest_action
+            self.logger.info(f'Recovered last action: {latest_action}')
+        else:
+            self.logger.info('No previous action found, starting fresh')
