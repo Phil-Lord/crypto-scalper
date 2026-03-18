@@ -1,4 +1,4 @@
-.PHONY: test test/utils test/data_system test/data_system/models test/data_system/repositories test/data_system/config test/data_system/clients test/exchange_connector test/exchange_connector/api test/exchange_connector/connectors test/exchange_connector/services test/exchange_connector/kraken_utils test/strategy_manager test/strategy_manager/indicators test/strategy_manager/rules test/strategy_manager/strategies test/backtesting_engine test/integration test/integration/data_system test/integration/exchange_connector test/integration/exchange_connector_data_system test/integration/strategy_manager test/integration/backtesting_engine
+.PHONY: test test/utils test/data_system test/data_system/models test/data_system/repositories test/data_system/config test/data_system/clients test/exchange_connector test/exchange_connector/api test/exchange_connector/connectors test/exchange_connector/services test/exchange_connector/kraken_utils test/strategy_manager test/strategy_manager/indicators test/strategy_manager/rules test/strategy_manager/strategies test/backtesting_engine test/trade_executor test/integration test/integration/data_system test/integration/exchange_connector test/integration/exchange_connector_data_system test/integration/strategy_manager test/integration/backtesting_engine test/integration/trade_executor
 
 # Run all tests
 test:
@@ -81,3 +81,11 @@ test/integration/strategy_manager:
 
 test/integration/backtesting_engine:
 	pytest -m backtesting_engine_integration
+
+# Run all trade_executor tests
+test/trade_executor:
+	pytest -m trade_executor
+
+# Run trade_executor integration tests
+test/integration/trade_executor:
+	pytest -m trade_executor_integration
