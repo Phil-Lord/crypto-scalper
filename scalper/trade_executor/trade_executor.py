@@ -1,4 +1,7 @@
 import logging
+import time
+
+import pandas as pd
 
 from data_system import Bot, BotRun, BotRunRepository, BotTickRepository, BotOrderRepository
 from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector
@@ -93,3 +96,21 @@ class TradeExecutor:
             self.logger.info(f'Recovered last action: {latest_action}')
         else:
             self.logger.info('No previous action found, starting fresh')
+
+    def _fetch_ohlc(self) -> pd.Series:
+        '''
+        Fetches the latest completed OHLC candle as a Series with open, high, low, close keys.
+
+        We use 2 intervals rather than 1: Kraken returns candles whose start timestamp >= since,
+        and always appends the forming candle. With 1 interval back, the previous closed candle's
+        start falls before since and is excluded, leaving only the forming candle duplicated at
+        [-2] and [-1]. Two intervals back guarantees a distinct completed candle at [-2].
+        '''
+        since = int(time.time()) - self.bot.interval * 60 * 2
+        candle = self.ohlc_connector.fetch(self.bot.pair, self.bot.interval, since)[-2]
+        return pd.Series({
+            'open': candle.open,
+            'high': candle.high,
+            'low': candle.low,
+            'close': candle.close
+        })
