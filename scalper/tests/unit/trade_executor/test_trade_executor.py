@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -15,7 +16,7 @@ from exchange_connector.connectors.ohlc_connector import OhlcConnector
 from exchange_connector.models.ohlc_candle import OhlcCandle
 from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
 from strategy_manager.strategies.base_strategy import Strategy
-from trade_executor.position_sizer import PositionSizer
+from trade_executor.position_sizer import PairBalances, PositionSizer
 from trade_executor.trade_executor import BotLoggerAdapter, TradeExecutor
 from utils.pair_config import PairSymbols
 
@@ -376,3 +377,65 @@ class TestTradeExecutor:
             executor._fetch_ohlc_history()
 
         executor.logger.warning.assert_called_once()
+
+    # --- _fetch_balances ---
+
+    def test_fetch_balances_calls_balance_connector(self, executor, mock_balance_connector):
+        mock_balance_connector.fetch.return_value = {'XXBT': '1.5', 'ZGBP': '10000.00'}
+
+        executor._fetch_balances()
+
+        mock_balance_connector.fetch.assert_called_once()
+
+    def test_fetch_balances_returns_pair_balances_instance(self, executor, mock_balance_connector):
+        mock_balance_connector.fetch.return_value = {'XXBT': '1.5', 'ZGBP': '10000.00'}
+
+        result = executor._fetch_balances()
+
+        assert isinstance(result, PairBalances)
+
+    def test_fetch_balances_sets_correct_symbols(self, executor, mock_balance_connector):
+        mock_balance_connector.fetch.return_value = {'XXBT': '1.5', 'ZGBP': '10000.00'}
+
+        result = executor._fetch_balances()
+
+        assert result.symbol_base == 'XXBT'
+        assert result.symbol_quote == 'ZGBP'
+
+    def test_fetch_balances_maps_balances_correctly(self, executor, mock_balance_connector):
+        mock_balance_connector.fetch.return_value = {'XXBT': '1.5', 'ZGBP': '10000.00'}
+
+        result = executor._fetch_balances()
+
+        assert result.balance_base == Decimal('1.5')
+        assert result.balance_quote == Decimal('10000.00')
+
+    def test_fetch_balances_defaults_base_balance_to_zero_when_missing(self, executor, mock_balance_connector):
+        mock_balance_connector.fetch.return_value = {'ZGBP': '10000.00'}
+
+        result = executor._fetch_balances()
+
+        assert result.balance_base == Decimal('0')
+
+    def test_fetch_balances_defaults_quote_balance_to_zero_when_missing(self, executor, mock_balance_connector):
+        mock_balance_connector.fetch.return_value = {'XXBT': '1.5'}
+
+        result = executor._fetch_balances()
+
+        assert result.balance_quote == Decimal('0')
+
+    def test_fetch_balances_defaults_both_to_zero_when_response_is_empty(self, executor, mock_balance_connector):
+        mock_balance_connector.fetch.return_value = {}
+
+        result = executor._fetch_balances()
+
+        assert result.balance_base == Decimal('0')
+        assert result.balance_quote == Decimal('0')
+
+    def test_fetch_balances_handles_numeric_balance_values(self, executor, mock_balance_connector):
+        mock_balance_connector.fetch.return_value = {'XXBT': 1.5, 'ZGBP': 10000.0}
+
+        result = executor._fetch_balances()
+
+        assert result.balance_base == Decimal('1.5')
+        assert result.balance_quote == Decimal('10000.0')
