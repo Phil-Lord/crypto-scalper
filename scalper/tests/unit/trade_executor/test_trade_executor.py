@@ -256,3 +256,123 @@ class TestTradeExecutor:
             result = executor._fetch_ohlc()
 
         assert list(result.index) == ['open', 'high', 'low', 'close']
+
+    # --- _fetch_ohlc_history ---
+
+    def test_fetch_ohlc_history_calls_connector_with_correct_pair_and_interval(
+            self, executor, mock_ohlc_connector, mock_strategy, sample_candles,
+    ):
+        mock_strategy.warmup_candles = 10
+        mock_ohlc_connector.fetch.return_value = sample_candles
+
+        with patch('time.time', return_value=1700000120.0):
+            executor._fetch_ohlc_history()
+
+        args = mock_ohlc_connector.fetch.call_args[0]
+        assert args[0] == 'XXBTZGBP'
+        assert args[1] == 1
+
+    def test_fetch_ohlc_history_calls_connector_with_since_based_on_warmup_candles(
+            self, executor, mock_ohlc_connector, mock_strategy, sample_candles,
+    ):
+        # bot.interval=1, warmup_candles=10; since = now - 1 * 60 * min(10, 720)
+        mock_strategy.warmup_candles = 10
+        mock_ohlc_connector.fetch.return_value = sample_candles
+        frozen_time = 1700000120.0
+
+        with patch('time.time', return_value=frozen_time):
+            executor._fetch_ohlc_history()
+
+        expected_since = int(frozen_time) - 1 * 60 * 10
+        args = mock_ohlc_connector.fetch.call_args[0]
+        assert args[2] == expected_since
+
+    def test_fetch_ohlc_history_caps_warmup_candles_at_720(
+            self, executor, mock_ohlc_connector, mock_strategy, sample_candles,
+    ):
+        mock_strategy.warmup_candles = 1000
+        mock_ohlc_connector.fetch.return_value = sample_candles
+        frozen_time = 1700000120.0
+
+        with patch('time.time', return_value=frozen_time):
+            executor._fetch_ohlc_history()
+
+        expected_since = int(frozen_time) - 1 * 60 * 720
+        args = mock_ohlc_connector.fetch.call_args[0]
+        assert args[2] == expected_since
+
+    def test_fetch_ohlc_history_returns_list_of_series(
+            self, executor, mock_ohlc_connector, mock_strategy, sample_candles,
+    ):
+        mock_strategy.warmup_candles = 10
+        mock_ohlc_connector.fetch.return_value = sample_candles
+
+        with patch('time.time', return_value=1700000120.0):
+            result = executor._fetch_ohlc_history()
+
+        assert isinstance(result, list)
+        assert all(isinstance(s, pd.Series) for s in result)
+
+    def test_fetch_ohlc_history_returns_one_series_per_completed_candle(
+            self, executor, mock_ohlc_connector, mock_strategy, sample_candles,
+    ):
+        mock_strategy.warmup_candles = 10
+        mock_ohlc_connector.fetch.return_value = sample_candles
+
+        with patch('time.time', return_value=1700000120.0):
+            result = executor._fetch_ohlc_history()
+
+        assert len(result) == len(sample_candles) - 1
+
+    def test_fetch_ohlc_history_maps_ohlc_fields_correctly(
+            self, executor, mock_ohlc_connector, mock_strategy, sample_candles,
+    ):
+        mock_strategy.warmup_candles = 10
+        mock_ohlc_connector.fetch.return_value = sample_candles
+
+        with patch('time.time', return_value=1700000120.0):
+            result = executor._fetch_ohlc_history()
+
+        for series, candle in zip(result, sample_candles[:-1]):
+            assert series['open'] == candle.open
+            assert series['high'] == candle.high
+            assert series['low'] == candle.low
+            assert series['close'] == candle.close
+
+    def test_fetch_ohlc_history_series_contain_only_ohlc_keys(
+            self, executor, mock_ohlc_connector, mock_strategy, sample_candles,
+    ):
+        mock_strategy.warmup_candles = 10
+        mock_ohlc_connector.fetch.return_value = sample_candles
+
+        with patch('time.time', return_value=1700000120.0):
+            result = executor._fetch_ohlc_history()
+
+        for series in result:
+            assert list(series.index) == ['open', 'high', 'low', 'close']
+
+    def test_fetch_ohlc_history_excludes_forming_candle(
+            self, executor, mock_ohlc_connector, mock_strategy, sample_candles,
+    ):
+        # sample_candles[-1] is the forming candle; it must never appear in the result.
+        mock_strategy.warmup_candles = 10
+        mock_ohlc_connector.fetch.return_value = sample_candles
+        forming_candle = sample_candles[-1]
+
+        with patch('time.time', return_value=1700000120.0):
+            result = executor._fetch_ohlc_history()
+
+        result_closes = [s['close'] for s in result]
+        assert forming_candle.close not in result_closes
+
+    def test_fetch_ohlc_history_logs_warning_when_warmup_candles_exceeds_720(
+            self, executor, mock_ohlc_connector, mock_strategy, sample_candles,
+    ):
+        mock_strategy.warmup_candles = 1000
+        mock_ohlc_connector.fetch.return_value = sample_candles
+        executor.logger = Mock()
+
+        with patch('time.time', return_value=1700000120.0):
+            executor._fetch_ohlc_history()
+
+        executor.logger.warning.assert_called_once()
