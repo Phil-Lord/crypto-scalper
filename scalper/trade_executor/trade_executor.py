@@ -1,3 +1,4 @@
+from decimal import Decimal
 import logging
 import time
 
@@ -5,7 +6,7 @@ import pandas as pd
 
 from data_system import Bot, BotRun, BotRunRepository, BotTickRepository, BotOrderRepository
 from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector
-from .position_sizer import PositionSizer
+from .position_sizer import PairBalances, PositionSizer
 from strategy_manager import Strategy
 from utils import get_kraken_pair_symbols
 
@@ -136,3 +137,18 @@ class TradeExecutor:
             'low': c.low,
             'close': c.close
         }) for c in candles]
+
+    def _fetch_balances(self) -> PairBalances:
+        '''
+        Fetches balances for the trading pair and returns them in a PairBalances dataclass.
+
+        - If a balance is missing from the exchange response, it defaults to 0 to avoid errors.
+        - Kraken returns balances as strings, but we convert to string before Decimal for safety.
+        '''
+        balances = self.balance_connector.fetch()
+        return PairBalances(
+            symbol_base=self.pair_symbols.base,
+            symbol_quote=self.pair_symbols.quote,
+            balance_base=Decimal(str(balances.get(self.pair_symbols.base, 0))),
+            balance_quote=Decimal(str(balances.get(self.pair_symbols.quote, 0)))
+        )
