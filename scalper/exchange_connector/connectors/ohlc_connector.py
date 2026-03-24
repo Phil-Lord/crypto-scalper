@@ -35,11 +35,10 @@ class OhlcConnector(FetchConnector):
         :raises ValueError: If OHLC data is malformed.
         '''
         candles = []
-        try:
-            for candle in raw_candles:
-                if len(candle) < 8:
-                    raise ValueError(f'OHLC data incomplete: expected 8 fields, got {len(candle)}')
-
+        for candle in raw_candles:
+            if len(candle) < 8:
+                raise ValueError(f'OHLC data incomplete: expected 8 fields, got {len(candle)}')
+            try:
                 candles.append(OhlcCandle(
                     timestamp=int(candle[0]),
                     open=float(candle[1]),
@@ -50,7 +49,7 @@ class OhlcConnector(FetchConnector):
                     volume=float(candle[6]),
                     count=int(candle[7])
                 ))
-        except (ValueError, IndexError, TypeError) as e:
-            raise ValueError(f'Failed to parse OHLC data: {raw_candles}. Error: {e}')
+            except (ValueError, IndexError, TypeError) as e:
+                raise ValueError(f'Failed to parse OHLC data: {candle}. Error: {e}')
 
         return candles
