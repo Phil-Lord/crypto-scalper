@@ -11,7 +11,7 @@ from exchange_connector.connectors.balance_connector import BalanceConnector
 from exchange_connector.connectors.ohlc_connector import OhlcConnector
 from exchange_connector.connectors.ticker_connector import TickerConnector
 from exchange_connector.connectors.trades_connector import TradesConnector
-from exchange_connector.models import AddOrderResult, QueryOrderStatus
+from exchange_connector.models import AddOrderResult, QueryOrderStatus, OhlcCandle
 from data_system.models.trade_model import Trade
 
 
@@ -88,7 +88,7 @@ class TestTradesConnector:
         incomplete_trade = [['50000.0', '0.001', 1704067200.123]]  # Only 3 fields instead of 7
 
         # When / Then
-        with pytest.raises(ValueError, match='Trade data incomplete'):
+        with pytest.raises(ValueError, match=r'^Trade data incomplete'):
             connector._to_domain(incomplete_trade, 'XXBTZGBP')
 
     def test_to_domain_raises_on_invalid_price(self, mock_client):
@@ -422,6 +422,13 @@ class TestOhlcConnector:
     def mock_client(self):
         return Mock(spec=KrakenApiClient)
 
+    @pytest.fixture
+    def raw_candle_data(self):
+        return [
+            [1704067200, '50000.0', '50100.0', '49900.0', '50050.0', '49975.0', '10.5', 100],
+            [1704067260, '50050.0', '50200.0', '50000.0', '50150.0', '50100.0', '8.2', 80],
+        ]
+
     def test_init_with_injected_client(self, mock_client):
         # When
         connector = OhlcConnector(client=mock_client)
@@ -437,19 +444,19 @@ class TestOhlcConnector:
         assert connector.client is not None
         assert isinstance(connector.client, KrakenApiClient)
 
-    def test_fetch_calls_service_fetch_ohlc(self, mock_client):
+    def test_fetch_calls_service_fetch_ohlc(self, mock_client, raw_candle_data):
         # Given
         connector = OhlcConnector(client=mock_client)
         connector.service = Mock()
-        ohlc_data = [[1704067200, '50000', '50100', '49900', '50050', '100', '5000000', 10]]
-        connector.service.fetch_ohlc.return_value = ohlc_data
+        connector.service.fetch_ohlc.return_value = raw_candle_data
 
         # When
         result = connector.fetch('XXBTZGBP', 1, 1704067200)
 
         # Then
         connector.service.fetch_ohlc.assert_called_once_with('XXBTZGBP', 1, 1704067200)
-        assert result == ohlc_data
+        assert len(result) == 2
+        assert all(isinstance(c, OhlcCandle) for c in result)
 
     def test_fetch_passes_all_parameters(self, mock_client):
         # Given
@@ -472,6 +479,68 @@ class TestOhlcConnector:
         # When / Then
         with pytest.raises(ValueError, match='Invalid interval'):
             connector.fetch('XXBTZGBP', -1, 1704067200)
+
+    def test_to_domain_converts_raw_candles_to_ohlc_candles(self, mock_client, raw_candle_data):
+        # Given
+        connector = OhlcConnector(client=mock_client)
+
+        # When
+        candles = connector._to_domain(raw_candle_data)
+
+        # Then
+        assert len(candles) == 2
+        assert all(isinstance(c, OhlcCandle) for c in candles)
+
+    def test_to_domain_maps_all_fields_correctly(self, mock_client):
+        # Given
+        connector = OhlcConnector(client=mock_client)
+        raw = [[1704067200, '50000.0', '50100.0', '49900.0', '50050.0', '49975.0', '10.5', 100]]
+
+        # When
+        candles = connector._to_domain(raw)
+
+        # Then
+        candle = candles[0]
+        assert candle.timestamp == 1704067200
+        assert candle.open == 50000.0
+        assert candle.high == 50100.0
+        assert candle.low == 49900.0
+        assert candle.close == 50050.0
+        assert candle.vwap == 49975.0
+        assert candle.volume == 10.5
+        assert candle.count == 100
+        assert isinstance(candle.timestamp, int)
+        assert isinstance(candle.open, float)
+        assert isinstance(candle.count, int)
+
+    def test_to_domain_handles_empty_list(self, mock_client):
+        # Given
+        connector = OhlcConnector(client=mock_client)
+
+        # When
+        candles = connector._to_domain([])
+
+        # Then
+        assert candles == []
+
+    def test_to_domain_raises_on_incomplete_candle_data(self, mock_client):
+        # Given
+        connector = OhlcConnector(client=mock_client)
+        incomplete = [[1704067200, '50000.0', '50100.0']]  # Only 3 fields, need 8
+
+        # When / Then
+        with pytest.raises(ValueError, match=r'^OHLC data incomplete'):
+            connector._to_domain(incomplete)
+
+    def test_to_domain_raises_on_invalid_numeric_data(self, mock_client):
+        # Given
+        connector = OhlcConnector(client=mock_client)
+        invalid = [[1704067200, 'not_a_price', '50100.0',
+                    '49900.0', '50050.0', '49975.0', '10.5', 100]]
+
+        # When / Then
+        with pytest.raises(ValueError, match='Failed to parse OHLC data'):
+            connector._to_domain(invalid)
 
 
 @pytest.mark.exchange_connector
