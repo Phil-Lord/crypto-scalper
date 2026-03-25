@@ -89,7 +89,7 @@ class TradeExecutor:
         self.logger.info('Shutdown requested')
         self._shutting_down = True
 
-    def _recover_state(self) -> None:
+    def recover_state(self) -> None:
         ''' Sets latest directional action on strategy from database. '''
         latest_action = self.bot_tick_repo.get_latest_action_by_bot_id(self.bot.id)
         if latest_action:
