@@ -41,7 +41,7 @@ class TradeExecutor:
         self.pair_symbols = get_kraken_pair_symbols(bot.pair)
         self.run = self.bot_run_repo.add(BotRun(bot_id=bot.id))
 
-        self.logger.info('Initialised TradeExecutor')
+        self.logger.info('TradeExecutor initialised')
 
     def execute_interval(self) -> None:
         ''' Runs one trade decision cycle. '''
