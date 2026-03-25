@@ -7,6 +7,7 @@ import pytest
 
 from data_system.models.bot_model import Bot
 from data_system.models.bot_run_model import BotRun
+from data_system.models.bot_tick_model import Signal
 from data_system.repositories.bot_order.bot_order_repository import BotOrderRepository
 from data_system.repositories.bot_run.bot_run_repository import BotRunRepository
 from data_system.repositories.bot_tick.bot_tick_repository import BotTickRepository
@@ -138,6 +139,84 @@ class TestTradeExecutor:
 
     def test_constructor_dry_run_defaults_to_false(self, executor):
         assert executor.dry_run is False
+
+    # --- warm_up ---
+
+    def test_warm_up_calls_generate_signal_for_each_candle(self, executor, mock_strategy):
+        candles = [
+            pd.Series({'open': 1.0, 'high': 2.0, 'low': 0.5, 'close': 1.5}),
+            pd.Series({'open': 1.5, 'high': 2.5, 'low': 1.0, 'close': 2.0}),
+            pd.Series({'open': 2.0, 'high': 3.0, 'low': 1.5, 'close': 2.5}),
+        ]
+        mock_strategy.warmup_candles = 3
+        executor._fetch_ohlc_history = Mock(return_value=candles)
+
+        executor.warm_up()
+
+        assert mock_strategy.generate_signal.call_count == 3
+
+    def test_warm_up_passes_each_ohlc_series_to_generate_signal(self, executor, mock_strategy):
+        candles = [
+            pd.Series({'open': 1.0, 'high': 2.0, 'low': 0.5, 'close': 1.5}),
+            pd.Series({'open': 1.5, 'high': 2.5, 'low': 1.0, 'close': 2.0}),
+        ]
+        mock_strategy.warmup_candles = 2
+        executor._fetch_ohlc_history = Mock(return_value=candles)
+
+        executor.warm_up()
+
+        calls = mock_strategy.generate_signal.call_args_list
+        pd.testing.assert_series_equal(calls[0].args[0], candles[0])
+        pd.testing.assert_series_equal(calls[1].args[0], candles[1])
+
+    def test_warm_up_with_empty_history_does_not_call_generate_signal(self, executor, mock_strategy):
+        mock_strategy.warmup_candles = 3
+        executor._fetch_ohlc_history = Mock(return_value=[])
+
+        executor.warm_up()
+
+        mock_strategy.generate_signal.assert_not_called()
+
+    def test_warm_up_warns_when_fewer_candles_than_required(self, executor, mock_strategy):
+        candles = [
+            pd.Series({'open': 1.0, 'high': 2.0, 'low': 0.5, 'close': 1.5}),
+            pd.Series({'open': 1.5, 'high': 2.5, 'low': 1.0, 'close': 2.0}),
+        ]
+        mock_strategy.warmup_candles = 5
+        executor._fetch_ohlc_history = Mock(return_value=candles)
+        executor.logger = Mock()
+
+        executor.warm_up()
+
+        executor.logger.warning.assert_called_once()
+
+    def test_warm_up_does_not_warn_when_sufficient_candles(self, executor, mock_strategy):
+        candles = [
+            pd.Series({'open': 1.0, 'high': 2.0, 'low': 0.5, 'close': 1.5}),
+            pd.Series({'open': 1.5, 'high': 2.5, 'low': 1.0, 'close': 2.0}),
+            pd.Series({'open': 2.0, 'high': 3.0, 'low': 1.5, 'close': 2.5}),
+        ]
+        mock_strategy.warmup_candles = 3
+        executor._fetch_ohlc_history = Mock(return_value=candles)
+        executor.logger = Mock()
+
+        executor.warm_up()
+
+        executor.logger.warning.assert_not_called()
+
+    def test_warm_up_logs_completion_with_candle_count(self, executor, mock_strategy):
+        candles = [
+            pd.Series({'open': 1.0, 'high': 2.0, 'low': 0.5, 'close': 1.5}),
+            pd.Series({'open': 1.5, 'high': 2.5, 'low': 1.0, 'close': 2.0}),
+        ]
+        mock_strategy.warmup_candles = 2
+        executor._fetch_ohlc_history = Mock(return_value=candles)
+        executor.logger = Mock()
+
+        executor.warm_up()
+
+        info_messages = [str(call.args[0]) for call in executor.logger.info.call_args_list]
+        assert any('2 candles' in msg for msg in info_messages)
 
     def test_constructor_stores_dry_run_true_when_set(
             self, bot, mock_strategy, mock_position_sizer, mock_bot_run_repo,
@@ -276,7 +355,7 @@ class TestTradeExecutor:
     def test_fetch_ohlc_history_calls_connector_with_since_based_on_warmup_candles(
             self, executor, mock_ohlc_connector, mock_strategy, sample_candles,
     ):
-        # bot.interval=1, warmup_candles=10; since = now - 1 * 60 * min(10, 720)
+        # bot.interval=1, warmup_candles=10; since = now - 1 * 60 * (min(10, 720) + 1)
         mock_strategy.warmup_candles = 10
         mock_ohlc_connector.fetch.return_value = sample_candles
         frozen_time = 1700000120.0
@@ -284,7 +363,7 @@ class TestTradeExecutor:
         with patch('time.time', return_value=frozen_time):
             executor._fetch_ohlc_history()
 
-        expected_since = int(frozen_time) - 1 * 60 * 10
+        expected_since = int(frozen_time) - 1 * 60 * (10 + 1)
         args = mock_ohlc_connector.fetch.call_args[0]
         assert args[2] == expected_since
 
@@ -298,7 +377,7 @@ class TestTradeExecutor:
         with patch('time.time', return_value=frozen_time):
             executor._fetch_ohlc_history()
 
-        expected_since = int(frozen_time) - 1 * 60 * 720
+        expected_since = int(frozen_time) - 1 * 60 * (720 + 1)
         args = mock_ohlc_connector.fetch.call_args[0]
         assert args[2] == expected_since
 
@@ -365,18 +444,6 @@ class TestTradeExecutor:
 
         result_closes = [s['close'] for s in result]
         assert forming_candle.close not in result_closes
-
-    def test_fetch_ohlc_history_logs_warning_when_warmup_candles_exceeds_720(
-            self, executor, mock_ohlc_connector, mock_strategy, sample_candles,
-    ):
-        mock_strategy.warmup_candles = 1000
-        mock_ohlc_connector.fetch.return_value = sample_candles
-        executor.logger = Mock()
-
-        with patch('time.time', return_value=1700000120.0):
-            executor._fetch_ohlc_history()
-
-        executor.logger.warning.assert_called_once()
 
     # --- _fetch_balances ---
 
