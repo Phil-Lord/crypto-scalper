@@ -439,3 +439,33 @@ class TestTradeExecutor:
 
         assert result.balance_base == Decimal('1.5')
         assert result.balance_quote == Decimal('10000.0')
+
+    # --- recover_state ---
+
+    def test_recover_state_calls_repository_with_correct_bot_id(
+            self, executor, mock_bot_tick_repo, bot,
+    ):
+        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = None
+
+        executor.recover_state()
+
+        mock_bot_tick_repo.get_latest_action_by_bot_id.assert_called_once_with(bot.id)
+
+    def test_recover_state_sets_last_action_when_tick_found(
+            self, executor, mock_bot_tick_repo, mock_strategy,
+    ):
+        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = Signal.BUY
+
+        executor.recover_state()
+
+        assert mock_strategy.last_action == Signal.BUY
+
+    def test_recover_state_does_not_modify_last_action_when_no_tick_found(
+            self, executor, mock_bot_tick_repo, mock_strategy,
+    ):
+        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = None
+        mock_strategy.last_action = Signal.SELL
+
+        executor.recover_state()
+
+        assert mock_strategy.last_action == Signal.SELL
