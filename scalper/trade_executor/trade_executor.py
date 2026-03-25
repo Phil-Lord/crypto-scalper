@@ -136,15 +136,10 @@ class TradeExecutor:
         Fetches completed historical OHLC candles for the warmup period.
 
         - Removes the final candle as Kraken always appends the currently-forming candle.
-        - Warns if warmup_candles exceeds Kraken's 720-candle limit.
+        - Requests 1 additional interval to compensate for `since` landing mid-interval.
         '''
         warmup_candles = self.strategy.warmup_candles
-        if warmup_candles > 720:
-            self.logger.warning(
-                f'warmup_candles={warmup_candles} exceeds Kraken\'s 720-candle limit; '
-                f'warm-up will use at most 720 candles — indicators may not be fully converged'
-            )
-        since = int(time.time()) - self.bot.interval * 60 * min(warmup_candles, 720)
+        since = int(time.time()) - self.bot.interval * 60 * (min(warmup_candles, 720) + 1)
         candles = self.ohlc_connector.fetch(self.bot.pair, self.bot.interval, since)[:-1]
         return [pd.Series({
             'open': c.open,
