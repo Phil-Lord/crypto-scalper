@@ -3,8 +3,8 @@
 **TL;DR:**
 - Rewrite the trade executor module as an always-on process that:
   1. loads bot config from Supabase
-  2. recovers state from the latest persisted tick
-  3. warms up strategy indicators from OHLC history (using a `warmup_candles` property on each strategy)
+  2. warms up strategy indicators from OHLC history (using a `warmup_candles` property on each strategy)
+  3. recovers state from the latest persisted tick — called after warm-up so the DB value overrides whatever warm-up produced
   4. runs a BlockingScheduler with CronTrigger per bot interval (with jitter, fixed delay, misfire protection)
   5. persists every tick and order to Supabase.
 - Build a `QueryOrdersConnector` in the exchange connector to fetch fill details from Kraken after order placement, with a retry loop and per-interval reconciliation of outstanding orders.
@@ -73,7 +73,7 @@
 
 13. **Implement `complete()` in `SupabaseBotRunRepository`** at `data_system/repositories/bot_run/supabase_bot_run_repository.py`. Uses `client.table('bot_runs').update({'completed_at': completed_at.isoformat()}).eq('id', str(id)).execute()`, then returns the deserialised `BotRun`.
 
-14. **Add `get_latest_action_by_bot_id()` to `BotTickRepository`**. Signature: `get_latest_action_by_bot_id(self, bot_id: str) -> BotTick | None`. Returns the most recent tick with `signal IN ('buy', 'sell')` for a bot — i.e., the last *directional* action, excluding HOLD ticks. Used exclusively by `_recover_state()` to correctly restore `strategy.last_action`, which is only ever `BUY` or `SELL` (never `HOLD`). Without this filter, recovering from a HOLD tick would corrupt the consecutive-signal suppression logic — e.g., if the bot bought, then held for 20 intervals (latest tick signal = HOLD), crash-recovery would set `last_action = HOLD`, causing the next BUY signal to pass through suppression unchecked → double buy into an existing position.
+14. **Add `get_latest_action_by_bot_id()` to `BotTickRepository`**. Signature: `get_latest_action_by_bot_id(self, bot_id: str) -> BotTick | None`. Returns the most recent tick with `signal IN ('buy', 'sell')` for a bot — i.e., the last *directional* action, excluding HOLD ticks. Used exclusively by `recover_state()` to correctly restore `strategy.last_action`, which is only ever `BUY` or `SELL` (never `HOLD`). Without this filter, recovering from a HOLD tick would corrupt the consecutive-signal suppression logic — e.g., if the bot bought, then held for 20 intervals (latest tick signal = HOLD), crash-recovery would set `last_action = HOLD`, causing the next BUY signal to pass through suppression unchecked → double buy into an existing position.
 
 15. **Implement `get_latest_action_by_bot_id()` in `SupabaseBotTickRepository`**. Query with `.eq('bot_id', bot_id).in_('signal', ['buy', 'sell']).order('timestamp', desc=True).limit(1)`.
 
@@ -123,12 +123,12 @@
     - Has `self._shutting_down = False` flag for graceful drain
     - **`request_shutdown(self) -> None`**: Sets `self._shutting_down = True`. Called by the signal handler in `start_scalping.py` — keeps mutation of internal state behind a public method rather than reaching into a private attribute from outside the class.
     - Uses a `logging.LoggerAdapter` with `{'bot_id': bot.id}` extra context — all log calls automatically include bot ID, critical for debugging multi-bot processes
-    - **`_recover_state(self) -> None`**: Queries latest directional tick via `bot_tick_repo.get_latest_action_by_bot_id(bot.id)` — returns only BUY/SELL ticks, never HOLD. If found, sets `strategy.last_action` from tick's signal. Logs recovery details or 'first run' if no tick exists.
+    - **`recover_state(self) -> None`**: Queries latest directional tick via `bot_tick_repo.get_latest_action_by_bot_id(bot.id)` — returns only BUY/SELL ticks, never HOLD. If found, sets `strategy.last_action` from tick's signal. Logs recovery details or 'first run' if no tick exists.
     - **`_fetch_ohlc(self) -> pd.Series`**: Private method. Fetches latest OHLC via `OhlcConnector` using `since = int(time.time()) - interval * 60 * 2`. Using 2 intervals back rather than 1 is required: Kraken returns candles whose start timestamp >= since, plus always appends the forming candle. With only 1 interval back, the previous closed candle's start falls before since and is excluded, leaving only the forming candle duplicated at `[-2]` and `[-1]`. Two intervals back guarantees a distinct completed candle at `[-2]`. Extracts `candles[-2]` (an `OhlcCandle`), returns as `pd.Series` with keys `open`, `high`, `low`, `close` matching what `Strategy.generate_signal()` expects. Used by `execute_interval()` for single-candle fetches.
-    - **`_fetch_ohlc_history(self) -> list[pd.Series]`**: Private method. Fetches historical OHLC candles via `OhlcConnector` using a `since` timestamp derived from `bot.interval * min(strategy.warmup_candles, 720)`. Returns `candles[:-1]` as a list of `pd.Series` — the forming (not-yet-committed) candle is always the last element returned by Kraken and must be excluded, for the same reason as `_fetch_ohlc()`. If `warmup_candles > 720`, logs a warning before capping. Used exclusively by `warm_up()`. Separate from `_fetch_ohlc()` because the return type (`list[pd.Series]` vs `pd.Series`) and `since` calculation logic are fundamentally different.
+    - **`_fetch_ohlc_history(self) -> list[pd.Series]`**: Private method. Fetches historical OHLC candles via `OhlcConnector` using a `since` timestamp derived from `bot.interval * (min(strategy.warmup_candles, 720) + 1)` — the extra interval compensates for `since` landing mid-interval: Kraken's `start >= since` filter excludes the oldest candle whose minute boundary falls just before `since`. Returns `candles[:-1]` as a list of `pd.Series` — the forming (not-yet-committed) candle is always the last element returned by Kraken and must be excluded, for the same reason as `_fetch_ohlc()`. If `warmup_candles > 720`, logs a warning before capping. Used exclusively by `warm_up()`. Separate from `_fetch_ohlc()` because the return type (`list[pd.Series]` vs `pd.Series`) and `since` calculation logic are fundamentally different.
         - **Kraken 720-candle hard limit**: Kraken's OHLC endpoint returns at most 720 of the most recent candles. Older data cannot be retrieved regardless of the `since` value — pagination is not possible. Request `min(warmup_candles, 720)` candles. If `warmup_candles > 720` (e.g., an Optuna-optimised `SmaStrategy` with `long_window > 719`), the warm-up will be partial — the existing `warm_up()` validation already handles this by logging a warning and continuing. Solving warm-up beyond 720 candles (e.g., from stored local trades) is deferred to a future task; it does not affect `PrecisionTrendStrategy` whose maximum warm-up requirement is 237 candles.
     - **`_fetch_balances(self) -> PairBalances`**: Private method. Fetches balances via `BalanceConnector`, looks up `self.pair_symbols.base` and `self.pair_symbols.quote` in Kraken's response, converts string values to `Decimal`, handles missing keys (zero balance). Returns a `PairBalances(symbol_base=..., symbol_quote=..., balance_base=..., balance_quote=...)` frozen dataclass instance — all balance and symbol information for the pair in one object.
-    - **`warm_up(self) -> None`**: Fetches historical OHLC candles via `self._fetch_ohlc_history()`, feeds them sequentially through `strategy.generate_signal()` to warm up indicators. Logs progress but does **not** persist ticks during warm-up.
+    - **`warm_up(self) -> None`**: Fetches historical OHLC candles via `self._fetch_ohlc_history()`, feeds them sequentially through `strategy.generate_signal()` to warm up indicators. Logs progress but does **not** persist ticks during warm-up. Logs a completion message with the count of candles processed.
         - **Warm-up validation**: After fetching, check that candle count meets `self.strategy.warmup_candles`. If insufficient (e.g., new trading pair), log a warning that signals may be unreliable for the first N intervals. Bot starts anyway (warn and continue).
     - **`_reconcile_placed_orders(self) -> None`**: Queries outstanding PLACED orders via `bot_order_repo.get_placed_by_bot_id(bot.id)`. If none, returns immediately. Otherwise collects all `exchange_order_id` values into a list and calls `QueryOrdersConnector.fetch(exchange_order_ids)` once — Kraken's `QueryOrders` endpoint accepts multiple order IDs in one request. Iterates the results: if Kraken reports `closed` → update to FILLED with fill details and `filled_at`; if `cancelled` → update to FAILED; if still `open` → leave as PLACED (will retry next interval). Logs each resolution.
     - **`execute_interval(self) -> None`**: One decision cycle:
@@ -174,8 +174,8 @@
       2. Create strategy via `create_strategy(bot.strategy_name, bot.parameters)` — note: `bot.strategy_version` is metadata for auditing/debugging only, not used by `create_strategy()`
       3. Create `AllInPositionSizer()` (or future: select sizer from config)
       4. Instantiate `TradeExecutor` with all dependencies (repositories, connectors, strategy, position sizer, bot, `dry_run=dry_run`)
-      5. Call `executor._recover_state()` — restore `last_action` from latest directional (BUY/SELL) tick
-      6. Call `executor.warm_up()` — blocks until indicators are ready
+      5. Call `executor.warm_up()` — feeds historical candles to converge indicators; blocks until complete
+      6. Call `executor.recover_state()` — restore `last_action` from latest directional (BUY/SELL) tick; must run **after** `warm_up()` so the DB-persisted position overrides whatever `last_action` warm-up produced
       7. Schedule `executor.execute_interval` with APScheduler **`BlockingScheduler`** using **`CronTrigger`** aligned to wall-clock + **5-second offset** + **`jitter=3`** + **`misfire_grace_time=0`** + **`max_instances=1`** (e.g., `CronTrigger(minute='*', second=5)` for 1-min interval, `CronTrigger(minute='*/5', second=5)` for 5-min). The 5-second offset handles Kraken data propagation delay. Jitter prevents simultaneous API calls from multiple bots. `misfire_grace_time=0` skips misfired executions rather than stacking them. `max_instances=1` ensures only one `execute_interval` runs per bot at a time.
     - Register signal handlers for `SIGTERM`/`SIGINT`:
       1. Call `executor.request_shutdown()` on each executor (sets `_shutting_down = True`, prevents new intervals from doing work)
@@ -200,7 +200,7 @@
     - Copy `entrypoint.sh`
     - `ENTRYPOINT ["./entrypoint.sh"]`
 
-33. **Create `entrypoint.sh`** at project root. Parses comma-separated `BOT_IDS` env var into `--bot-id` flags. Validates that `BOT_IDS` is set and non-empty — exits with a clear error message if missing (`echo "Error: BOT_IDS env var is required" && exit 1`). If `DRY_RUN=true` env var is set, appends `--dry-run` to the command. Example: `BOT_IDS=btc_1m_001,eth_5m_v2` → `python -m scripts.start_scalping --bot-id btc_1m_001 --bot-id eth_5m_v2`. With `DRY_RUN=true` → appends `--dry-run`. Adding a bot requires updating the `BOT_IDS` env var and running `fly deploy` (restart is safe — warm-up replays history, `_recover_state()` restores position).
+33. **Create `entrypoint.sh`** at project root. Parses comma-separated `BOT_IDS` env var into `--bot-id` flags. Validates that `BOT_IDS` is set and non-empty — exits with a clear error message if missing (`echo "Error: BOT_IDS env var is required" && exit 1`). If `DRY_RUN=true` env var is set, appends `--dry-run` to the command. Example: `BOT_IDS=btc_1m_001,eth_5m_v2` → `python -m scripts.start_scalping --bot-id btc_1m_001 --bot-id eth_5m_v2`. With `DRY_RUN=true` → appends `--dry-run`. Adding a bot requires updating the `BOT_IDS` env var and running `fly deploy` (restart is safe — warm-up replays history, `recover_state()` restores position).
 
 34. **Create `fly.toml`** at project root. Configuration:
     - `app = 'crypto-scalper'`
@@ -256,9 +256,11 @@
     - `test_reconcile_placed_orders_leaves_open` — verify still-open orders left as PLACED
     - `test_reconcile_called_every_interval` — verify `_reconcile_placed_orders` is called at the start of each `execute_interval`
     - `test_warm_up_feeds_candles_sequentially` — verify OHLC fetched and each candle fed through `generate_signal()`, no ticks persisted
-    - `test_warm_up_uses_strategy_warmup_candles` — verify the `since` param to `OhlcConnector.fetch()` is derived from `strategy.warmup_candles`
-    - `test_warm_up_caps_fetch_at_720_candles` — verify that when `strategy.warmup_candles > 720`, only 720 candles are requested (one call) and the insufficient-candles warning is logged
-    - `test_warm_up_warns_on_insufficient_candles` — verify warning logged when candle count < `strategy.warmup_candles`
+    - `test_warm_up_uses_strategy_warmup_candles` — verify the `since` param to `OhlcConnector.fetch()` is derived from `strategy.warmup_candles + 1` (the +1 guarantees a full candle count after `[:-1]` drops the forming candle)
+    - `test_warm_up_caps_fetch_at_720_candles` — verify that when `strategy.warmup_candles > 720`, since is derived from 721 intervals (720 cap + 1) and the insufficient-candles warning is logged
+    - `test_warm_up_warns_on_insufficient_candles` — verify warning logged when candle count < `strategy.warmup_candles` (covers both new listings and the 720-candle Kraken cap)
+    - `test_warm_up_does_not_warn_when_sufficient_candles` — verify no warning when `len(candles) >= strategy.warmup_candles`
+    - `test_warm_up_logs_completion_with_candle_count` — verify completion log includes the count of candles processed
     - `test_recover_state_restores_last_action` — verify `strategy.last_action` set from latest directional tick's signal (uses `get_latest_action_by_bot_id`)
     - `test_recover_state_skips_hold_ticks` — verify that if the most recent tick is HOLD but there's an earlier BUY tick, `last_action` is set to BUY (not HOLD)
     - `test_recover_state_first_run` — verify no error when no previous tick exists
