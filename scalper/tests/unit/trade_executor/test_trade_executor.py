@@ -536,3 +536,54 @@ class TestTradeExecutor:
         executor.recover_state()
 
         assert mock_strategy.last_action == Signal.SELL
+
+    # --- shutdown ---
+
+    def test_shutdown_calls_complete_with_run_id(self, executor, mock_bot_run_repo):
+        executor.shutdown()
+        call_args = mock_bot_run_repo.complete.call_args[0]
+        assert call_args[0] == executor.run.id
+
+    def test_shutdown_calls_complete_with_utc_datetime(self, executor, mock_bot_run_repo):
+        executor.shutdown()
+        call_args = mock_bot_run_repo.complete.call_args[0]
+        completed_at = call_args[1]
+        assert completed_at.tzinfo is not None
+        assert completed_at.tzinfo.utcoffset(completed_at).total_seconds() == 0
+
+    def test_shutdown_logs_shutting_down_before_complete(self, executor, mock_bot_run_repo):
+        # Given
+        log_calls = []
+        executor.logger = Mock()
+        executor.logger.info.side_effect = lambda msg: log_calls.append(('info', msg))
+        mock_bot_run_repo.complete.side_effect = lambda *_: log_calls.append(('complete', None))
+
+        # When
+        executor.shutdown()
+
+        # Then — 'Shutting down...' must appear before the complete() call
+        info_indices = [i for i, (kind, _) in enumerate(log_calls) if kind == 'info']
+        complete_index = next(i for i, (kind, _) in enumerate(log_calls) if kind == 'complete')
+        assert info_indices[0] < complete_index
+
+    def test_shutdown_logs_shutdown_complete(self, executor):
+        executor.logger = Mock()
+        executor.shutdown()
+        messages = [call.args[0] for call in executor.logger.info.call_args_list]
+        assert 'Shutdown complete' in messages
+
+    def test_shutdown_logs_error_when_complete_raises(self, executor, mock_bot_run_repo):
+        mock_bot_run_repo.complete.side_effect = Exception('Supabase unreachable')
+        executor.logger = Mock()
+        executor.shutdown()
+        executor.logger.error.assert_called_once()
+
+    def test_shutdown_logs_shutdown_complete_even_when_complete_raises(
+            self, executor, mock_bot_run_repo,
+    ):
+        # Shutdown should be best-effort — log the error but still log completion.
+        mock_bot_run_repo.complete.side_effect = Exception('Supabase unreachable')
+        executor.logger = Mock()
+        executor.shutdown()
+        messages = [call.args[0] for call in executor.logger.info.call_args_list]
+        assert 'Shutdown complete' in messages
