@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 import logging
 import time
@@ -57,6 +58,15 @@ class TradeExecutor:
         for ohlc in candles:
             self.strategy.generate_signal(ohlc)
         self.logger.info(f'Warm-up complete: processed {len(candles)} candles')
+
+    def shutdown(self) -> None:
+        ''' Marks the bot run as complete. '''
+        self.logger.info('Shutting down...')
+        try:
+            self.bot_run_repo.complete(self.run.id, datetime.now(timezone.utc))
+        except Exception as e:
+            self.logger.error(f'Failed to mark bot run complete: {e}', exc_info=True)
+        self.logger.info('Shutdown complete')
 
     def execute_interval(self) -> None:
         ''' Runs one trade decision cycle. '''
