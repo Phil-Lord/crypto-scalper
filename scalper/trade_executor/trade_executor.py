@@ -1,4 +1,3 @@
-from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
 import logging
@@ -6,7 +5,7 @@ import time
 
 import pandas as pd
 
-from data_system import Bot, BotRun, BotRunRepository, BotTickRepository, BotOrderRepository, OrderStatus
+from data_system import Bot, BotRun, BotRunRepository, BotTickRepository, BotOrderRepository
 from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector, QueryOrderStatus
 from .position_sizer import PairBalances, PositionSizer
 from strategy_manager import Strategy
@@ -134,33 +133,22 @@ class TradeExecutor:
         exchange_orders = self.query_orders_connector.fetch(list(orders_by_exchange_id.keys()))
 
         for exchange_order in exchange_orders:
+            order = orders_by_exchange_id[exchange_order.txid]
             try:
-                order = orders_by_exchange_id[exchange_order.txid]
                 if exchange_order.status == QueryOrderStatus.OPEN:
-                    self.logger.info(f'Order {order.id} is still open on exchange')
+                    self.logger.info(f'Order {order.id} is still open on the exchange')
                 elif exchange_order.status == QueryOrderStatus.CLOSED:
-                    self.bot_order_repo.update(replace(
-                        order,
-                        status=OrderStatus.FILLED,
-                        filled_at=datetime.now(timezone.utc),
-                        price=exchange_order.price,
-                        volume=exchange_order.volume,
-                        fee=exchange_order.fee
-                    ))
+                    self.bot_order_repo.mark_filled(
+                        order.id, exchange_order.price, exchange_order.volume, exchange_order.fee)
                     self.logger.info(f'Order {order.id} marked as FILLED')
-                elif exchange_order.status == QueryOrderStatus.CANCELED:
-                    self.bot_order_repo.update(replace(
-                        order,
-                        status=OrderStatus.FAILED,
-                        filled_at=datetime.now(timezone.utc),
-                        price=exchange_order.price,
-                        volume=exchange_order.volume,
-                        fee=exchange_order.fee
-                    ))
-                    self.logger.info(f'Order {order.id} marked as FAILED (canceled on exchange)')
+                elif exchange_order.status in (QueryOrderStatus.CANCELED, QueryOrderStatus.EXPIRED):
+                    self.bot_order_repo.mark_failed(
+                        order.id, exchange_order.price, exchange_order.volume, exchange_order.fee)
+                    self.logger.info(
+                        f'Order {order.id} marked as FAILED ({exchange_order.status.value} on the exchange)')
                 else:
                     self.logger.warning(
-                        f'Order {order.id} has unrecognized status {exchange_order.status}')
+                        f'Order {order.id} has unrecognised status {exchange_order.status}')
             except Exception as e:
                 self.logger.error(
                     f'Failed to reconcile order {exchange_order.txid}: {e}', exc_info=True)
