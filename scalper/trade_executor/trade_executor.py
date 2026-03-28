@@ -5,7 +5,7 @@ import time
 
 import pandas as pd
 
-from data_system import Bot, BotRun, BotRunRepository, BotTickRepository, BotOrderRepository
+from data_system import Bot, BotRun, BotRunRepository, BotTickRepository, BotOrderRepository, Signal
 from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector, QueryOrderStatus
 from .position_sizer import PairBalances, PositionSizer
 from strategy_manager import Strategy
@@ -51,6 +51,7 @@ class TradeExecutor:
             self.strategy.last_action = latest_tick.signal
             self.logger.info(f'Recovered last action: {latest_tick.signal}')
         else:
+            self.strategy.last_action = Signal.SELL
             self.logger.info('No previous action found, starting fresh')
 
     def warm_up(self) -> None:
