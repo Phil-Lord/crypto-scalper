@@ -84,10 +84,11 @@ class SupabaseBotOrderRepository(BotOrderRepository):
             .table(self.TABLE_NAME)
             .update(payload)
             .eq('id', str(order_id))
+            .eq('status', OrderStatus.PLACED.value)
             .execute()
         )
         if not response.data:
-            raise ValueError(f'BotOrder with id {order_id} not found')
+            raise ValueError(f'BotOrder with id {order_id} not found or already resolved')
         return self._to_bot_order(response.data[0])
 
     def _to_record(self, bot_order: BotOrder) -> dict:
