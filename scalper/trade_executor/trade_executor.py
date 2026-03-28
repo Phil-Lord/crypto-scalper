@@ -44,6 +44,15 @@ class TradeExecutor:
 
         self.logger.info('TradeExecutor initialised')
 
+    def recover_state(self) -> None:
+        ''' Sets latest directional action on strategy from database. '''
+        latest_action = self.bot_tick_repo.get_latest_action_by_bot_id(self.bot.id)
+        if latest_action:
+            self.strategy.last_action = latest_action
+            self.logger.info(f'Recovered last action: {latest_action}')
+        else:
+            self.logger.info('No previous action found, starting fresh')
+
     def warm_up(self) -> None:
         ''' Feeds historical OHLC data through the strategy to warm up indicators. '''
         self.logger.info('Warming up strategy...')
@@ -59,6 +68,11 @@ class TradeExecutor:
             self.strategy.generate_signal(ohlc)
         self.logger.info(f'Warm-up complete: processed {len(candles)} candles')
 
+    def request_shutdown(self) -> None:
+        ''' Signal the executor to stop after the current interval. '''
+        self.logger.info('Shutdown requested')
+        self._shutting_down = True
+
     def shutdown(self) -> None:
         ''' Marks the bot run as complete. '''
         self.logger.info('Shutting down...')
@@ -67,20 +81,6 @@ class TradeExecutor:
         except Exception as e:
             self.logger.error(f'Failed to mark bot run complete: {e}', exc_info=True)
         self.logger.info('Shutdown complete')
-
-    def request_shutdown(self) -> None:
-        ''' Signal the executor to stop after the current interval. '''
-        self.logger.info('Shutdown requested')
-        self._shutting_down = True
-
-    def recover_state(self) -> None:
-        ''' Sets latest directional action on strategy from database. '''
-        latest_action = self.bot_tick_repo.get_latest_action_by_bot_id(self.bot.id)
-        if latest_action:
-            self.strategy.last_action = latest_action
-            self.logger.info(f'Recovered last action: {latest_action}')
-        else:
-            self.logger.info('No previous action found, starting fresh')
 
     def _reconcile_placed_orders(self) -> None:
         placed_orders = self.bot_order_repo.get_placed_by_bot_id(self.bot.id)
