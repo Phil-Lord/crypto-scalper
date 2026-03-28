@@ -133,8 +133,8 @@ class TradeExecutor:
         exchange_orders = self.query_orders_connector.fetch(list(orders_by_exchange_id.keys()))
 
         for exchange_order in exchange_orders:
-            order = orders_by_exchange_id[exchange_order.txid]
             try:
+                order = orders_by_exchange_id[exchange_order.txid]
                 if exchange_order.status == QueryOrderStatus.OPEN:
                     self.logger.info(f'Order {order.id} is still open on the exchange')
                 elif exchange_order.status == QueryOrderStatus.CLOSED:
