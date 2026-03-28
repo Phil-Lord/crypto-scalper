@@ -32,10 +32,9 @@ class TradesConnector(FetchConnector):
         '''
         trades = []
         for raw in raw_trades:
+            if len(raw) < 7:
+                raise ValueError(f'Trade data incomplete: expected 7 fields, got {len(raw)}')
             try:
-                if len(raw) < 7:
-                    raise ValueError(f'Trade data incomplete: expected 7 fields, got {len(raw)}')
-
                 trades.append(Trade(
                     trade_id=int(raw[6]),
                     pair=pair,
@@ -45,7 +44,7 @@ class TradesConnector(FetchConnector):
                     side=str(raw[3]),
                     order_type=str(raw[4])
                 ))
-            except (ValueError, IndexError, TypeError) as e:
+            except (ValueError, TypeError) as e:
                 raise ValueError(f'Failed to parse trade data: {raw}. Error: {e}')
 
         return trades

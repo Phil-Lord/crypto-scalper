@@ -408,7 +408,7 @@ class TestExchangeConnectorDataSystemIntegration:
                 trades = connector.fetch(pair, start, end)
 
             assert 'Failed to parse' in str(
-                exc_info.value) or 'Incomplete data' in str(exc_info.value)
+                exc_info.value) or 'Trade data incomplete' in str(exc_info.value)
 
     def test_storage_error_after_successful_fetch(self, mock_kraken_trades_response):
         '''

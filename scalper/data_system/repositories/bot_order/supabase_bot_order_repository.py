@@ -1,5 +1,5 @@
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -64,6 +64,32 @@ class SupabaseBotOrderRepository(BotOrderRepository):
             .execute()
         )
         return [self._to_bot_order(row) for row in response.data]
+
+    def mark_filled(self, order_id: UUID, price: Decimal, volume: Decimal, fee: Decimal) -> BotOrder:
+        return self._mark_terminal(order_id, OrderStatus.FILLED, price, volume, fee)
+
+    def mark_failed(self, order_id: UUID, price: Decimal, volume: Decimal, fee: Decimal) -> BotOrder:
+        return self._mark_terminal(order_id, OrderStatus.FAILED, price, volume, fee)
+
+    def _mark_terminal(self, order_id: UUID, status: OrderStatus, price: Decimal, volume: Decimal, fee: Decimal) -> BotOrder:
+        payload = {
+            'status': status.value,
+            'filled_at': datetime.now(timezone.utc).isoformat(),
+            'price': str(price),
+            'volume': str(volume),
+            'fee': str(fee),
+        }
+        response = (
+            self.client
+            .table(self.TABLE_NAME)
+            .update(payload)
+            .eq('id', str(order_id))
+            .eq('status', OrderStatus.PLACED.value)
+            .execute()
+        )
+        if not response.data:
+            raise ValueError(f'BotOrder with id {order_id} not found or already resolved')
+        return self._to_bot_order(response.data[0])
 
     def _to_record(self, bot_order: BotOrder) -> dict:
         record = asdict(bot_order)

@@ -293,4 +293,4 @@ class TestExchangeConnectorIntegration:
 
             # Verify error indicates transformation failure
             assert 'Failed to parse' in str(
-                exc_info.value) or 'Incomplete data' in str(exc_info.value)
+                exc_info.value) or 'Trade data incomplete' in str(exc_info.value)
