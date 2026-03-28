@@ -33,7 +33,8 @@ class BotOrder:
         status (OrderStatus): Status of the order (defaults to `placed`).
         placed_at (datetime): Timestamp when the order was placed (defaults to current time).
 
-        filled_at (datetime | None): Timestamp when the order was filled.
+        filled_at (datetime | None): Timestamp when the order reached a terminal state
+            (filled, cancelled, or expired). Set for both FILLED and FAILED orders.
         price (Decimal | None): Average price at which the order was executed.
         volume (Decimal | None): Order volume.
         fee (Decimal | None): Fee paid.
