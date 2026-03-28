@@ -94,6 +94,10 @@ class TestSupabaseBotOrderRepository:
         ''' Sets response for: table().update().eq().execute() '''
         client.table.return_value.update.return_value.eq.return_value.execute.return_value.data = data
 
+    def _set_update_double_eq_response(self, client, data: list) -> None:
+        ''' Sets response for: table().update().eq().eq().execute() '''
+        client.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value.data = data
+
     # --- add ---
 
     def test_add_inserts_order_and_returns_result(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
@@ -675,7 +679,7 @@ class TestSupabaseBotOrderRepository:
 
     def test_mark_filled_sends_filled_status(self, mock_supabase_client, sample_placed_order: BotOrder, mock_response_data: dict):
         # Given
-        self._set_update_response(mock_supabase_client, [mock_response_data])
+        self._set_update_double_eq_response(mock_supabase_client, [mock_response_data])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
 
         # When
@@ -688,7 +692,7 @@ class TestSupabaseBotOrderRepository:
 
     def test_mark_filled_sends_execution_details_as_strings(self, mock_supabase_client, sample_placed_order: BotOrder, mock_response_data: dict):
         # Given
-        self._set_update_response(mock_supabase_client, [mock_response_data])
+        self._set_update_double_eq_response(mock_supabase_client, [mock_response_data])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
 
         # When
@@ -703,7 +707,7 @@ class TestSupabaseBotOrderRepository:
 
     def test_mark_filled_sets_filled_at_timestamp(self, mock_supabase_client, sample_placed_order: BotOrder, mock_response_data: dict):
         # Given
-        self._set_update_response(mock_supabase_client, [mock_response_data])
+        self._set_update_double_eq_response(mock_supabase_client, [mock_response_data])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
 
         # When
@@ -715,9 +719,9 @@ class TestSupabaseBotOrderRepository:
         assert sent['filled_at'] is not None
         datetime.fromisoformat(sent['filled_at'])  # Validates ISO format
 
-    def test_mark_filled_filters_by_order_id(self, mock_supabase_client, sample_placed_order: BotOrder, mock_response_data: dict):
+    def test_mark_filled_filters_by_order_id_and_placed_status(self, mock_supabase_client, sample_placed_order: BotOrder, mock_response_data: dict):
         # Given
-        self._set_update_response(mock_supabase_client, [mock_response_data])
+        self._set_update_double_eq_response(mock_supabase_client, [mock_response_data])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
 
         # When
@@ -728,10 +732,13 @@ class TestSupabaseBotOrderRepository:
         mock_supabase_client.table.return_value.update.return_value.eq.assert_called_once_with(
             'id', str(sample_placed_order.id)
         )
+        mock_supabase_client.table.return_value.update.return_value.eq.return_value.eq.assert_called_once_with(
+            'status', OrderStatus.PLACED.value
+        )
 
     def test_mark_filled_returns_updated_order(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
         # Given
-        self._set_update_response(mock_supabase_client, [mock_response_data])
+        self._set_update_double_eq_response(mock_supabase_client, [mock_response_data])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
 
         # When
@@ -741,9 +748,9 @@ class TestSupabaseBotOrderRepository:
         # Then
         assert result == sample_order
 
-    def test_mark_filled_raises_error_when_order_not_found(self, mock_supabase_client, sample_placed_order: BotOrder):
+    def test_mark_filled_raises_error_when_order_not_found_or_already_resolved(self, mock_supabase_client, sample_placed_order: BotOrder):
         # Given
-        self._set_update_response(mock_supabase_client, [])
+        self._set_update_double_eq_response(mock_supabase_client, [])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
 
         # When / Then
@@ -755,7 +762,7 @@ class TestSupabaseBotOrderRepository:
 
     def test_mark_failed_sends_failed_status(self, mock_supabase_client, sample_placed_order: BotOrder, mock_response_data: dict):
         # Given
-        self._set_update_response(mock_supabase_client, [mock_response_data])
+        self._set_update_double_eq_response(mock_supabase_client, [mock_response_data])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
 
         # When
@@ -767,7 +774,7 @@ class TestSupabaseBotOrderRepository:
 
     def test_mark_failed_sends_execution_details_as_strings(self, mock_supabase_client, sample_placed_order: BotOrder, mock_response_data: dict):
         # Given
-        self._set_update_response(mock_supabase_client, [mock_response_data])
+        self._set_update_double_eq_response(mock_supabase_client, [mock_response_data])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
 
         # When
@@ -782,7 +789,7 @@ class TestSupabaseBotOrderRepository:
 
     def test_mark_failed_sets_filled_at_timestamp(self, mock_supabase_client, sample_placed_order: BotOrder, mock_response_data: dict):
         # Given
-        self._set_update_response(mock_supabase_client, [mock_response_data])
+        self._set_update_double_eq_response(mock_supabase_client, [mock_response_data])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
 
         # When
@@ -793,9 +800,25 @@ class TestSupabaseBotOrderRepository:
         assert sent['filled_at'] is not None
         datetime.fromisoformat(sent['filled_at'])
 
-    def test_mark_failed_raises_error_when_order_not_found(self, mock_supabase_client, sample_placed_order: BotOrder):
+    def test_mark_failed_filters_by_order_id_and_placed_status(self, mock_supabase_client, sample_placed_order: BotOrder, mock_response_data: dict):
         # Given
-        self._set_update_response(mock_supabase_client, [])
+        self._set_update_double_eq_response(mock_supabase_client, [mock_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        repository.mark_failed(sample_placed_order.id, Decimal('0'), Decimal('0'), Decimal('0'))
+
+        # Then
+        mock_supabase_client.table.return_value.update.return_value.eq.assert_called_once_with(
+            'id', str(sample_placed_order.id)
+        )
+        mock_supabase_client.table.return_value.update.return_value.eq.return_value.eq.assert_called_once_with(
+            'status', OrderStatus.PLACED.value
+        )
+
+    def test_mark_failed_raises_error_when_order_not_found_or_already_resolved(self, mock_supabase_client, sample_placed_order: BotOrder):
+        # Given
+        self._set_update_double_eq_response(mock_supabase_client, [])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
 
         # When / Then
