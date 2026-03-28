@@ -1,11 +1,11 @@
 ---
 agent: agent
-description: "Manually test the add, get, and update paths for the four live-trading Supabase repos and models, ensuring correct type serialisation, FK constraints, and error handling."
+description: "Manually test the add, get, mark_filled, mark_failed, and complete paths for the four live-trading Supabase repos and models, ensuring correct type serialisation, FK constraints, and error handling."
 ---
 
 # Test Supabase Repos
 
-Test the **add**, **get**, and **update** paths for the four live-trading Supabase repositories.
+Test the **add**, **get**, **mark_filled**, **mark_failed**, and **complete** paths for the four live-trading Supabase repositories.
 
 ## ⚠️ Important: Scope Restriction
 
@@ -41,16 +41,17 @@ Use a consistent test prefix (e.g. `bot_id = 'test_btc_1m_001'`) so test data is
 
 The `get` methods are **not uniform** across repos — note the differences:
 
-| Repo                        | Method                                       | Returns            |
-|-----------------------------|----------------------------------------------|--------------------|
-| `SupabaseBotRepository`     | `get(id: str)`                               | `Bot \| None`      |
-| `SupabaseBotRunRepository`  | `get(id: UUID)`                              | `BotRun \| None`   |
-| `SupabaseBotRunRepository`  | `complete(id: UUID, completed_at: datetime)` | `BotRun \| None`   |
-| `SupabaseBotTickRepository` | `get_by_bot_id(bot_id: str)`                 | `list[BotTick]`    |
-| `SupabaseBotTickRepository` | `get_latest_action_by_bot_id(bot_id: str)`   | `BotTick \| None`  |
-| `SupabaseBotOrderRepository`| `get_by_bot_id(bot_id: str)`                 | `list[BotOrder]`   |
-| `SupabaseBotOrderRepository`| `get_placed_by_bot_id(bot_id: str)`          | `list[BotOrder]`   |
-| `SupabaseBotOrderRepository`| `update(bot_order: BotOrder)`                | `BotOrder`         |
+| Repo                        | Method                                                                       | Returns            |
+|-----------------------------|----------------------------------------------------------------------------- |--------------------|
+| `SupabaseBotRepository`     | `get(id: str)`                                                               | `Bot \| None`      |
+| `SupabaseBotRunRepository`  | `get(id: UUID)`                                                              | `BotRun \| None`   |
+| `SupabaseBotRunRepository`  | `complete(id: UUID, completed_at: datetime)`                                 | `BotRun \| None`   |
+| `SupabaseBotTickRepository` | `get_by_bot_id(bot_id: str)`                                                 | `list[BotTick]`    |
+| `SupabaseBotTickRepository` | `get_latest_action_by_bot_id(bot_id: str)`                                   | `BotTick \| None`  |
+| `SupabaseBotOrderRepository`| `get_by_bot_id(bot_id: str)`                                                 | `list[BotOrder]`   |
+| `SupabaseBotOrderRepository`| `get_placed_by_bot_id(bot_id: str)`                                          | `list[BotOrder]`   |
+| `SupabaseBotOrderRepository`| `mark_filled(order_id: UUID, price: Decimal, volume: Decimal, fee: Decimal)` | `BotOrder`         |
+| `SupabaseBotOrderRepository`| `mark_failed(order_id: UUID, price: Decimal, volume: Decimal, fee: Decimal)` | `BotOrder`         |
 
 Ticks are returned ordered by `timestamp DESC`; orders (both get methods) are returned ordered by `placed_at DESC`. `get_placed_by_bot_id` filters to `status = 'placed'` only.
 
@@ -103,11 +104,21 @@ For each repo, test both the add and get paths. Cover:
 - Verify `get_placed_by_bot_id` returns **only** the `placed` order, not the `filled` one
 - Verify the returned list is empty when no `placed` orders exist for a given `bot_id`
 
-#### `update`
-- Insert a `placed` order, then call `update` to transition it to `filled` — set `filled_at`, `price`, `volume`, `fee`, and `status = OrderStatus.FILLED`
-- Verify the returned `BotOrder` from `update` reflects all updated values exactly (including `Decimal` precision, `OrderStatus` enum, and timezone-aware `filled_at`)
+#### `mark_filled`
+- Insert a `placed` order, then call `mark_filled(order_id, price, volume, fee)` with realistic `Decimal` values
+- Verify the returned `BotOrder` has `status == OrderStatus.FILLED`, correct `Decimal` precision on `price`/`volume`/`fee`, and a timezone-aware `filled_at` that was set internally (not passed by the caller)
 - Verify `get_by_bot_id` reflects the updated state (the order appears as `filled`)
-- Verify `get_placed_by_bot_id` no longer returns the order after it has been updated to `filled`
+- Verify `get_placed_by_bot_id` no longer returns the order after it has been marked as filled
+- Call `mark_filled` on an already-filled order and confirm it raises `ValueError` (the double `.eq()` guard on `id` + `status='placed'` prevents re-transitions)
+- Call `mark_filled` with a non-existent `order_id` and confirm it raises `ValueError`
+
+#### `mark_failed`
+- Insert a `placed` order, then call `mark_failed(order_id, price, volume, fee)` — values may be zero for a fully-cancelled order or non-zero for a partial fill
+- Verify the returned `BotOrder` has `status == OrderStatus.FAILED`, correct `Decimal` values, and a timezone-aware `filled_at`
+- Verify `get_by_bot_id` reflects the updated state (the order appears as `failed`)
+- Verify `get_placed_by_bot_id` no longer returns the order after it has been marked as failed
+- Call `mark_failed` on an already-failed order and confirm it raises `ValueError`
+- Call `mark_failed` on a `filled` order and confirm it raises `ValueError` (terminal states are final)
 
 ## Type Serialisation Round-Trips
 
