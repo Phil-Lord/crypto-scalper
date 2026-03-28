@@ -114,6 +114,12 @@ class TradeExecutor:
                 self.logger.error(
                     f'Failed to reconcile order {exchange_order.txid}: {e}', exc_info=True)
 
+        returned_txids = {exchange_order.txid for exchange_order in exchange_orders}
+        for exchange_id, order in orders_by_exchange_id.items():
+            if exchange_id not in returned_txids:
+                self.logger.warning(
+                    f'Order {order.id} (txid={exchange_id}) not returned by exchange')
+
     def _fetch_ohlc(self) -> pd.Series:
         '''
         Fetches the latest completed OHLC candle as a Series with open, high, low, close keys.
