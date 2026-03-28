@@ -123,7 +123,10 @@ class TradeExecutor:
         [-2] and [-1]. Two intervals back guarantees a distinct completed candle at [-2].
         '''
         since = int(time.time()) - self.bot.interval * 60 * 2
-        candle = self.ohlc_connector.fetch(self.bot.pair, self.bot.interval, since)[-2]
+        candles = self.ohlc_connector.fetch(self.bot.pair, self.bot.interval, since)
+        if len(candles) < 2:
+            raise ValueError(f'Expected at least 2 OHLC candles but got {len(candles)}')
+        candle = candles[-2]
         return pd.Series({
             'open': candle.open,
             'high': candle.high,
