@@ -584,11 +584,11 @@ class TestTradeExecutor:
 
         assert mock_strategy.last_action == Signal.SELL
 
-    def test_recover_state_does_not_modify_last_action_when_no_tick_found(
+    def test_recover_state_resets_last_action_to_sell_when_no_tick_found(
             self, executor, mock_bot_tick_repo, mock_strategy,
     ):
         mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = None
-        mock_strategy.last_action = Signal.SELL
+        mock_strategy.last_action = Signal.BUY
 
         executor.recover_state()
 
@@ -869,6 +869,24 @@ class TestTradeExecutor:
 
         executor.logger.error.assert_called_once()
         mock_bot_order_repo.mark_filled.assert_not_called()
+
+    def test_reconcile_warns_when_order_missing_from_exchange_response(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            sample_placed_orders,
+    ):
+        # Given — two placed orders, but exchange only returns one
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = sample_placed_orders
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-AAA', QueryOrderStatus.CLOSED),
+        ]
+        executor.logger = Mock()
+
+        # When
+        executor._reconcile_placed_orders()
+
+        # Then — warning logged for the missing order
+        warning_messages = [str(call.args[0]) for call in executor.logger.warning.call_args_list]
+        assert any('TXID-BBB' in msg and 'not returned' in msg for msg in warning_messages)
 
     # --- _fetch_ohlc with different intervals ---
 
