@@ -49,7 +49,7 @@ class OhlcConnector(FetchConnector):
                     volume=float(candle[6]),
                     count=int(candle[7])
                 ))
-            except (ValueError, IndexError, TypeError) as e:
+            except (ValueError, TypeError) as e:
                 raise ValueError(f'Failed to parse OHLC data: {candle}. Error: {e}')
 
         return candles

@@ -44,7 +44,7 @@ class TradesConnector(FetchConnector):
                     side=str(raw[3]),
                     order_type=str(raw[4])
                 ))
-            except (ValueError, IndexError, TypeError) as e:
+            except (ValueError, TypeError) as e:
                 raise ValueError(f'Failed to parse trade data: {raw}. Error: {e}')
 
         return trades
