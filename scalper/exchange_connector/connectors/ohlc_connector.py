@@ -26,7 +26,7 @@ class OhlcConnector(FetchConnector):
         raw_candles = self.service.fetch_ohlc(pair, interval, start)
         return self._to_domain(raw_candles)
 
-    def _to_domain(self, raw_candles: list[list[int | float]]) -> list[OhlcCandle]:
+    def _to_domain(self, raw_candles: list[list[int | float | str]]) -> list[OhlcCandle]:
         '''
         Convert raw Kraken OHLC arrays to OHLC domain objects.
 
