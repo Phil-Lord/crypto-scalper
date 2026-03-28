@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from decimal import Decimal
 from unittest.mock import Mock, patch
 from uuid import uuid4
@@ -9,7 +10,7 @@ import pytest
 from data_system.models.bot_model import Bot
 from data_system.models.bot_order_model import BotOrder, Side
 from data_system.models.bot_run_model import BotRun
-from data_system.models.bot_tick_model import Signal
+from data_system.models.bot_tick_model import BotTick, Signal
 from data_system.repositories.bot_order.bot_order_repository import BotOrderRepository
 from data_system.repositories.bot_run.bot_run_repository import BotRunRepository
 from data_system.repositories.bot_tick.bot_tick_repository import BotTickRepository
@@ -153,6 +154,7 @@ class TestTradeExecutor:
         ]
         mock_strategy.warmup_candles = 3
         executor._fetch_ohlc_history = Mock(return_value=candles)
+        executor.logger = Mock()
 
         executor.warm_up()
 
@@ -165,6 +167,7 @@ class TestTradeExecutor:
         ]
         mock_strategy.warmup_candles = 2
         executor._fetch_ohlc_history = Mock(return_value=candles)
+        executor.logger = Mock()
 
         executor.warm_up()
 
@@ -175,6 +178,7 @@ class TestTradeExecutor:
     def test_warm_up_with_empty_history_does_not_call_generate_signal(self, executor, mock_strategy):
         mock_strategy.warmup_candles = 3
         executor._fetch_ohlc_history = Mock(return_value=[])
+        executor.logger = Mock()
 
         executor.warm_up()
 
@@ -339,6 +343,23 @@ class TestTradeExecutor:
             result = executor._fetch_ohlc()
 
         assert list(result.index) == ['open', 'high', 'low', 'close']
+
+    def test_fetch_ohlc_raises_when_fewer_than_two_candles(self, executor, mock_ohlc_connector):
+        mock_ohlc_connector.fetch.return_value = [OhlcCandle(
+            timestamp=1700000000, open=50000.0, high=50100.0,
+            low=49900.0, close=50050.0, vwap=50000.0, volume=100.0, count=50,
+        )]
+
+        with patch('time.time', return_value=1700000120.0):
+            with pytest.raises(ValueError, match='Expected at least 2 OHLC candles'):
+                executor._fetch_ohlc()
+
+    def test_fetch_ohlc_raises_when_empty_response(self, executor, mock_ohlc_connector):
+        mock_ohlc_connector.fetch.return_value = []
+
+        with patch('time.time', return_value=1700000120.0):
+            with pytest.raises(ValueError, match='Expected at least 2 OHLC candles'):
+                executor._fetch_ohlc()
 
     # --- _fetch_ohlc_history ---
 
@@ -512,6 +533,30 @@ class TestTradeExecutor:
 
     # --- recover_state ---
 
+    @pytest.fixture
+    def sample_buy_tick(self) -> BotTick:
+        return BotTick(
+            bot_id='btc_1m_001',
+            run_id=uuid4(),
+            timestamp=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            price=Decimal('50000.00'),
+            signal=Signal.BUY,
+            balance_base=Decimal('0'),
+            balance_quote=Decimal('10000.00'),
+        )
+
+    @pytest.fixture
+    def sample_sell_tick(self) -> BotTick:
+        return BotTick(
+            bot_id='btc_1m_001',
+            run_id=uuid4(),
+            timestamp=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            price=Decimal('50000.00'),
+            signal=Signal.SELL,
+            balance_base=Decimal('1.0'),
+            balance_quote=Decimal('0'),
+        )
+
     def test_recover_state_calls_repository_with_correct_bot_id(
             self, executor, mock_bot_tick_repo, bot,
     ):
@@ -521,14 +566,23 @@ class TestTradeExecutor:
 
         mock_bot_tick_repo.get_latest_action_by_bot_id.assert_called_once_with(bot.id)
 
-    def test_recover_state_sets_last_action_when_tick_found(
-            self, executor, mock_bot_tick_repo, mock_strategy,
+    def test_recover_state_sets_last_action_from_buy_tick(
+            self, executor, mock_bot_tick_repo, mock_strategy, sample_buy_tick,
     ):
-        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = Signal.BUY
+        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = sample_buy_tick
 
         executor.recover_state()
 
         assert mock_strategy.last_action == Signal.BUY
+
+    def test_recover_state_sets_last_action_from_sell_tick(
+            self, executor, mock_bot_tick_repo, mock_strategy, sample_sell_tick,
+    ):
+        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = sample_sell_tick
+
+        executor.recover_state()
+
+        assert mock_strategy.last_action == Signal.SELL
 
     def test_recover_state_does_not_modify_last_action_when_no_tick_found(
             self, executor, mock_bot_tick_repo, mock_strategy,
@@ -539,6 +593,17 @@ class TestTradeExecutor:
         executor.recover_state()
 
         assert mock_strategy.last_action == Signal.SELL
+
+    def test_recover_state_logs_recovered_signal(
+            self, executor, mock_bot_tick_repo, sample_buy_tick,
+    ):
+        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = sample_buy_tick
+        executor.logger = Mock()
+
+        executor.recover_state()
+
+        info_messages = [str(call.args[0]) for call in executor.logger.info.call_args_list]
+        assert any('buy' in msg.lower() for msg in info_messages)
 
     # --- shutdown ---
 
@@ -787,3 +852,50 @@ class TestTradeExecutor:
         executor._reconcile_placed_orders()
 
         executor.logger.error.assert_called_once()
+
+    def test_reconcile_handles_unexpected_exchange_order_id(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            sample_placed_orders,
+    ):
+        # Exchange returns an order with a txid not in our placed orders map — should be
+        # caught by the per-order try/except and logged, not crash reconciliation.
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = [sample_placed_orders[0]]
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-UNKNOWN', QueryOrderStatus.CLOSED),
+        ]
+        executor.logger = Mock()
+
+        executor._reconcile_placed_orders()
+
+        executor.logger.error.assert_called_once()
+        mock_bot_order_repo.mark_filled.assert_not_called()
+
+    # --- _fetch_ohlc with different intervals ---
+
+    def test_fetch_ohlc_since_calculation_with_five_minute_interval(
+            self, bot, mock_strategy, mock_position_sizer, mock_bot_run_repo,
+            mock_bot_tick_repo, mock_bot_order_repo, mock_balance_connector,
+            mock_ohlc_connector, mock_add_order_connector, mock_query_orders_connector,
+            sample_candles,
+    ):
+        five_min_bot = Bot(
+            id='btc_5m_001', pair='XXBTZGBP', strategy_name='PrecisionTrendStrategy',
+            strategy_version='v1.0.0', interval=5, parameters={'short_ema': 43},
+        )
+        executor = TradeExecutor(
+            bot=five_min_bot, strategy=mock_strategy, position_sizer=mock_position_sizer,
+            bot_run_repo=mock_bot_run_repo, bot_tick_repo=mock_bot_tick_repo,
+            bot_order_repo=mock_bot_order_repo, balance_connector=mock_balance_connector,
+            ohlc_connector=mock_ohlc_connector, add_order_connector=mock_add_order_connector,
+            query_orders_connector=mock_query_orders_connector,
+        )
+        mock_ohlc_connector.fetch.return_value = sample_candles
+        frozen_time = 1700000120.0
+
+        with patch('time.time', return_value=frozen_time):
+            executor._fetch_ohlc()
+
+        # 5-minute interval: since = now - 5 * 60 * 2 = now - 600
+        expected_since = int(frozen_time) - 5 * 60 * 2
+        args = mock_ohlc_connector.fetch.call_args[0]
+        assert args[2] == expected_since
