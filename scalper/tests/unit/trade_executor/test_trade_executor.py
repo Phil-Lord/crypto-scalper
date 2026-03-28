@@ -1,11 +1,13 @@
 import logging
 from decimal import Decimal
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 import pandas as pd
 import pytest
 
 from data_system.models.bot_model import Bot
+from data_system.models.bot_order_model import BotOrder, Side
 from data_system.models.bot_run_model import BotRun
 from data_system.models.bot_tick_model import Signal
 from data_system.repositories.bot_order.bot_order_repository import BotOrderRepository
@@ -14,8 +16,9 @@ from data_system.repositories.bot_tick.bot_tick_repository import BotTickReposit
 from exchange_connector.connectors.add_order_connector import AddOrderConnector
 from exchange_connector.connectors.balance_connector import BalanceConnector
 from exchange_connector.connectors.ohlc_connector import OhlcConnector
-from exchange_connector.models.ohlc_candle import OhlcCandle
 from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
+from exchange_connector.models.ohlc_candle import OhlcCandle
+from exchange_connector.models.query_order_result import QueryOrderResult, QueryOrderStatus
 from strategy_manager.strategies.base_strategy import Strategy
 from trade_executor.position_sizer import PairBalances, PositionSizer
 from trade_executor.trade_executor import BotLoggerAdapter, TradeExecutor
@@ -587,3 +590,200 @@ class TestTradeExecutor:
         executor.shutdown()
         messages = [call.args[0] for call in executor.logger.info.call_args_list]
         assert 'Shutdown complete' in messages
+
+    # --- _reconcile_placed_orders ---
+
+    @pytest.fixture
+    def sample_placed_orders(self) -> list[BotOrder]:
+        return [
+            BotOrder(
+                bot_id='btc_1m_001',
+                run_id=uuid4(),
+                exchange_order_id='TXID-AAA',
+                side=Side.BUY,
+            ),
+            BotOrder(
+                bot_id='btc_1m_001',
+                run_id=uuid4(),
+                exchange_order_id='TXID-BBB',
+                side=Side.SELL,
+            ),
+        ]
+
+    def _make_exchange_order(
+            self, txid: str, status: QueryOrderStatus,
+            price: str = '50000.00', volume: str = '0.001', fee: str = '0.50',
+    ) -> QueryOrderResult:
+        return QueryOrderResult(
+            txid=txid,
+            price=Decimal(price),
+            volume=Decimal(volume),
+            fee=Decimal(fee),
+            status=status,
+        )
+
+    def test_reconcile_returns_early_when_no_placed_orders(
+            self, executor, mock_bot_order_repo,
+    ):
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = []
+
+        executor._reconcile_placed_orders()
+
+        mock_bot_order_repo.mark_filled.assert_not_called()
+        mock_bot_order_repo.mark_failed.assert_not_called()
+
+    def test_reconcile_does_not_call_exchange_when_no_placed_orders(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+    ):
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = []
+
+        executor._reconcile_placed_orders()
+
+        mock_query_orders_connector.fetch.assert_not_called()
+
+    def test_reconcile_fetches_exchange_orders_by_exchange_ids(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            sample_placed_orders,
+    ):
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = sample_placed_orders
+        mock_query_orders_connector.fetch.return_value = []
+
+        executor._reconcile_placed_orders()
+
+        txids = mock_query_orders_connector.fetch.call_args[0][0]
+        assert set(txids) == {'TXID-AAA', 'TXID-BBB'}
+
+    def test_reconcile_marks_closed_order_as_filled(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            sample_placed_orders,
+    ):
+        order = sample_placed_orders[0]
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = [order]
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-AAA', QueryOrderStatus.CLOSED),
+        ]
+
+        executor._reconcile_placed_orders()
+
+        mock_bot_order_repo.mark_filled.assert_called_once_with(
+            order.id, Decimal('50000.00'), Decimal('0.001'), Decimal('0.50'),
+        )
+
+    def test_reconcile_marks_canceled_order_as_failed(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            sample_placed_orders,
+    ):
+        order = sample_placed_orders[0]
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = [order]
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-AAA', QueryOrderStatus.CANCELED),
+        ]
+
+        executor._reconcile_placed_orders()
+
+        mock_bot_order_repo.mark_failed.assert_called_once_with(
+            order.id, Decimal('50000.00'), Decimal('0.001'), Decimal('0.50'),
+        )
+
+    def test_reconcile_marks_expired_order_as_failed(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            sample_placed_orders,
+    ):
+        order = sample_placed_orders[0]
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = [order]
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-AAA', QueryOrderStatus.EXPIRED),
+        ]
+
+        executor._reconcile_placed_orders()
+
+        mock_bot_order_repo.mark_failed.assert_called_once_with(
+            order.id, Decimal('50000.00'), Decimal('0.001'), Decimal('0.50'),
+        )
+
+    def test_reconcile_does_not_mark_open_order(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            sample_placed_orders,
+    ):
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = [sample_placed_orders[0]]
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-AAA', QueryOrderStatus.OPEN),
+        ]
+
+        executor._reconcile_placed_orders()
+
+        mock_bot_order_repo.mark_filled.assert_not_called()
+        mock_bot_order_repo.mark_failed.assert_not_called()
+
+    def test_reconcile_does_not_mark_pending_order(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            sample_placed_orders,
+    ):
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = [sample_placed_orders[0]]
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-AAA', QueryOrderStatus.PENDING),
+        ]
+
+        executor._reconcile_placed_orders()
+
+        mock_bot_order_repo.mark_filled.assert_not_called()
+        mock_bot_order_repo.mark_failed.assert_not_called()
+
+    def test_reconcile_handles_multiple_orders_with_different_statuses(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            sample_placed_orders,
+    ):
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = sample_placed_orders
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-AAA', QueryOrderStatus.CLOSED,
+                                      price='50000.00', volume='0.001', fee='0.50'),
+            self._make_exchange_order('TXID-BBB', QueryOrderStatus.CANCELED,
+                                      price='0', volume='0', fee='0'),
+        ]
+
+        executor._reconcile_placed_orders()
+
+        mock_bot_order_repo.mark_filled.assert_called_once_with(
+            sample_placed_orders[0].id,
+            Decimal('50000.00'), Decimal('0.001'), Decimal('0.50'),
+        )
+        mock_bot_order_repo.mark_failed.assert_called_once_with(
+            sample_placed_orders[1].id,
+            Decimal('0'), Decimal('0'), Decimal('0'),
+        )
+
+    def test_reconcile_continues_after_single_order_error(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            sample_placed_orders,
+    ):
+        # Given — first mark_filled raises, second should still proceed
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = sample_placed_orders
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-AAA', QueryOrderStatus.CLOSED),
+            self._make_exchange_order('TXID-BBB', QueryOrderStatus.CLOSED),
+        ]
+        mock_bot_order_repo.mark_filled.side_effect = [
+            ValueError('Already resolved'),
+            Mock(),
+        ]
+
+        # When
+        executor._reconcile_placed_orders()
+
+        # Then — mark_filled was attempted for both orders
+        assert mock_bot_order_repo.mark_filled.call_count == 2
+
+    def test_reconcile_logs_error_when_single_order_fails(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            sample_placed_orders,
+    ):
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = [sample_placed_orders[0]]
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-AAA', QueryOrderStatus.CLOSED),
+        ]
+        mock_bot_order_repo.mark_filled.side_effect = ValueError('Already resolved')
+        executor.logger = Mock()
+
+        executor._reconcile_placed_orders()
+
+        executor.logger.error.assert_called_once()
