@@ -46,10 +46,10 @@ class TradeExecutor:
 
     def recover_state(self) -> None:
         ''' Sets latest directional action on strategy from database. '''
-        latest_action = self.bot_tick_repo.get_latest_action_by_bot_id(self.bot.id)
-        if latest_action:
-            self.strategy.last_action = latest_action
-            self.logger.info(f'Recovered last action: {latest_action}')
+        latest_tick = self.bot_tick_repo.get_latest_action_by_bot_id(self.bot.id)
+        if latest_tick:
+            self.strategy.last_action = latest_tick.signal
+            self.logger.info(f'Recovered last action: {latest_tick.signal}')
         else:
             self.logger.info('No previous action found, starting fresh')
 
