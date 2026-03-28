@@ -135,8 +135,9 @@ class TradeExecutor:
         for exchange_order in exchange_orders:
             try:
                 order = orders_by_exchange_id[exchange_order.txid]
-                if exchange_order.status == QueryOrderStatus.OPEN:
-                    self.logger.info(f'Order {order.id} is still open on the exchange')
+                if exchange_order.status in (QueryOrderStatus.PENDING, QueryOrderStatus.OPEN):
+                    self.logger.info(
+                        f'Order {order.id} is still open on the exchange with status {exchange_order.status}')
                 elif exchange_order.status == QueryOrderStatus.CLOSED:
                     self.bot_order_repo.mark_filled(
                         order.id, exchange_order.price, exchange_order.volume, exchange_order.fee)
