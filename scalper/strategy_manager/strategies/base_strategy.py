@@ -28,7 +28,12 @@ class Strategy(ABC):
         self.rules[name] = rule
 
     def generate_signal(self, ohlc: pd.Series) -> dict:
-        ''' Compute indicators and rules given a new ohlc, then generate signal. '''
+        '''
+        Compute indicators and rules given a new ohlc, then generate signal.
+
+        :param ohlc: Series with keys: open, high, low, close.
+        :return: Dict with keys: price, [indicator names], [rule names], signal.
+        '''
         indicator_results = {
             name: indicator.update(ohlc)
             for name, indicator in self.indicators.items()
@@ -54,7 +59,12 @@ class Strategy(ABC):
         return {'price': ohlc['close'], **indicator_results, **rule_results, 'signal': signal}
 
     def vectorised_compute(self, ohlc: pd.DataFrame) -> pd.DataFrame:
-        ''' Compute indicators and rules for a series of ohlc data, then generate signals. '''
+        '''
+        Compute indicators and rules for a series of ohlc data, then generate signals.
+
+        :param ohlc: DataFrame with columns: open, high, low, close.
+        :return: DataFrame with columns: price, [indicator names], [rule names], signal.
+        '''
         indicator_results = {
             name: indicator.compute_vectorised(ohlc)
             for name, indicator in self.indicators.items()
