@@ -6,7 +6,7 @@ import time
 
 import pandas as pd
 
-from data_system import Bot, BotOrder, BotRun, BotTick, BotRunRepository, BotTickRepository, BotOrderRepository, Signal
+from data_system import Bot, BotOrder, BotRun, BotTick, BotRunRepository, BotTickRepository, BotOrderRepository, Side, Signal
 from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector, QueryOrderStatus
 from .position_sizer import PairBalances, PositionSizer
 from strategy_manager import Strategy
@@ -110,7 +110,7 @@ class TradeExecutor:
                         bot_id=self.bot.id,
                         run_id=self.run.id,
                         exchange_order_id=add_order_result.txid[0],
-                        side=signal
+                        side=Side(signal.value)
                     ))
                     placed_order = self._confirm_order(placed_order)
                     balances = self._fetch_balances()
