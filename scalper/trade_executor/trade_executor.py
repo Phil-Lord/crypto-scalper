@@ -6,7 +6,7 @@ import time
 
 import pandas as pd
 
-from data_system import Bot, BotOrder, BotRun, BotTick, BotRunRepository, BotTickRepository, BotOrderRepository, Side, Signal
+from data_system import Bot, BotOrder, BotRun, BotTick, BotRunRepository, BotTickRepository, BotOrderRepository, OrderStatus, Side, Signal
 from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector, QueryOrderStatus
 from .position_sizer import PairBalances, PositionSizer
 from strategy_manager import Strategy
@@ -89,6 +89,7 @@ class TradeExecutor:
         tick_error: str | None = None
         placed_order: BotOrder | None = None
         balances: PairBalances | None = None
+        previous_action = self.strategy.last_action
 
         try:
             signal = self.strategy.generate_signal(ohlc)['signal']
@@ -116,6 +117,10 @@ class TradeExecutor:
                         side=Side(signal.value)
                     ))
                     placed_order = self._confirm_order(placed_order)
+                    if placed_order.status == OrderStatus.FAILED:
+                        self.strategy.last_action = previous_action
+                        signal = Signal.HOLD
+                        tick_error = f'Order {placed_order.id} failed on exchange'
                     balances = self._fetch_balances()
 
             if balances is None:
@@ -124,6 +129,8 @@ class TradeExecutor:
         except Exception as e:
             self.logger.error(f'Error during signal/order flow: {e}', exc_info=True)
             tick_error = str(e)
+            if placed_order is None:
+                self.strategy.last_action = previous_action
             signal = Signal.HOLD
             if balances is None:
                 try:
@@ -194,6 +201,10 @@ class TradeExecutor:
                         order.id, exchange_order.price, exchange_order.volume, exchange_order.fee)
                     self.logger.info(
                         f'Order {order.id} marked as FAILED ({exchange_order.status.value} on the exchange)')
+                    if self.strategy.last_action == Signal(order.side.value):
+                        opposite = Signal.SELL if order.side == Side.BUY else Signal.BUY
+                        self.strategy.last_action = opposite
+                        self.logger.info(f'Rolled back strategy last_action to {opposite}')
                 else:
                     self.logger.warning(
                         f'Order {order.id} has unrecognised status {exchange_order.status}')
