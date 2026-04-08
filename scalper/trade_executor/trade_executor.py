@@ -149,18 +149,26 @@ class TradeExecutor:
             )
             return
 
-        tick = self.bot_tick_repo.add(BotTick(
-            bot_id=self.bot.id,
-            run_id=self.run.id,
-            price=Decimal(str(ohlc['close'])),
-            signal=signal,
-            balance_base=balances.balance_base,
-            balance_quote=balances.balance_quote,
-            error=tick_error,
-        ))
+        try:
+            tick = self.bot_tick_repo.add(BotTick(
+                bot_id=self.bot.id,
+                run_id=self.run.id,
+                price=Decimal(str(ohlc['close'])),
+                signal=signal,
+                balance_base=balances.balance_base,
+                balance_quote=balances.balance_quote,
+                error=tick_error,
+            ))
+        except Exception as e:
+            self.logger.error(f'Failed to persist tick: {e}', exc_info=True)
+            return
 
         if placed_order is not None:
-            self.bot_order_repo.update(replace(placed_order, tick_id=tick.id))
+            try:
+                self.bot_order_repo.update(replace(placed_order, tick_id=tick.id))
+            except Exception as e:
+                self.logger.error(
+                    f'Failed to link order {placed_order.id} to tick {tick.id}: {e}', exc_info=True)
 
         self.logger.info(f'Interval execution complete with signal {signal}')
 
