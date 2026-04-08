@@ -83,40 +83,69 @@ class TradeExecutor:
             self.logger.error(f'Failed to fetch OHLC data: {e}', exc_info=True)
             return
 
-        signal = self.strategy.generate_signal(ohlc)['signal']
+        tick_error: str | None = None
+        placed_order: BotOrder | None = None
+        balances: PairBalances | None = None
 
-        placed_order = None
+        try:
+            signal = self.strategy.generate_signal(ohlc)['signal']
 
-        if signal in (Signal.BUY, Signal.SELL):
-            pre_order_balances = self._fetch_balances()
-            size = self.position_sizer.calculate_volume(signal, pre_order_balances)
+            if signal in (Signal.BUY, Signal.SELL):
+                pre_order_balances = self._fetch_balances()
+                size = self.position_sizer.calculate_volume(signal, pre_order_balances)
 
-            if self.dry_run:
-                self.logger.info(
-                    f'DRY RUN: Calculated order {signal} {size} {self.bot.pair} at {ohlc["close"]} not placed')
-                return
+                add_order_result = self.add_order_connector.place(
+                    self.bot.pair, signal, size, validate=self.dry_run
+                )
 
-            add_order_result = self.add_order_connector.place(
-                self.bot.pair, signal, size, self.dry_run
+                if self.dry_run:
+                    self.logger.info(
+                        f'DRY RUN: Validated order — {add_order_result.order_description}')
+                    balances = pre_order_balances
+                else:
+                    if add_order_result.txid is None:
+                        raise ValueError('AddOrderResult.txid is None after live order placement')
+
+                    placed_order = self.bot_order_repo.add(BotOrder(
+                        bot_id=self.bot.id,
+                        run_id=self.run.id,
+                        exchange_order_id=add_order_result.txid[0],
+                        side=signal
+                    ))
+                    placed_order = self._confirm_order(placed_order)
+                    balances = self._fetch_balances()
+
+            if balances is None:
+                balances = self._fetch_balances()
+
+        except Exception as e:
+            self.logger.error(f'Error during signal/order flow: {e}', exc_info=True)
+            tick_error = str(e)
+            signal = Signal.HOLD
+            if balances is None:
+                try:
+                    balances = self._fetch_balances()
+                except Exception as balance_error:
+                    self.logger.error(
+                        f'Failed to fetch balances for error tick: {balance_error}', exc_info=True)
+                    return
+
+        if self.dry_run:
+            self.logger.info(
+                f'DRY RUN: signal={signal}, price={ohlc["close"]}, '
+                f'balance_base={balances.balance_base}, balance_quote={balances.balance_quote}'
             )
+            return
 
-            placed_order = self.bot_order_repo.add(BotOrder(
-                bot_id=self.bot.id,
-                run_id=self.run.id,
-                exchange_order_id=add_order_result.txid[0],
-                side=signal
-            ))
-            self._confirm_order(placed_order)
-
-        balances = self._fetch_balances()
         tick = self.bot_tick_repo.add(BotTick(
             bot_id=self.bot.id,
             run_id=self.run.id,
             timestamp=datetime.now(timezone.utc),
-            price=ohlc['close'],
+            price=Decimal(str(ohlc['close'])),
             signal=signal,
             balance_base=balances.balance_base,
-            balance_quote=balances.balance_quote
+            balance_quote=balances.balance_quote,
+            error=tick_error,
         ))
 
         if placed_order is not None:
@@ -228,7 +257,7 @@ class TradeExecutor:
             balance_quote=Decimal(str(balances.get(self.pair_symbols.quote, 0)))
         )
 
-    def _confirm_order(self, order: BotOrder) -> None:
+    def _confirm_order(self, order: BotOrder) -> BotOrder:
         for attempt in range(3):
             if attempt > 0:
                 time.sleep(1)
@@ -240,15 +269,18 @@ class TradeExecutor:
             result = results[0]
 
             if result.status == QueryOrderStatus.CLOSED:
-                self.bot_order_repo.mark_filled(order.id, result.price, result.volume, result.fee)
+                updated_order = self.bot_order_repo.mark_filled(
+                    order.id, result.price, result.volume, result.fee)
                 self.logger.info(f'Order {order.id} marked as FILLED')
-                return
+                return updated_order
             elif result.status in (QueryOrderStatus.CANCELED, QueryOrderStatus.EXPIRED):
-                self.bot_order_repo.mark_failed(order.id, result.price, result.volume, result.fee)
+                updated_order = self.bot_order_repo.mark_failed(
+                    order.id, result.price, result.volume, result.fee)
                 self.logger.warning(
                     f'Order {order.id} (txid={order.exchange_order_id}) marked as FAILED '
                     f'({result.status.value} on the exchange)')
-                return
+                return updated_order
 
         self.logger.info(
             f'Order {order.id} still PLACED after 3 attempts; to be reconciled next interval')
+        return order
