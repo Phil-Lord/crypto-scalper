@@ -131,7 +131,9 @@ class TradeExecutor:
             tick_error = str(e)
             if placed_order is None:
                 self.strategy.last_action = previous_action
-            signal = Signal.HOLD
+                signal = Signal.HOLD
+            else:
+                signal = Signal(placed_order.side.value)
             if balances is None:
                 try:
                     balances = self._fetch_balances()
