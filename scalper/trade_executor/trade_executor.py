@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
 import logging
@@ -5,7 +6,7 @@ import time
 
 import pandas as pd
 
-from data_system import Bot, BotRun, BotRunRepository, BotTickRepository, BotOrderRepository, Signal
+from data_system import Bot, BotOrder, BotRun, BotTick, BotRunRepository, BotTickRepository, BotOrderRepository, Signal
 from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector, QueryOrderStatus
 from .position_sizer import PairBalances, PositionSizer
 from strategy_manager import Strategy
@@ -68,6 +69,60 @@ class TradeExecutor:
         for ohlc in candles:
             self.strategy.generate_signal(ohlc)
         self.logger.info(f'Warm-up complete: processed {len(candles)} candles')
+
+    def execute_interval(self) -> None:
+        if self._shutting_down:
+            self.logger.info('Shutdown in progress, skipping interval execution')
+            return
+
+        self._reconcile_placed_orders()
+
+        try:
+            ohlc = self._fetch_ohlc()
+        except Exception as e:
+            self.logger.error(f'Failed to fetch OHLC data: {e}', exc_info=True)
+            return
+
+        signal = self.strategy.generate_signal(ohlc)['signal']
+
+        placed_order = None
+
+        if signal in (Signal.BUY, Signal.SELL):
+            pre_order_balances = self._fetch_balances()
+            size = self.position_sizer.calculate_volume(signal, pre_order_balances)
+
+            if self.dry_run:
+                self.logger.info(
+                    f'DRY RUN: Calculated order {signal} {size} {self.bot.pair} at {ohlc["close"]} not placed')
+                return
+
+            add_order_result = self.add_order_connector.place(
+                self.bot.pair, signal, size, self.dry_run
+            )
+
+            placed_order = self.bot_order_repo.add(BotOrder(
+                bot_id=self.bot.id,
+                run_id=self.run.id,
+                exchange_order_id=add_order_result.txid[0],
+                side=signal
+            ))
+            self._confirm_order(placed_order)
+
+        balances = self._fetch_balances()
+        tick = self.bot_tick_repo.add(BotTick(
+            bot_id=self.bot.id,
+            run_id=self.run.id,
+            timestamp=datetime.now(timezone.utc),
+            price=ohlc['close'],
+            signal=signal,
+            balance_base=balances.balance_base,
+            balance_quote=balances.balance_quote
+        ))
+
+        if placed_order is not None:
+            self.bot_order_repo.update(replace(placed_order, tick_id=tick.id))
+
+        self.logger.info(f'Interval execution complete with signal {signal}')
 
     def request_shutdown(self) -> None:
         ''' Signal the executor to stop after the current interval. '''
@@ -172,3 +227,28 @@ class TradeExecutor:
             balance_base=Decimal(str(balances.get(self.pair_symbols.base, 0))),
             balance_quote=Decimal(str(balances.get(self.pair_symbols.quote, 0)))
         )
+
+    def _confirm_order(self, order: BotOrder) -> None:
+        for attempt in range(3):
+            if attempt > 0:
+                time.sleep(1)
+
+            results = self.query_orders_connector.fetch([order.exchange_order_id])
+            if not results:
+                continue
+
+            result = results[0]
+
+            if result.status == QueryOrderStatus.CLOSED:
+                self.bot_order_repo.mark_filled(order.id, result.price, result.volume, result.fee)
+                self.logger.info(f'Order {order.id} marked as FILLED')
+                return
+            elif result.status in (QueryOrderStatus.CANCELED, QueryOrderStatus.EXPIRED):
+                self.bot_order_repo.mark_failed(order.id, result.price, result.volume, result.fee)
+                self.logger.warning(
+                    f'Order {order.id} (txid={order.exchange_order_id}) marked as FAILED '
+                    f'({result.status.value} on the exchange)')
+                return
+
+        self.logger.info(
+            f'Order {order.id} still PLACED after 3 attempts; to be reconciled next interval')
