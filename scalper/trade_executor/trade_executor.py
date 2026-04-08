@@ -75,7 +75,10 @@ class TradeExecutor:
             self.logger.info('Shutdown in progress, skipping interval execution')
             return
 
-        self._reconcile_placed_orders()
+        try:
+            self._reconcile_placed_orders()
+        except Exception as e:
+            self.logger.error(f'Failed to reconcile placed orders: {e}', exc_info=True)
 
         try:
             ohlc = self._fetch_ohlc()
