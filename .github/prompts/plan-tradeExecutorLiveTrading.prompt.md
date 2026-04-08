@@ -142,20 +142,21 @@
           - Place order via `AddOrderConnector.place(pair, signal, volume, validate=self.dry_run)` → get `AddOrderResult`
           - **If `self.dry_run`:** Log the validated order description from `AddOrderResult`. Skip order persistence, QueryOrders, and post-trade balance fetch — no real order was placed.
           - **If live (not dry run):**
-              - Extract `exchange_order_id = order_result.txid[0]` (guard for `None` — should not happen outside `validate=True` mode)
+              - Extract `exchange_order_id = order_result.txid[0]` (guard for `None` — should not happen outside `validate=True` mode; raise `ValueError` if it is)
               - **Immediately persist** partial `BotOrder` with `exchange_order_id`, status=`PLACED`, fill fields=`None`, `filled_at=None`
-              - **Retry QueryOrders up to 3 times** (1s delay between attempts). Check for Kraken's `status='closed'` (fully filled).
-                  - On fill success (status `closed`): update `BotOrder` with price/volume/fee, `filled_at=datetime.now(utc)`, status=`FILLED` via `bot_order_repo.update()`
-                  - On still open after 3 attempts: leave as `PLACED`, log info — will be reconciled at the start of the next interval
-                  - On `cancelled` status: update to `FAILED`, log warning with `exchange_order_id`
+              - **Retry QueryOrders up to 3 times** (1s delay between attempts) via `_confirm_order()`. Check for Kraken's `status='closed'` (fully filled). `_confirm_order()` returns the updated `BotOrder` in all cases (FILLED, FAILED, or still PLACED after retries) so `execute_interval` always holds the current state when linking the tick.
+                  - On fill success (status `closed`): call `mark_filled()` → returns updated `BotOrder` with status=`FILLED`
+                  - On still open after 3 attempts: leave as `PLACED`, log info — will be reconciled at the start of the next interval; return original `BotOrder`
+                  - On `cancelled` status: call `mark_failed()` → returns updated `BotOrder` with status=`FAILED`
+              - Reassign `placed_order` to the return value of `_confirm_order()` to ensure the correct status is used when linking the tick
               - Fetch balances again after order flow to get post-trade balances for the tick record
-      6. If signal is `HOLD`: fetch balances via `self._fetch_balances()` (no order flow needed)
+      6. If signal is `HOLD` (or BUY/SELL without entering the order branch): `balances` is still `None` — fetch via `self._fetch_balances()`
       7. **If `self.dry_run`:** Log tick summary (price, signal, balances) and return — no persistence. This prevents dry run ticks from polluting `bot_ticks` and corrupting `_recover_state()` when switching to live mode.
-      8. Construct `BotTick` with `bot_id`, `run_id`, `timestamp`, `price` (from OHLC), `signal` (post-suppression), `balance_base`, `balance_quote` — balances always reflect the bot's position **after** acting on the signal
+      8. Construct `BotTick` with `bot_id`, `run_id`, `timestamp`, `price` (from OHLC, cast to `Decimal`), `signal` (post-suppression), `balance_base`, `balance_quote`, `error` — balances always reflect the bot's position **after** acting on the signal
       9. Persist tick via `bot_tick_repo.add()` → get back tick with DB-generated `id`
-      10. If order was placed: update `BotOrder` with `tick_id` from persisted tick via `bot_order_repo.update()`
+      10. If order was placed: update `BotOrder.tick_id` via `bot_order_repo.update(replace(placed_order, tick_id=tick.id))` — `placed_order` holds the post-`_confirm_order` state (FILLED/FAILED/PLACED), so the update preserves the correct status.
       11. Log results
-    - **Error handling**: If OHLC fetch fails → log error, return (no tick — can't construct BotTick without price). If strategy or order placement fails → persist tick with `error` field set, log error, continue. On fatal errors (Supabase unreachable): log and let the process crash (Fly.io auto-restarts).
+    - **Error handling**: The signal/order block (steps 4–6) is wrapped in a single try/except. If OHLC fetch fails → log error, return (no tick — can't construct BotTick without price). If strategy or order placement fails → catch the exception, set `tick_error = str(e)`, fall back to `signal = Signal.HOLD`, attempt to fetch balances (return if that also fails), then persist tick with `error` field set. On fatal errors (Supabase unreachable): log and let the process crash (Fly.io auto-restarts).
     - **`shutdown(self) -> None`**: Marks the run as completed via `bot_run_repo.complete(self.run.id, datetime.now(timezone.utc))`. Wraps the DB call in try/except (best-effort cleanup — a Supabase network error should not prevent the process from exiting cleanly). Does **not** call `_reconcile_placed_orders()`: by the time `shutdown()` is called, `scheduler.shutdown(wait=True)` has already blocked until the current interval completed (including its own reconciliation step), and `_shutting_down = True` prevents any new interval from starting. Any order that still has `status='placed'` after that interval's 3-retry window will be picked up by the next run's `get_placed_by_bot_id()` query at the start of its first `execute_interval()` — the same recovery path that handles crash restarts.
     - **No `load_env()`** or `logging.basicConfig()` — these stay in the entry-point script only.
     - **No internal connector instantiation** — all injected via constructor.
