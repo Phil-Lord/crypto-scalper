@@ -33,7 +33,7 @@ CREATE TABLE bot_ticks (
     run_id UUID NOT NULL REFERENCES bot_runs(id) ON DELETE CASCADE,
 
     -- Tick Data
-    timestamp TIMESTAMPTZ NOT NULL,               -- Matches BotTick.timestamp (The Heartbeat)
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(), -- Matches BotTick.timestamp (The Heartbeat)
     price DECIMAL(32, 12) NOT NULL,               -- Matches BotTick.price
     signal TEXT NOT NULL,                         -- Matches BotTick.signal ('buy', 'sell', 'hold')
     error TEXT,                                   -- Matches BotTick.error

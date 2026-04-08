@@ -150,7 +150,6 @@ class TradeExecutor:
         tick = self.bot_tick_repo.add(BotTick(
             bot_id=self.bot.id,
             run_id=self.run.id,
-            timestamp=datetime.now(timezone.utc),
             price=Decimal(str(ohlc['close'])),
             signal=signal,
             balance_base=balances.balance_base,

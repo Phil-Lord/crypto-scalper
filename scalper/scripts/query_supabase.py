@@ -77,7 +77,6 @@ def bot_tick(action: str, client: SupabaseClient):
         bot_tick = repository.add(BotTick(
             bot_id=ask('bot_id:', required=True),
             run_id=UUID(ask('run_id:', required=True)),
-            timestamp=datetime.now(timezone.utc),
             price=Decimal(ask('price:', required=True)),
             signal=Signal(questionary.select('signal:', choices=['buy', 'hold', 'sell']).ask()),
             balance_base=Decimal(ask('balance_base:', required=True)),
