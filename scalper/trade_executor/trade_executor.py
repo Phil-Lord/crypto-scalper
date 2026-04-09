@@ -95,6 +95,29 @@ class TradeExecutor:
             self.logger.error(f'Failed to fetch OHLC data: {e}', exc_info=True)
             return
 
+        result = self._execute_signal(ohlc)
+        if result is None:
+            return
+
+        signal, placed_order, balances, tick_error = result
+
+        if self.dry_run:
+            self.logger.info(
+                f'DRY RUN: signal={signal}, price={ohlc["close"]}, '
+                f'balance_base={balances.balance_base}, balance_quote={balances.balance_quote}'
+            )
+            return
+
+        self._persist_results(ohlc, signal, balances, tick_error, placed_order)
+
+    def _execute_signal(
+            self, ohlc: pd.Series,
+    ) -> tuple[Signal, BotOrder | None, PairBalances, str | None] | None:
+        '''
+        Generates a signal from the strategy and, for BUY/SELL signals, places and confirms
+        an order. Returns (signal, placed_order, balances, tick_error), or None if balances
+        could not be fetched during error recovery.
+        '''
         tick_error: str | None = None
         placed_order: BotOrder | None = None
         balances: PairBalances | None = None
@@ -149,15 +172,15 @@ class TradeExecutor:
                 except Exception as balance_error:
                     self.logger.error(
                         f'Failed to fetch balances for error tick: {balance_error}', exc_info=True)
-                    return
+                    return None
 
-        if self.dry_run:
-            self.logger.info(
-                f'DRY RUN: signal={signal}, price={ohlc["close"]}, '
-                f'balance_base={balances.balance_base}, balance_quote={balances.balance_quote}'
-            )
-            return
+        return signal, placed_order, balances, tick_error
 
+    def _persist_results(
+            self, ohlc: pd.Series, signal: Signal, balances: PairBalances,
+            tick_error: str | None, placed_order: BotOrder | None,
+    ) -> None:
+        ''' Persists a tick to the database and links any placed order to it. '''
         try:
             tick = self.bot_tick_repo.add(BotTick(
                 bot_id=self.bot.id,
