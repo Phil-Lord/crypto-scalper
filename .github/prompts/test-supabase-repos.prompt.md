@@ -50,6 +50,7 @@ The `get` methods are **not uniform** across repos — note the differences:
 | `SupabaseBotTickRepository` | `get_latest_action_by_bot_id(bot_id: str)`                                   | `BotTick \| None`  |
 | `SupabaseBotOrderRepository`| `get_by_bot_id(bot_id: str)`                                                 | `list[BotOrder]`   |
 | `SupabaseBotOrderRepository`| `get_placed_by_bot_id(bot_id: str)`                                          | `list[BotOrder]`   |
+| `SupabaseBotOrderRepository`| `get_by_tick_id(tick_id: int)`                                               | `BotOrder \| None` |
 | `SupabaseBotOrderRepository`| `mark_filled(order_id: UUID, price: Decimal, volume: Decimal, fee: Decimal)` | `BotOrder`         |
 | `SupabaseBotOrderRepository`| `mark_failed(order_id: UUID, price: Decimal, volume: Decimal, fee: Decimal)` | `BotOrder`         |
 
@@ -103,6 +104,12 @@ For each repo, test both the add and get paths. Cover:
 - Insert one `placed` order and one `filled` order for the same `bot_id`
 - Verify `get_placed_by_bot_id` returns **only** the `placed` order, not the `filled` one
 - Verify the returned list is empty when no `placed` orders exist for a given `bot_id`
+
+#### `get_by_tick_id`
+- Insert a tick, then insert an order with `tick_id` set to that tick's ID
+- Verify `get_by_tick_id(tick_id)` returns the correct `BotOrder` with the expected `tick_id`
+- Call `get_by_tick_id` with a `tick_id` that has no associated order — confirm `None` is returned
+- Confirm the `tick_id` field on the returned `BotOrder` is an `int`, not a string
 
 #### `mark_filled`
 - Insert a `placed` order, then call `mark_filled(order_id, price, volume, fee)` with realistic `Decimal` values
