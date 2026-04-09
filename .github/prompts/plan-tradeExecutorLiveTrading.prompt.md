@@ -69,6 +69,10 @@
 
 11. **Implement `get_placed_by_bot_id()` in `SupabaseBotOrderRepository`**. Query with `.eq('bot_id', bot_id).eq('status', 'placed').execute()`.
 
+11a. **Add `get_by_tick_id()` to `BotOrderRepository`** at `data_system/repositories/bot_order/bot_order_repository.py`. Signature: `get_by_tick_id(self, tick_id: int) -> BotOrder | None`. Returns the order associated with a given tick ID, or `None` if not found. Used by `recover_state()` to check whether the order recorded at the most recent directional tick ended up FAILED — without fetching all orders for the bot.
+
+11b. **Implement `get_by_tick_id()` in `SupabaseBotOrderRepository`**. Query with `.eq('tick_id', tick_id).execute()`. Returns the first result or `None`.
+
 12. **Add `complete()` method to `BotRunRepository`** at `data_system/repositories/bot_run/bot_run_repository.py`. Signature: `complete(self, id: UUID, completed_at: datetime) -> BotRun`. Abstract method to mark a run as finished by setting `completed_at`.
 
 13. **Implement `complete()` in `SupabaseBotRunRepository`** at `data_system/repositories/bot_run/supabase_bot_run_repository.py`. Uses `client.table('bot_runs').update({'completed_at': completed_at.isoformat()}).eq('id', str(id)).execute()`, then returns the deserialised `BotRun`.
