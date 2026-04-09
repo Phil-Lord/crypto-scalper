@@ -49,8 +49,18 @@ class TradeExecutor:
         ''' Sets latest directional action on strategy from database. '''
         latest_tick = self.bot_tick_repo.get_latest_action_by_bot_id(self.bot.id)
         if latest_tick:
-            self.strategy.last_action = latest_tick.signal
-            self.logger.info(f'Recovered last action: {latest_tick.signal}')
+            orders = self.bot_order_repo.get_by_bot_id(self.bot.id)
+            associated_order = next((o for o in orders if o.tick_id == latest_tick.id), None)
+            if associated_order and associated_order.status == OrderStatus.FAILED:
+                actual_action = Signal.SELL if latest_tick.signal == Signal.BUY else Signal.BUY
+                self.strategy.last_action = actual_action
+                self.logger.info(
+                    f'Recovered last action: {actual_action} '
+                    f'(reversed from {latest_tick.signal} — order {associated_order.id} FAILED)'
+                )
+            else:
+                self.strategy.last_action = latest_tick.signal
+                self.logger.info(f'Recovered last action: {latest_tick.signal}')
         else:
             self.strategy.last_action = Signal.SELL
             self.logger.info('No previous action found, starting fresh')
