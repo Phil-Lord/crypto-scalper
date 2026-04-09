@@ -86,6 +86,10 @@ class TestSupabaseBotOrderRepository:
         ''' Sets response for: table().select().eq().eq().order().execute() '''
         client.table.return_value.select.return_value.eq.return_value.eq.return_value.order.return_value.execute.return_value.data = data
 
+    def _set_select_eq_response(self, client, data: list) -> None:
+        ''' Sets response for: table().select().eq().execute() '''
+        client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = data
+
     def _set_insert_response(self, client, data: list) -> None:
         ''' Sets response for: table().insert().execute() '''
         client.table.return_value.insert.return_value.execute.return_value.data = data
@@ -585,6 +589,81 @@ class TestSupabaseBotOrderRepository:
         assert order.fee is None
         assert order.tick_id is None
         assert order.status == OrderStatus.PLACED
+
+    # --- get_by_tick_id ---
+
+    def test_get_by_tick_id_returns_none_when_no_order_found(self, mock_supabase_client):
+        # Given
+        self._set_select_eq_response(mock_supabase_client, [])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.get_by_tick_id(999)
+
+        # Then
+        assert result is None
+        mock_supabase_client.table.assert_called_once_with('bot_orders')
+
+    def test_get_by_tick_id_returns_order_when_found(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
+        # Given
+        self._set_select_eq_response(mock_supabase_client, [mock_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.get_by_tick_id(sample_order.tick_id)
+
+        # Then
+        assert result == sample_order
+        mock_supabase_client.table.assert_called_once_with('bot_orders')
+
+    def test_get_by_tick_id_filters_by_tick_id(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
+        # Given
+        self._set_select_eq_response(mock_supabase_client, [mock_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        repository.get_by_tick_id(sample_order.tick_id)
+
+        # Then
+        mock_supabase_client.table.return_value.select.return_value.eq.assert_called_once_with(
+            'tick_id', sample_order.tick_id
+        )
+
+    def test_get_by_tick_id_parses_response_types_correctly(self, mock_supabase_client, sample_order: BotOrder, mock_response_data: dict):
+        # Given
+        self._set_select_eq_response(mock_supabase_client, [mock_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.get_by_tick_id(sample_order.tick_id)
+
+        # Then
+        assert result is not None
+        assert isinstance(result.id, UUID)
+        assert isinstance(result.run_id, UUID)
+        assert isinstance(result.placed_at, datetime)
+        assert isinstance(result.filled_at, datetime)
+        assert isinstance(result.price, Decimal)
+        assert isinstance(result.volume, Decimal)
+        assert isinstance(result.fee, Decimal)
+        assert isinstance(result.side, Side)
+        assert isinstance(result.status, OrderStatus)
+
+    def test_get_by_tick_id_parses_null_fill_fields(self, mock_supabase_client, sample_placed_order: BotOrder, mock_placed_response_data: dict):
+        # Given
+        self._set_select_eq_response(mock_supabase_client, [mock_placed_response_data])
+        repository = SupabaseBotOrderRepository(mock_supabase_client)
+
+        # When
+        result = repository.get_by_tick_id(sample_placed_order.tick_id)
+
+        # Then
+        assert result is not None
+        assert result.filled_at is None
+        assert result.price is None
+        assert result.volume is None
+        assert result.fee is None
+        assert result.tick_id is None
 
     # --- get_placed_by_bot_id ---
 
