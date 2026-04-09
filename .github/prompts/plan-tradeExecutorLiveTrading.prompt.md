@@ -258,10 +258,7 @@
     - `test_execute_interval_query_fill_cancelled_marks_failed` — Kraken reports `cancelled`, status set to FAILED and `strategy.last_action` rolled back to pre-signal value
     - `test_execute_interval_last_action_rolled_back_on_pre_order_exception` — exception thrown before `placed_order` is persisted (e.g., balance fetch fails); `strategy.last_action` restored to its pre-`generate_signal` value
     - `test_execute_interval_last_action_not_rolled_back_when_order_persisted` — exception thrown after `placed_order` is persisted; `strategy.last_action` is NOT restored (order is in DB as PLACED, position did change)
-    - `test_execute_interval_exception_after_order_persisted_tick_records_order_direction` — when an exception is raised after `placed_order` is set (e.g., `_fetch_balances` throws), the tick's `signal` is set to the order's actual direction (`BUY` or `SELL`), not `Signal.HOLD`; this ensures crash recovery via `recover_state` reads the correct `last_action`
     - `test_execute_interval_skipped_when_shutting_down` — verify early return when `_shutting_down` is True
-    - `test_execute_interval_tick_persistence_failure_logs_and_returns` — when `bot_tick_repo.add()` raises, error is logged and `execute_interval` returns without propagating; scheduler is not disrupted
-    - `test_execute_interval_order_link_failure_logs_but_interval_completes` — when `bot_order_repo.update()` raises during `tick_id` linking, error is logged but the interval still completes (tick was already persisted; final log message fires)
     - `test_reconcile_placed_orders_resolves_filled` — verify outstanding PLACED order updated to FILLED when Kraken reports `closed`
     - `test_reconcile_placed_orders_resolves_cancelled` — verify outstanding PLACED order updated to FAILED when Kraken reports `cancelled`, and `strategy.last_action` rolled back to opposite side
     - `test_reconcile_placed_orders_leaves_open` — verify still-open orders left as PLACED
@@ -275,22 +272,25 @@
     - `test_recover_state_restores_last_action` — verify `strategy.last_action` set from latest directional tick's signal (uses `get_latest_action_by_bot_id`)
     - `test_recover_state_skips_hold_ticks` — verify that if the most recent tick is HOLD but there's an earlier BUY tick, `last_action` is set to BUY (not HOLD)
     - `test_recover_state_first_run` — verify no error when no previous tick exists
-    - `test_recover_state_reverses_signal_when_associated_order_failed` — when the order associated with the latest directional tick has `status=FAILED`, `last_action` is set to the *opposite* of the tick's signal (e.g., tick=SELL but order FAILED → `last_action=BUY`); guards against re-entering a position the bot never actually exited
-    - `test_recover_state_uses_tick_signal_when_associated_order_filled` — when the associated order is FILLED, `last_action` is set to the tick's signal as normal (the position change is confirmed)
-    - `test_recover_state_uses_tick_signal_when_no_order_for_tick` — when `get_by_tick_id` returns `None` (tick has no associated order, e.g., a HOLD tick or the order wasn't persisted), `last_action` is set to the tick's signal as normal
     - `test_shutdown_marks_run_completed` — verify `bot_run_repo.complete()` called
     - `test_constructor_creates_and_persists_run` — verify `BotRun` created and added to repo
     - `test_execute_interval_dry_run_validates_without_placing` — verify `validate=True` passed to `AddOrderConnector.place()`, no `BotOrder` persisted, no `QueryOrdersConnector` calls, no tick persisted
     - `test_execute_interval_dry_run_logs_tick_without_persisting` — verify tick data (price, signal, balances) is logged but `bot_tick_repo.add()` is never called
     - `test_execute_interval_dry_run_skips_reconciliation` — verify `_reconcile_placed_orders` is a no-op in dry run mode (no PLACED orders exist to reconcile)
 
-    *Regression tests — bugs fixed during review:*
-    - `test_execute_interval_bot_order_side_is_side_enum_not_signal_enum` — (Bug 5) `BotOrder.side` is a `Side` instance, not a `Signal` instance; both are string enums with matching values so this only fails at the type level without an explicit test
-    - `test_reconcile_exception_does_not_abort_interval` — (Bug 4) if `_reconcile_placed_orders` raises, the exception is caught and logged, and `execute_interval` continues to fetch OHLC and produce a tick as normal; verifies the scheduler is never disrupted by a reconciliation outage
-    - `test_execute_interval_failed_order_tick_has_hold_signal` — (Bug 2) when `_confirm_order` returns a FAILED order, the persisted tick has `signal=Signal.HOLD` (not BUY/SELL); the order did not execute so the directional tick must not be recorded
-    - `test_execute_interval_failed_order_tick_has_error_set` — (Bug 2) when `_confirm_order` returns FAILED, `tick.error` is a non-None string describing the failure
-    - `test_execute_interval_failed_order_still_linked_to_tick` — (Bug 2) even when `_confirm_order` returns FAILED and signal becomes HOLD, the `placed_order` is still linked to the tick via `bot_order_repo.update(replace(placed_order, tick_id=tick.id))` — the order record exists and must point to its tick
-    - `test_reconcile_does_not_roll_back_last_action_when_failed_order_side_differs` — (Bug 3 edge case) if a FAILED order's side does not match the current `strategy.last_action`, `last_action` is left unchanged; prevents incorrectly flipping state when a stale previous-position order surfaces during reconciliation
+    *Regression tests — bugs fixed during review (don't specifically put these in their own test class or section):*
+    - `test_execute_interval_tick_persistence_failure_logs_and_returns` — when `bot_tick_repo.add()` raises, error is logged and `execute_interval` returns without propagating; scheduler is not disrupted
+    - `test_execute_interval_order_link_failure_logs_but_interval_completes` — when `bot_order_repo.update()` raises during `tick_id` linking, error is logged but the interval still completes (tick was already persisted; final log message fires)
+    - `test_execute_interval_exception_after_order_persisted_tick_records_order_direction` — when an exception is raised after `placed_order` is set (e.g., `_fetch_balances` throws), the tick's `signal` is set to the order's actual direction (`BUY` or `SELL`), not `Signal.HOLD`; this ensures crash recovery via `recover_state` reads the correct `last_action`
+    - `test_recover_state_reverses_signal_when_associated_order_failed` — when the order associated with the latest directional tick has `status=FAILED`, `last_action` is set to the *opposite* of the tick's signal (e.g., tick=SELL but order FAILED → `last_action=BUY`); guards against re-entering a position the bot never actually exited
+    - `test_recover_state_uses_tick_signal_when_associated_order_filled` — when the associated order is FILLED, `last_action` is set to the tick's signal as normal (the position change is confirmed)
+    - `test_recover_state_uses_tick_signal_when_no_order_for_tick` — when `get_by_tick_id` returns `None` (tick has no associated order, e.g., a HOLD tick or the order wasn't persisted), `last_action` is set to the tick's signal as normal
+    - `test_execute_interval_bot_order_side_is_side_enum_not_signal_enum` — `BotOrder.side` is a `Side` instance, not a `Signal` instance; both are string enums with matching values so this only fails at the type level without an explicit test
+    - `test_reconcile_exception_does_not_abort_interval` — if `_reconcile_placed_orders` raises, the exception is caught and logged, and `execute_interval` continues to fetch OHLC and produce a tick as normal; verifies the scheduler is never disrupted by a reconciliation outage
+    - `test_execute_interval_failed_order_tick_has_hold_signal` — when `_confirm_order` returns a FAILED order, the persisted tick has `signal=Signal.HOLD` (not BUY/SELL); the order did not execute so the directional tick must not be recorded
+    - `test_execute_interval_failed_order_tick_has_error_set` — when `_confirm_order` returns FAILED, `tick.error` is a non-None string describing the failure
+    - `test_execute_interval_failed_order_still_linked_to_tick` — even when `_confirm_order` returns FAILED and signal becomes HOLD, the `placed_order` is still linked to the tick via `bot_order_repo.update(replace(placed_order, tick_id=tick.id))` — the order record exists and must point to its tick
+    - `test_reconcile_does_not_roll_back_last_action_when_failed_order_side_differs` —edge case) if a FAILED order's side does not match the current `strategy.last_action`, `last_action` is left unchanged; prevents incorrectly flipping state when a stale previous-position order surfaces during reconciliation
     - `test_reconcile_per_order_exception_does_not_prevent_other_orders` — per-order try/except allows remaining orders in the batch to continue being reconciled even when one throws; verifies all N orders are attempted regardless of individual failures
     - `test_execute_interval_tick_has_timestamp_set` — `BotTick.timestamp` is set to a UTC datetime when the tick is persisted; regression guard against the required field being omitted from the `BotTick(...)` constructor call
     - All connectors and repositories are mocked (constructor is DI-based)
