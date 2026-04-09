@@ -129,25 +129,11 @@ class TradeExecutor:
             if signal in (Signal.BUY, Signal.SELL):
                 pre_order_balances = self._fetch_balances()
                 size = self.position_sizer.calculate_volume(signal, pre_order_balances)
+                placed_order = self._submit_order(signal, size)
 
-                add_order_result = self.add_order_connector.place(
-                    self.bot.pair, signal, size, validate=self.dry_run
-                )
-
-                if self.dry_run:
-                    self.logger.info(
-                        f'DRY RUN: Validated order — {add_order_result.order_description}')
+                if placed_order is None:
                     balances = pre_order_balances
                 else:
-                    if add_order_result.txid is None:
-                        raise ValueError('AddOrderResult.txid is None after live order placement')
-
-                    placed_order = self.bot_order_repo.add(BotOrder(
-                        bot_id=self.bot.id,
-                        run_id=self.run.id,
-                        exchange_order_id=add_order_result.txid[0],
-                        side=Side(signal.value)
-                    ))
                     placed_order = self._confirm_order(placed_order)
                     if placed_order.status == OrderStatus.FAILED:
                         self.strategy.last_action = previous_action
@@ -175,6 +161,30 @@ class TradeExecutor:
                     return None
 
         return signal, placed_order, balances, tick_error
+
+    def _submit_order(self, signal: Signal, size: Decimal) -> BotOrder | None:
+        '''
+        Submits an order to the exchange and persists it to the database.
+
+        :return: Persisted BotOrder, or None in dry-run mode.
+        '''
+        result = self.add_order_connector.place(
+            self.bot.pair, signal, size, validate=self.dry_run
+        )
+
+        if self.dry_run:
+            self.logger.info(f'DRY RUN: Validated order — {result.order_description}')
+            return None
+
+        if result.txid is None:
+            raise ValueError('AddOrderResult.txid is None after live order placement')
+
+        return self.bot_order_repo.add(BotOrder(
+            bot_id=self.bot.id,
+            run_id=self.run.id,
+            exchange_order_id=result.txid[0],
+            side=Side(signal.value),
+        ))
 
     def _persist_results(
             self, ohlc: pd.Series, signal: Signal, balances: PairBalances,
