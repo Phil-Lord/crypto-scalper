@@ -569,18 +569,22 @@ class TestTradeExecutor:
         mock_bot_tick_repo.get_latest_action_by_bot_id.assert_called_once_with(bot.id)
 
     def test_recover_state_sets_last_action_from_buy_tick(
-            self, executor, mock_bot_tick_repo, mock_strategy, sample_buy_tick,
+            self, executor, mock_bot_tick_repo, mock_bot_order_repo,
+            mock_strategy, sample_buy_tick,
     ):
         mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = sample_buy_tick
+        mock_bot_order_repo.get_by_tick_id.return_value = None
 
         executor.recover_state()
 
         assert mock_strategy.last_action == Signal.BUY
 
     def test_recover_state_sets_last_action_from_sell_tick(
-            self, executor, mock_bot_tick_repo, mock_strategy, sample_sell_tick,
+            self, executor, mock_bot_tick_repo, mock_bot_order_repo,
+            mock_strategy, sample_sell_tick,
     ):
         mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = sample_sell_tick
+        mock_bot_order_repo.get_by_tick_id.return_value = None
 
         executor.recover_state()
 
@@ -606,6 +610,45 @@ class TestTradeExecutor:
 
         info_messages = [str(call.args[0]) for call in executor.logger.info.call_args_list]
         assert any('buy' in msg.lower() for msg in info_messages)
+
+    def test_recover_state_reverses_signal_when_associated_order_failed(
+            self, executor, mock_bot_tick_repo, mock_bot_order_repo,
+            mock_strategy, sample_buy_tick,
+    ):
+        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = sample_buy_tick
+        mock_bot_order_repo.get_by_tick_id.return_value = BotOrder(
+            bot_id='btc_1m_001', run_id=uuid4(),
+            exchange_order_id='TXID-001', side=Side.BUY, status=OrderStatus.FAILED,
+        )
+
+        executor.recover_state()
+
+        assert mock_strategy.last_action == Signal.SELL
+
+    def test_recover_state_uses_tick_signal_when_associated_order_filled(
+            self, executor, mock_bot_tick_repo, mock_bot_order_repo,
+            mock_strategy, sample_buy_tick,
+    ):
+        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = sample_buy_tick
+        mock_bot_order_repo.get_by_tick_id.return_value = BotOrder(
+            bot_id='btc_1m_001', run_id=uuid4(),
+            exchange_order_id='TXID-001', side=Side.BUY, status=OrderStatus.FILLED,
+        )
+
+        executor.recover_state()
+
+        assert mock_strategy.last_action == Signal.BUY
+
+    def test_recover_state_uses_tick_signal_when_no_order_for_tick(
+            self, executor, mock_bot_tick_repo, mock_bot_order_repo,
+            mock_strategy, sample_sell_tick,
+    ):
+        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = sample_sell_tick
+        mock_bot_order_repo.get_by_tick_id.return_value = None
+
+        executor.recover_state()
+
+        assert mock_strategy.last_action == Signal.SELL
 
     # --- shutdown ---
 
@@ -889,6 +932,36 @@ class TestTradeExecutor:
         # Then — warning logged for the missing order
         warning_messages = [str(call.args[0]) for call in executor.logger.warning.call_args_list]
         assert any('TXID-BBB' in msg and 'not returned' in msg for msg in warning_messages)
+
+    def test_reconcile_rolls_back_last_action_when_canceled_order_matches(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            mock_strategy, sample_placed_orders,
+    ):
+        order = sample_placed_orders[0]  # Side.BUY
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = [order]
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-AAA', QueryOrderStatus.CANCELED),
+        ]
+        mock_strategy.last_action = Signal.BUY
+
+        executor._reconcile_placed_orders()
+
+        assert mock_strategy.last_action == Signal.SELL
+
+    def test_reconcile_does_not_roll_back_last_action_when_failed_order_side_differs(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            mock_strategy, sample_placed_orders,
+    ):
+        order = sample_placed_orders[0]  # Side.BUY
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = [order]
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-AAA', QueryOrderStatus.CANCELED),
+        ]
+        mock_strategy.last_action = Signal.SELL  # Does not match order side (BUY)
+
+        executor._reconcile_placed_orders()
+
+        assert mock_strategy.last_action == Signal.SELL
 
     # --- _fetch_ohlc with different intervals ---
 
@@ -1348,3 +1421,84 @@ class TestTradeExecutor:
         exec_executor.logger.error.assert_called()
         log_messages = [str(call.args[0]) for call in exec_executor.logger.info.call_args_list]
         assert any('complete' in msg.lower() for msg in log_messages)
+
+    # Dry run — reconciliation
+
+    def test_execute_interval_dry_run_skips_reconciliation(
+            self, exec_executor, mock_bot_order_repo,
+    ):
+        exec_executor.dry_run = True
+        exec_executor.execute_interval()
+        mock_bot_order_repo.get_placed_by_bot_id.assert_not_called()
+
+    # --- _confirm_order ---
+
+    def test_confirm_order_retries_three_times_when_still_open(
+            self, executor, mock_query_orders_connector, mock_bot_order_repo,
+    ):
+        order = BotOrder(
+            bot_id='btc_1m_001', run_id=executor.run.id,
+            exchange_order_id='TXID-001', side=Side.BUY,
+        )
+        mock_query_orders_connector.fetch.return_value = [
+            QueryOrderResult(
+                txid='TXID-001', price=Decimal('0'), volume=Decimal('0'),
+                fee=Decimal('0'), status=QueryOrderStatus.OPEN,
+            ),
+        ]
+        executor.logger = Mock()
+
+        with patch('time.sleep'):
+            result = executor._confirm_order(order)
+
+        assert mock_query_orders_connector.fetch.call_count == 3
+        assert result.status == OrderStatus.PLACED
+
+    def test_confirm_order_marks_filled_when_closed(
+            self, executor, mock_query_orders_connector, mock_bot_order_repo,
+    ):
+        order = BotOrder(
+            bot_id='btc_1m_001', run_id=executor.run.id,
+            exchange_order_id='TXID-001', side=Side.BUY,
+        )
+        filled_order = replace(
+            order, status=OrderStatus.FILLED, price=Decimal('50000.00'),
+            volume=Decimal('0.001'), fee=Decimal('0.50'),
+        )
+        mock_query_orders_connector.fetch.return_value = [
+            QueryOrderResult(
+                txid='TXID-001', price=Decimal('50000.00'), volume=Decimal('0.001'),
+                fee=Decimal('0.50'), status=QueryOrderStatus.CLOSED,
+            ),
+        ]
+        mock_bot_order_repo.mark_filled.return_value = filled_order
+        executor.logger = Mock()
+
+        result = executor._confirm_order(order)
+
+        mock_bot_order_repo.mark_filled.assert_called_once_with(
+            order.id, Decimal('50000.00'), Decimal('0.001'), Decimal('0.50'),
+        )
+        assert result.status == OrderStatus.FILLED
+
+    def test_confirm_order_marks_failed_when_cancelled(
+            self, executor, mock_query_orders_connector, mock_bot_order_repo,
+    ):
+        order = BotOrder(
+            bot_id='btc_1m_001', run_id=executor.run.id,
+            exchange_order_id='TXID-001', side=Side.BUY,
+        )
+        failed_order = replace(order, status=OrderStatus.FAILED)
+        mock_query_orders_connector.fetch.return_value = [
+            QueryOrderResult(
+                txid='TXID-001', price=Decimal('0'), volume=Decimal('0'),
+                fee=Decimal('0'), status=QueryOrderStatus.CANCELED,
+            ),
+        ]
+        mock_bot_order_repo.mark_failed.return_value = failed_order
+        executor.logger = Mock()
+
+        result = executor._confirm_order(order)
+
+        mock_bot_order_repo.mark_failed.assert_called_once()
+        assert result.status == OrderStatus.FAILED
