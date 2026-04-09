@@ -258,7 +258,10 @@
     - `test_execute_interval_query_fill_cancelled_marks_failed` — Kraken reports `cancelled`, status set to FAILED and `strategy.last_action` rolled back to pre-signal value
     - `test_execute_interval_last_action_rolled_back_on_pre_order_exception` — exception thrown before `placed_order` is persisted (e.g., balance fetch fails); `strategy.last_action` restored to its pre-`generate_signal` value
     - `test_execute_interval_last_action_not_rolled_back_when_order_persisted` — exception thrown after `placed_order` is persisted; `strategy.last_action` is NOT restored (order is in DB as PLACED, position did change)
+    - `test_execute_interval_exception_after_order_persisted_tick_records_order_direction` — when an exception is raised after `placed_order` is set (e.g., `_fetch_balances` throws), the tick's `signal` is set to the order's actual direction (`BUY` or `SELL`), not `Signal.HOLD`; this ensures crash recovery via `recover_state` reads the correct `last_action`
     - `test_execute_interval_skipped_when_shutting_down` — verify early return when `_shutting_down` is True
+    - `test_execute_interval_tick_persistence_failure_logs_and_returns` — when `bot_tick_repo.add()` raises, error is logged and `execute_interval` returns without propagating; scheduler is not disrupted
+    - `test_execute_interval_order_link_failure_logs_but_interval_completes` — when `bot_order_repo.update()` raises during `tick_id` linking, error is logged but the interval still completes (tick was already persisted; final log message fires)
     - `test_reconcile_placed_orders_resolves_filled` — verify outstanding PLACED order updated to FILLED when Kraken reports `closed`
     - `test_reconcile_placed_orders_resolves_cancelled` — verify outstanding PLACED order updated to FAILED when Kraken reports `cancelled`, and `strategy.last_action` rolled back to opposite side
     - `test_reconcile_placed_orders_leaves_open` — verify still-open orders left as PLACED
@@ -272,6 +275,9 @@
     - `test_recover_state_restores_last_action` — verify `strategy.last_action` set from latest directional tick's signal (uses `get_latest_action_by_bot_id`)
     - `test_recover_state_skips_hold_ticks` — verify that if the most recent tick is HOLD but there's an earlier BUY tick, `last_action` is set to BUY (not HOLD)
     - `test_recover_state_first_run` — verify no error when no previous tick exists
+    - `test_recover_state_reverses_signal_when_associated_order_failed` — when the order associated with the latest directional tick has `status=FAILED`, `last_action` is set to the *opposite* of the tick's signal (e.g., tick=SELL but order FAILED → `last_action=BUY`); guards against re-entering a position the bot never actually exited
+    - `test_recover_state_uses_tick_signal_when_associated_order_filled` — when the associated order is FILLED, `last_action` is set to the tick's signal as normal (the position change is confirmed)
+    - `test_recover_state_uses_tick_signal_when_no_order_for_tick` — when `get_by_tick_id` returns `None` (tick has no associated order, e.g., a HOLD tick or the order wasn't persisted), `last_action` is set to the tick's signal as normal
     - `test_shutdown_marks_run_completed` — verify `bot_run_repo.complete()` called
     - `test_constructor_creates_and_persists_run` — verify `BotRun` created and added to repo
     - `test_execute_interval_dry_run_validates_without_placing` — verify `validate=True` passed to `AddOrderConnector.place()`, no `BotOrder` persisted, no `QueryOrdersConnector` calls, no tick persisted
