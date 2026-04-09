@@ -27,6 +27,16 @@ class BotOrderRepository(ABC):
         pass
 
     @abstractmethod
+    def get_by_tick_id(self, tick_id: int) -> BotOrder | None:
+        '''
+        Fetches the order associated with a given tick ID.
+
+        :param tick_id: Tick ID.
+        :return: Order record or None if not found.
+        '''
+        pass
+
+    @abstractmethod
     def update(self, bot_order: BotOrder) -> BotOrder:
         '''
         Updates an existing order record.
