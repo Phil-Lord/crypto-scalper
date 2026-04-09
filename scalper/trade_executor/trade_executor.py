@@ -7,7 +7,7 @@ import time
 import pandas as pd
 
 from data_system import Bot, BotOrder, BotRun, BotTick, BotRunRepository, BotTickRepository, BotOrderRepository, OrderStatus, Side, Signal
-from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector, QueryOrderStatus
+from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector, QueryOrderResult, QueryOrderStatus
 from .position_sizer import PairBalances, PositionSizer
 from strategy_manager import Strategy
 from utils import get_kraken_pair_symbols
@@ -240,25 +240,7 @@ class TradeExecutor:
         for exchange_order in exchange_orders:
             try:
                 order = orders_by_exchange_id[exchange_order.txid]
-                if exchange_order.status in (QueryOrderStatus.PENDING, QueryOrderStatus.OPEN):
-                    self.logger.info(
-                        f'Order {order.id} is still open on the exchange with status {exchange_order.status}')
-                elif exchange_order.status == QueryOrderStatus.CLOSED:
-                    self.bot_order_repo.mark_filled(
-                        order.id, exchange_order.price, exchange_order.volume, exchange_order.fee)
-                    self.logger.info(f'Order {order.id} marked as FILLED')
-                elif exchange_order.status in (QueryOrderStatus.CANCELED, QueryOrderStatus.EXPIRED):
-                    self.bot_order_repo.mark_failed(
-                        order.id, exchange_order.price, exchange_order.volume, exchange_order.fee)
-                    self.logger.info(
-                        f'Order {order.id} marked as FAILED ({exchange_order.status.value} on the exchange)')
-                    if self.strategy.last_action == Signal(order.side.value):
-                        opposite = Signal.SELL if order.side == Side.BUY else Signal.BUY
-                        self.strategy.last_action = opposite
-                        self.logger.info(f'Rolled back strategy last_action to {opposite}')
-                else:
-                    self.logger.warning(
-                        f'Order {order.id} has unrecognised status {exchange_order.status}')
+                self._reconcile_order(order, exchange_order)
             except Exception as e:
                 self.logger.error(
                     f'Failed to reconcile order {exchange_order.txid}: {e}', exc_info=True)
@@ -268,6 +250,44 @@ class TradeExecutor:
             if exchange_id not in returned_txids:
                 self.logger.warning(
                     f'Order {order.id} (txid={exchange_id}) not returned by exchange')
+
+    def _reconcile_order(self, order: BotOrder, exchange_order: QueryOrderResult) -> None:
+        ''' Reconciles a single placed order against its exchange status. '''
+        if exchange_order.status in (QueryOrderStatus.PENDING, QueryOrderStatus.OPEN):
+            self.logger.info(
+                f'Order {order.id} is still open on the exchange '
+                f'with status {exchange_order.status}')
+            return
+
+        settled = self._settle_order(order, exchange_order)
+        if settled is None:
+            self.logger.warning(f'Order {order.id} has unrecognised status {exchange_order.status}')
+            return
+
+        if exchange_order.status in (QueryOrderStatus.CANCELED, QueryOrderStatus.EXPIRED):
+            if self.strategy.last_action == Signal(order.side.value):
+                opposite = Signal.SELL if order.side == Side.BUY else Signal.BUY
+                self.strategy.last_action = opposite
+                self.logger.info(f'Rolled back strategy last_action to {opposite}')
+
+    def _settle_order(self, order: BotOrder, exchange_order: QueryOrderResult) -> BotOrder | None:
+        '''
+        Updates an order's status based on exchange query results.
+
+        :return: Updated order if settled (FILLED/FAILED), None if still open/pending.
+        '''
+        if exchange_order.status == QueryOrderStatus.CLOSED:
+            updated = self.bot_order_repo.mark_filled(
+                order.id, exchange_order.price, exchange_order.volume, exchange_order.fee)
+            self.logger.info(f'Order {order.id} marked as FILLED')
+            return updated
+        if exchange_order.status in (QueryOrderStatus.CANCELED, QueryOrderStatus.EXPIRED):
+            updated = self.bot_order_repo.mark_failed(
+                order.id, exchange_order.price, exchange_order.volume, exchange_order.fee)
+            self.logger.warning(
+                f'Order {order.id} marked as FAILED ({exchange_order.status.value} on the exchange)')
+            return updated
+        return None
 
     def _fetch_ohlc(self) -> pd.Series:
         '''
@@ -327,24 +347,13 @@ class TradeExecutor:
             if attempt > 0:
                 time.sleep(1)
 
-            results = self.query_orders_connector.fetch([order.exchange_order_id])
-            if not results:
+            exchange_order = self.query_orders_connector.fetch([order.exchange_order_id])
+            if not exchange_order:
                 continue
 
-            result = results[0]
-
-            if result.status == QueryOrderStatus.CLOSED:
-                updated_order = self.bot_order_repo.mark_filled(
-                    order.id, result.price, result.volume, result.fee)
-                self.logger.info(f'Order {order.id} marked as FILLED')
-                return updated_order
-            elif result.status in (QueryOrderStatus.CANCELED, QueryOrderStatus.EXPIRED):
-                updated_order = self.bot_order_repo.mark_failed(
-                    order.id, result.price, result.volume, result.fee)
-                self.logger.warning(
-                    f'Order {order.id} (txid={order.exchange_order_id}) marked as FAILED '
-                    f'({result.status.value} on the exchange)')
-                return updated_order
+            settled = self._settle_order(order, exchange_order[0])
+            if settled is not None:
+                return settled
 
         self.logger.info(
             f'Order {order.id} still PLACED after 3 attempts; to be reconciled next interval')
