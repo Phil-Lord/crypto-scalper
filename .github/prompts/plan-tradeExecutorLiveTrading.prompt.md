@@ -260,17 +260,17 @@
     - `test_execute_interval_last_action_not_rolled_back_when_order_persisted` — exception thrown after `placed_order` is persisted; `strategy.last_action` is NOT restored (order is in DB as PLACED, position did change)
     - `test_execute_interval_skipped_when_shutting_down` — verify early return when `_shutting_down` is True
     - `test_reconcile_placed_orders_resolves_filled` — verify outstanding PLACED order updated to FILLED when Kraken reports `closed`
-    - `test_reconcile_placed_orders_resolves_cancelled` — verify outstanding PLACED order updated to FAILED when Kraken reports `cancelled`, and `strategy.last_action` rolled back to opposite side
+    - `test_reconcile_placed_orders_resolves_cancelled` — verify outstanding PLACED order updated to FAILED when Kraken reports `cancelled`, and `strategy.last_action` rolled back to opposite side. Set `mock_strategy.last_action` to match the placed order's side before the call so the rollback is observable. Note: the existing `test_reconcile_marks_canceled_order_as_failed` covers only `mark_failed` — it must be extended with the `last_action` assertion or superseded by this test
     - `test_reconcile_placed_orders_leaves_open` — verify still-open orders left as PLACED
     - `test_reconcile_called_every_interval` — verify `_reconcile_placed_orders` is called at the start of each `execute_interval`
     - `test_warm_up_feeds_candles_sequentially` — verify OHLC fetched and each candle fed through `generate_signal()`, no ticks persisted
-    - `test_warm_up_uses_strategy_warmup_candles` — verify the `since` param to `OhlcConnector.fetch()` is derived from `strategy.warmup_candles + 1` (the +1 guarantees a full candle count after `[:-1]` drops the forming candle)
+    - `test_warm_up_uses_strategy_warmup_candles` — verify the `since` param to `OhlcConnector.fetch()` is derived from `min(strategy.warmup_candles, 720) + 1` (the 720 cap is applied before the +1; the +1 compensates for `since` landing mid-interval and guarantees a full candle count after `[:-1]` drops the forming candle)
     - `test_warm_up_caps_fetch_at_720_candles` — verify that when `strategy.warmup_candles > 720`, since is derived from 721 intervals (720 cap + 1) and the insufficient-candles warning is logged
     - `test_warm_up_warns_on_insufficient_candles` — verify warning logged when candle count < `strategy.warmup_candles` (covers both new listings and the 720-candle Kraken cap)
     - `test_warm_up_does_not_warn_when_sufficient_candles` — verify no warning when `len(candles) >= strategy.warmup_candles`
     - `test_warm_up_logs_completion_with_candle_count` — verify completion log includes the count of candles processed
-    - `test_recover_state_restores_last_action` — verify `strategy.last_action` set from latest directional tick's signal (uses `get_latest_action_by_bot_id`)
-    - `test_recover_state_skips_hold_ticks` — verify that if the most recent tick is HOLD but there's an earlier BUY tick, `last_action` is set to BUY (not HOLD)
+    - `test_recover_state_restores_last_action` — verify `strategy.last_action` set from latest directional tick's signal (uses `get_latest_action_by_bot_id`). Mock `bot_order_repo.get_by_tick_id` to explicitly return `None` so the test doesn't silently rely on `Mock()`'s default inequality with `OrderStatus.FAILED`
+    - `test_recover_state_skips_hold_ticks` — verify that `get_latest_action_by_bot_id()` is called rather than any general latest-tick method; HOLD filtering is enforced at the repository query level (`signal IN ('buy', 'sell')`), not in the executor. This is effectively a call-site assertion — the method name itself is the guarantee. Signal-correctness is covered by `test_recover_state_sets_last_action_from_buy/sell_tick`
     - `test_recover_state_first_run` — verify no error when no previous tick exists
     - `test_shutdown_marks_run_completed` — verify `bot_run_repo.complete()` called
     - `test_constructor_creates_and_persists_run` — verify `BotRun` created and added to repo
