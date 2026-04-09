@@ -110,110 +110,6 @@ class TradeExecutor:
 
         self._persist_results(ohlc, signal, balances, tick_error, placed_order)
 
-    def _execute_signal(
-            self, ohlc: pd.Series,
-    ) -> tuple[Signal, BotOrder | None, PairBalances, str | None] | None:
-        '''
-        Generates a signal from the strategy and, for BUY/SELL signals, places and confirms
-        an order. Returns (signal, placed_order, balances, tick_error), or None if balances
-        could not be fetched during error recovery.
-        '''
-        tick_error: str | None = None
-        placed_order: BotOrder | None = None
-        balances: PairBalances | None = None
-        previous_action = self.strategy.last_action
-
-        try:
-            signal = self.strategy.generate_signal(ohlc)['signal']
-
-            if signal in (Signal.BUY, Signal.SELL):
-                pre_order_balances = self._fetch_balances()
-                size = self.position_sizer.calculate_volume(signal, pre_order_balances)
-                placed_order = self._submit_order(signal, size)
-
-                if placed_order is None:
-                    balances = pre_order_balances
-                else:
-                    placed_order = self._confirm_order(placed_order)
-                    if placed_order.status == OrderStatus.FAILED:
-                        self.strategy.last_action = previous_action
-                        signal = Signal.HOLD
-                        tick_error = f'Order {placed_order.id} failed on exchange'
-                    balances = self._fetch_balances()
-
-            if balances is None:
-                balances = self._fetch_balances()
-
-        except Exception as e:
-            self.logger.error(f'Error during signal/order flow: {e}', exc_info=True)
-            tick_error = str(e)
-            if placed_order is None:
-                self.strategy.last_action = previous_action
-                signal = Signal.HOLD
-            else:
-                signal = Signal(placed_order.side.value)
-            if balances is None:
-                try:
-                    balances = self._fetch_balances()
-                except Exception as balance_error:
-                    self.logger.error(
-                        f'Failed to fetch balances for error tick: {balance_error}', exc_info=True)
-                    return None
-
-        return signal, placed_order, balances, tick_error
-
-    def _submit_order(self, signal: Signal, size: Decimal) -> BotOrder | None:
-        '''
-        Submits an order to the exchange and persists it to the database.
-
-        :return: Persisted BotOrder, or None in dry-run mode.
-        '''
-        result = self.add_order_connector.place(
-            self.bot.pair, signal, size, validate=self.dry_run
-        )
-
-        if self.dry_run:
-            self.logger.info(f'DRY RUN: Validated order — {result.order_description}')
-            return None
-
-        if result.txid is None:
-            raise ValueError('AddOrderResult.txid is None after live order placement')
-
-        return self.bot_order_repo.add(BotOrder(
-            bot_id=self.bot.id,
-            run_id=self.run.id,
-            exchange_order_id=result.txid[0],
-            side=Side(signal.value),
-        ))
-
-    def _persist_results(
-            self, ohlc: pd.Series, signal: Signal, balances: PairBalances,
-            tick_error: str | None, placed_order: BotOrder | None,
-    ) -> None:
-        ''' Persists a tick to the database and links any placed order to it. '''
-        try:
-            tick = self.bot_tick_repo.add(BotTick(
-                bot_id=self.bot.id,
-                run_id=self.run.id,
-                price=Decimal(str(ohlc['close'])),
-                signal=signal,
-                balance_base=balances.balance_base,
-                balance_quote=balances.balance_quote,
-                error=tick_error,
-            ))
-        except Exception as e:
-            self.logger.error(f'Failed to persist tick: {e}', exc_info=True)
-            return
-
-        if placed_order is not None:
-            try:
-                self.bot_order_repo.update(replace(placed_order, tick_id=tick.id))
-            except Exception as e:
-                self.logger.error(
-                    f'Failed to link order {placed_order.id} to tick {tick.id}: {e}', exc_info=True)
-
-        self.logger.info(f'Interval execution complete with signal {signal}')
-
     def request_shutdown(self) -> None:
         ''' Signal the executor to stop after the current interval. '''
         self.logger.info('Shutdown requested')
@@ -341,6 +237,110 @@ class TradeExecutor:
             balance_base=Decimal(str(balances.get(self.pair_symbols.base, 0))),
             balance_quote=Decimal(str(balances.get(self.pair_symbols.quote, 0)))
         )
+
+    def _execute_signal(
+            self, ohlc: pd.Series,
+    ) -> tuple[Signal, BotOrder | None, PairBalances, str | None] | None:
+        '''
+        Generates a signal from the strategy and, for BUY/SELL signals, places and confirms
+        an order. Returns (signal, placed_order, balances, tick_error), or None if balances
+        could not be fetched during error recovery.
+        '''
+        tick_error: str | None = None
+        placed_order: BotOrder | None = None
+        balances: PairBalances | None = None
+        previous_action = self.strategy.last_action
+
+        try:
+            signal = self.strategy.generate_signal(ohlc)['signal']
+
+            if signal in (Signal.BUY, Signal.SELL):
+                pre_order_balances = self._fetch_balances()
+                size = self.position_sizer.calculate_volume(signal, pre_order_balances)
+                placed_order = self._submit_order(signal, size)
+
+                if placed_order is None:
+                    balances = pre_order_balances
+                else:
+                    placed_order = self._confirm_order(placed_order)
+                    if placed_order.status == OrderStatus.FAILED:
+                        self.strategy.last_action = previous_action
+                        signal = Signal.HOLD
+                        tick_error = f'Order {placed_order.id} failed on exchange'
+                    balances = self._fetch_balances()
+
+            if balances is None:
+                balances = self._fetch_balances()
+
+        except Exception as e:
+            self.logger.error(f'Error during signal/order flow: {e}', exc_info=True)
+            tick_error = str(e)
+            if placed_order is None:
+                self.strategy.last_action = previous_action
+                signal = Signal.HOLD
+            else:
+                signal = Signal(placed_order.side.value)
+            if balances is None:
+                try:
+                    balances = self._fetch_balances()
+                except Exception as balance_error:
+                    self.logger.error(
+                        f'Failed to fetch balances for error tick: {balance_error}', exc_info=True)
+                    return None
+
+        return signal, placed_order, balances, tick_error
+
+    def _submit_order(self, signal: Signal, size: Decimal) -> BotOrder | None:
+        '''
+        Submits an order to the exchange and persists it to the database.
+
+        :return: Persisted BotOrder, or None in dry-run mode.
+        '''
+        result = self.add_order_connector.place(
+            self.bot.pair, signal, size, validate=self.dry_run
+        )
+
+        if self.dry_run:
+            self.logger.info(f'DRY RUN: Validated order — {result.order_description}')
+            return None
+
+        if result.txid is None:
+            raise ValueError('AddOrderResult.txid is None after live order placement')
+
+        return self.bot_order_repo.add(BotOrder(
+            bot_id=self.bot.id,
+            run_id=self.run.id,
+            exchange_order_id=result.txid[0],
+            side=Side(signal.value),
+        ))
+
+    def _persist_results(
+            self, ohlc: pd.Series, signal: Signal, balances: PairBalances,
+            tick_error: str | None, placed_order: BotOrder | None,
+    ) -> None:
+        ''' Persists a tick to the database and links any placed order to it. '''
+        try:
+            tick = self.bot_tick_repo.add(BotTick(
+                bot_id=self.bot.id,
+                run_id=self.run.id,
+                price=Decimal(str(ohlc['close'])),
+                signal=signal,
+                balance_base=balances.balance_base,
+                balance_quote=balances.balance_quote,
+                error=tick_error,
+            ))
+        except Exception as e:
+            self.logger.error(f'Failed to persist tick: {e}', exc_info=True)
+            return
+
+        if placed_order is not None:
+            try:
+                self.bot_order_repo.update(replace(placed_order, tick_id=tick.id))
+            except Exception as e:
+                self.logger.error(
+                    f'Failed to link order {placed_order.id} to tick {tick.id}: {e}', exc_info=True)
+
+        self.logger.info(f'Interval execution complete with signal {signal}')
 
     def _confirm_order(self, order: BotOrder) -> BotOrder:
         for attempt in range(3):
