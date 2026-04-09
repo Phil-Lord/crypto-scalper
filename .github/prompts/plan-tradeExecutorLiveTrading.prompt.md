@@ -283,6 +283,16 @@
     - `test_execute_interval_dry_run_validates_without_placing` — verify `validate=True` passed to `AddOrderConnector.place()`, no `BotOrder` persisted, no `QueryOrdersConnector` calls, no tick persisted
     - `test_execute_interval_dry_run_logs_tick_without_persisting` — verify tick data (price, signal, balances) is logged but `bot_tick_repo.add()` is never called
     - `test_execute_interval_dry_run_skips_reconciliation` — verify `_reconcile_placed_orders` is a no-op in dry run mode (no PLACED orders exist to reconcile)
+
+    *Regression tests — bugs fixed during review:*
+    - `test_execute_interval_bot_order_side_is_side_enum_not_signal_enum` — (Bug 5) `BotOrder.side` is a `Side` instance, not a `Signal` instance; both are string enums with matching values so this only fails at the type level without an explicit test
+    - `test_reconcile_exception_does_not_abort_interval` — (Bug 4) if `_reconcile_placed_orders` raises, the exception is caught and logged, and `execute_interval` continues to fetch OHLC and produce a tick as normal; verifies the scheduler is never disrupted by a reconciliation outage
+    - `test_execute_interval_failed_order_tick_has_hold_signal` — (Bug 2) when `_confirm_order` returns a FAILED order, the persisted tick has `signal=Signal.HOLD` (not BUY/SELL); the order did not execute so the directional tick must not be recorded
+    - `test_execute_interval_failed_order_tick_has_error_set` — (Bug 2) when `_confirm_order` returns FAILED, `tick.error` is a non-None string describing the failure
+    - `test_execute_interval_failed_order_still_linked_to_tick` — (Bug 2) even when `_confirm_order` returns FAILED and signal becomes HOLD, the `placed_order` is still linked to the tick via `bot_order_repo.update(replace(placed_order, tick_id=tick.id))` — the order record exists and must point to its tick
+    - `test_reconcile_does_not_roll_back_last_action_when_failed_order_side_differs` — (Bug 3 edge case) if a FAILED order's side does not match the current `strategy.last_action`, `last_action` is left unchanged; prevents incorrectly flipping state when a stale previous-position order surfaces during reconciliation
+    - `test_reconcile_per_order_exception_does_not_prevent_other_orders` — per-order try/except allows remaining orders in the batch to continue being reconciled even when one throws; verifies all N orders are attempted regardless of individual failures
+    - `test_execute_interval_tick_has_timestamp_set` — `BotTick.timestamp` is set to a UTC datetime when the tick is persisted; regression guard against the required field being omitted from the `BotTick(...)` constructor call
     - All connectors and repositories are mocked (constructor is DI-based)
 
 38. **Unit tests** for `AllInPositionSizer` at `tests/unit/trade_executor/test_position_sizer.py`.
