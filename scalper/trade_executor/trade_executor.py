@@ -215,7 +215,8 @@ class TradeExecutor:
                 order.id, exchange_order.price, exchange_order.volume, exchange_order.fee)
             self.logger.warning(
                 f'Order {order.id} (txid={exchange_order.txid}) marked as FAILED '
-                f'({exchange_order.status.value} on the exchange)')
+                f'({exchange_order.status.value}, price={exchange_order.price}, '
+                f'volume={exchange_order.volume}, fee={exchange_order.fee})')
             return updated
         return None
 
@@ -287,7 +288,7 @@ class TradeExecutor:
             signal = self.strategy.generate_signal(ohlc)['signal']
 
             if signal in (Signal.BUY, Signal.SELL):
-                self.logger.info(f'Signal: {signal.value}, price={ohlc["close"]}')
+                self.logger.info(f'Signal generated: signal={signal.value}, price={ohlc["close"]}')
                 pre_order_balances = self._fetch_balances()
                 size = self.position_sizer.calculate_volume(signal, pre_order_balances)
                 placed_order = self._submit_order(signal, size)
@@ -399,11 +400,17 @@ class TradeExecutor:
 
             exchange_order = self.query_orders_connector.fetch([order.exchange_order_id])
             if not exchange_order:
+                self.logger.debug(
+                    f'Confirm attempt {attempt + 1}/3: no response for order {order.id}')
                 continue
 
             settled = self._settle_order(order, exchange_order[0])
             if settled is not None:
                 return settled
+
+            self.logger.debug(
+                f'Confirm attempt {attempt + 1}/3: order {order.id} still '
+                f'{exchange_order[0].status.value}')
 
         self.logger.warning(
             f'Order {order.id} still PLACED after 3 attempts; to be reconciled next interval')
