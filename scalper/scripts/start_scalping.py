@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
     help='Bot ID(s) to run (e.g. --bot-id bot1 --bot-id bot2)'
 )
 @click.option('--dry-run', is_flag=True, default=False, help='Run the bot in dry-run mode')
-def start_scalping(bot_id: str, dry_run: bool) -> None:
+def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
     pass
 
 
