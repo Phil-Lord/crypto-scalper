@@ -2,7 +2,20 @@ import logging
 
 import click
 
-from trade_executor import TradeExecutor
+from data_system import (
+    SupabaseClient,
+    SupabaseBotRepository,
+    SupabaseBotOrderRepository,
+    SupabaseBotRunRepository,
+    SupabaseBotTickRepository
+)
+from exchange_connector import (
+    AddOrderConnector,
+    BalanceConnector,
+    OhlcConnector,
+    QueryOrdersConnector
+)
+from trade_executor import AllInPositionSizer, TradeExecutor
 from strategy_manager import create_strategy
 from utils import load_env, LOG_FORMAT
 
@@ -18,7 +31,30 @@ logger = logging.getLogger(__name__)
 )
 @click.option('--dry-run', is_flag=True, default=False, help='Run the bot in dry-run mode')
 def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
-    pass
+    client = SupabaseClient()
+    bot_repository = SupabaseBotRepository(client)
+
+    for id in bot_id:
+        bot = bot_repository.get(id)
+        if not bot:
+            logger.error(f'Bot with ID {id} not found')
+            continue
+
+        strategy = create_strategy(bot.strategy_name, bot.parameters)
+        sizer = AllInPositionSizer()
+        executor = TradeExecutor(
+            bot,
+            strategy,
+            sizer,
+            SupabaseBotRunRepository(client),
+            SupabaseBotTickRepository(client),
+            SupabaseBotOrderRepository(client),
+            BalanceConnector(),
+            OhlcConnector(),
+            AddOrderConnector(),
+            QueryOrdersConnector(),
+            dry_run=dry_run
+        )
 
 
 if __name__ == '__main__':
