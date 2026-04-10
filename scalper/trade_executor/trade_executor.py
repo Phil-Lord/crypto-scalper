@@ -59,12 +59,12 @@ class TradeExecutor:
                 actual_action = Signal.SELL if latest_tick.signal == Signal.BUY else Signal.BUY
                 self.strategy.last_action = actual_action
                 self.logger.info(
-                    f'Recovered last action: {actual_action} '
-                    f'(reversed from {latest_tick.signal} — order {associated_order.id} FAILED)'
+                    f'Recovered last action: {actual_action.value} '
+                    f'(reversed from {latest_tick.signal.value} — order {associated_order.id} FAILED)'
                 )
             else:
                 self.strategy.last_action = latest_tick.signal
-                self.logger.info(f'Recovered last action: {latest_tick.signal}')
+                self.logger.info(f'Recovered last action: {latest_tick.signal.value}')
         else:
             self.strategy.last_action = Signal.SELL
             self.logger.info('No previous action found, starting fresh')
@@ -117,9 +117,11 @@ class TradeExecutor:
         signal, placed_order, balances, tick_error = result
 
         if self.dry_run:
-            self.logger.info(
-                f'DRY RUN: signal={signal}, price={ohlc["close"]}, '
-                f'balance_base={balances.balance_base}, balance_quote={balances.balance_quote}'
+            level = logging.DEBUG if signal == Signal.HOLD else logging.INFO
+            self.logger.log(
+                level,
+                f'[DRY RUN] signal={signal.value}, price={ohlc["close"]}, '
+                f'balance_base={balances.balance_base}, balance_quote={balances.balance_quote}',
             )
             return
 
@@ -148,9 +150,10 @@ class TradeExecutor:
         '''
         placed_orders = self.bot_order_repo.get_placed_by_bot_id(self.bot.id)
         if not placed_orders:
-            self.logger.info('No placed orders to reconcile')
+            self.logger.debug('No placed orders to reconcile')
             return
 
+        self.logger.info(f'Reconciling {len(placed_orders)} placed order(s)')
         orders_by_exchange_id = {order.exchange_order_id: order for order in placed_orders}
         exchange_orders = self.query_orders_connector.fetch(list(orders_by_exchange_id.keys()))
 
@@ -177,19 +180,20 @@ class TradeExecutor:
         if exchange_order.status in (QueryOrderStatus.PENDING, QueryOrderStatus.OPEN):
             self.logger.info(
                 f'Order {order.id} is still open on the exchange '
-                f'with status {exchange_order.status}')
+                f'with status {exchange_order.status.value}')
             return
 
         settled = self._settle_order(order, exchange_order)
         if settled is None:
-            self.logger.warning(f'Order {order.id} has unrecognised status {exchange_order.status}')
+            self.logger.warning(
+                f'Order {order.id} has unrecognised status {exchange_order.status.value}')
             return
 
         if exchange_order.status in (QueryOrderStatus.CANCELED, QueryOrderStatus.EXPIRED):
             if self.strategy.last_action == Signal(order.side.value):
                 opposite = Signal.SELL if order.side == Side.BUY else Signal.BUY
                 self.strategy.last_action = opposite
-                self.logger.info(f'Rolled back strategy last_action to {opposite}')
+                self.logger.warning(f'Rolled back strategy last_action to {opposite.value}')
 
     def _settle_order(self, order: BotOrder, exchange_order: QueryOrderResult) -> BotOrder | None:
         '''
@@ -278,6 +282,7 @@ class TradeExecutor:
             signal = self.strategy.generate_signal(ohlc)['signal']
 
             if signal in (Signal.BUY, Signal.SELL):
+                self.logger.info(f'Signal: {signal.value}, price={ohlc["close"]}')
                 pre_order_balances = self._fetch_balances()
                 size = self.position_sizer.calculate_volume(signal, pre_order_balances)
                 placed_order = self._submit_order(signal, size)
@@ -319,23 +324,26 @@ class TradeExecutor:
 
         :return: Persisted BotOrder, or None in dry-run mode.
         '''
-        result = self.add_order_connector.place(
+        exchange_order = self.add_order_connector.place(
             self.bot.pair, signal, size, validate=self.dry_run
         )
 
         if self.dry_run:
-            self.logger.info(f'DRY RUN: Validated order — {result.order_description}')
+            self.logger.info(f'[DRY RUN] Validated order — {exchange_order.order_description}')
             return None
 
-        if result.txid is None:
+        if exchange_order.txid is None:
             raise ValueError('AddOrderResult.txid is None after live order placement')
 
-        return self.bot_order_repo.add(BotOrder(
+        order = self.bot_order_repo.add(BotOrder(
             bot_id=self.bot.id,
             run_id=self.run.id,
-            exchange_order_id=result.txid[0],
+            exchange_order_id=exchange_order.txid[0],
             side=Side(signal.value),
         ))
+        self.logger.info(
+            f'Order submitted: txid={exchange_order.txid[0]}, side={signal.value}, size={size}')
+        return order
 
     def _persist_results(
             self, ohlc: pd.Series, signal: Signal, balances: PairBalances,
@@ -363,7 +371,12 @@ class TradeExecutor:
                 self.logger.error(
                     f'Failed to link order {placed_order.id} to tick {tick.id}: {e}', exc_info=True)
 
-        self.logger.info(f'Interval execution complete with signal {signal}')
+        if signal == Signal.HOLD:
+            self.logger.debug(f'Interval complete: signal={signal.value}')
+        else:
+            self.logger.info(
+                f'Interval complete: signal={signal.value}, '
+                f'balance_base={balances.balance_base}, balance_quote={balances.balance_quote}')
 
     def _confirm_order(self, order: BotOrder) -> BotOrder:
         '''
@@ -383,6 +396,6 @@ class TradeExecutor:
             if settled is not None:
                 return settled
 
-        self.logger.info(
+        self.logger.warning(
             f'Order {order.id} still PLACED after 3 attempts; to be reconciled next interval')
         return order
