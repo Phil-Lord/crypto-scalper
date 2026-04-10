@@ -7,7 +7,7 @@ import time
 import pandas as pd
 
 from data_system import Bot, BotOrder, BotRun, BotTick, BotRunRepository, BotTickRepository, BotOrderRepository, OrderStatus, Side, Signal
-from exchange_connector import AddOrderConnector, BalanceConnector, OhlcConnector, QueryOrdersConnector, QueryOrderResult, QueryOrderStatus
+from exchange_connector import AddOrderConnector, BalanceConnector, OhlcCandle, OhlcConnector, QueryOrdersConnector, QueryOrderResult, QueryOrderStatus
 from .position_sizer import PairBalances, PositionSizer
 from strategy_manager import Strategy
 from utils import get_kraken_pair_symbols
@@ -221,7 +221,7 @@ class TradeExecutor:
         return None
 
     @staticmethod
-    def _candle_to_series(candle) -> pd.Series:
+    def _candle_to_series(candle: OhlcCandle) -> pd.Series:
         return pd.Series({
             'open': candle.open,
             'high': candle.high,
