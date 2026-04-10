@@ -7,6 +7,7 @@ import pytest
 
 from data_system import Bot, BotOrder, BotRun, BotTick, OrderStatus, Side, Signal
 from exchange_connector import OhlcConnector, BalanceConnector, AddOrderConnector, QueryOrdersConnector
+from strategy_manager import SmaStrategy, create_strategy
 from trade_executor import TradeExecutor
 from trade_executor.position_sizer import AllInPositionSizer
 
@@ -987,3 +988,427 @@ class TestTradeExecutorIntegration:
         # Then — one filled, one failed
         mock_bot_order_repo.mark_filled.assert_called_once()
         mock_bot_order_repo.mark_failed.assert_called_once()
+
+
+@pytest.mark.integration
+@pytest.mark.trade_executor_integration
+class TestTradeExecutorRealStrategyIntegration:
+    '''
+    Integration tests using a real SmaStrategy with actual indicators and rules.
+
+    Uses SmaStrategy(short_window=3, long_window=5) with deterministic price data
+    to verify the full pipeline: OHLC connector stack → real strategy indicators →
+    real crossover rule → order placement → persistence.
+    '''
+
+    @pytest.fixture
+    def bot(self) -> Bot:
+        return Bot(
+            id='btc_1m_001',
+            pair='XXBTZGBP',
+            strategy_name='SmaStrategy',
+            strategy_version='v1.0.0',
+            interval=1,
+            parameters={'short_window': 3, 'long_window': 5},
+        )
+
+    @pytest.fixture
+    def strategy(self, bot) -> SmaStrategy:
+        return create_strategy(bot.strategy_name, bot.parameters)
+
+    @pytest.fixture
+    def run(self) -> BotRun:
+        return BotRun(bot_id='btc_1m_001')
+
+    @pytest.fixture
+    def mock_bot_run_repo(self, run):
+        repo = Mock()
+        repo.add.return_value = run
+        return repo
+
+    @pytest.fixture
+    def mock_bot_tick_repo(self):
+        repo = Mock()
+        repo.get_latest_action_by_bot_id.return_value = None
+
+        def add_tick(tick):
+            return replace(tick, id=42)
+
+        repo.add.side_effect = add_tick
+        return repo
+
+    @pytest.fixture
+    def mock_bot_order_repo(self):
+        repo = Mock()
+        repo.get_placed_by_bot_id.return_value = []
+        repo.get_by_tick_id.return_value = None
+
+        def add_order(order):
+            return replace(order, id=uuid4())
+
+        repo.add.side_effect = add_order
+        return repo
+
+    @pytest.fixture
+    def balance_response(self):
+        return {
+            'error': [],
+            'result': {'XXBT': '0.00', 'ZGBP': '25000.00'},
+        }
+
+    @pytest.fixture
+    def add_order_response(self):
+        return {
+            'error': [],
+            'result': {
+                'descr': {'order': 'buy 25000.00 XXBTZGBP @ market'},
+                'txid': ['OREAL-STRAT-BUYSIG'],
+            }
+        }
+
+    @pytest.fixture
+    def query_orders_filled_response(self):
+        return {
+            'error': [],
+            'result': {
+                'OREAL-STRAT-BUYSIG': {
+                    'status': 'closed',
+                    'price': '50100.00',
+                    'vol_exec': '0.49900199',
+                    'fee': '6.50',
+                }
+            }
+        }
+
+    def _mock_http_response(self, json_data):
+        response = Mock()
+        response.json.return_value = json_data
+        response.raise_for_status.return_value = None
+        return response
+
+    def _build_ohlc_response(self, prices: list[float], base_timestamp: int = 1700000000) -> dict:
+        '''
+        Build a Kraken OHLC API response from a list of close prices.
+
+        Each candle has open=high=low=close for simplicity — SMA only uses close.
+        '''
+        candles = [
+            [base_timestamp + i * 60, str(p), str(p), str(p), str(p), str(p), '10.0', 100]
+            for i, p in enumerate(prices)
+        ]
+        return {
+            'error': [],
+            'result': {
+                'XXBTZGBP': candles,
+                'last': candles[-1][0],
+            }
+        }
+
+    def test_warmup_and_buy_signal_with_real_strategy(
+            self, bot, strategy, mock_bot_run_repo, mock_bot_tick_repo,
+            mock_bot_order_repo, balance_response, add_order_response,
+            query_orders_filled_response,
+    ):
+        '''
+        Full pipeline with real SmaStrategy(short=3, long=5):
+
+        Warmup prices: [100, 100, 100, 100, 100, 100, 100]
+          → After warmup: short_sma=100, long_sma=100 (no crossover, all HOLD)
+          → last_action stays at SELL (default)
+
+        Interval candle: close=120 (sharp spike)
+          → short_sma(3): mean of [100, 100, 120] = 106.67
+          → long_sma(5): mean of [100, 100, 100, 100, 120] = 104.0
+          → Previous: short_sma <= long_sma (both 100), now short > long → golden cross → BUY
+
+        Verifies the real indicator math + crossover rule produces a BUY that flows through
+        order placement and persistence.
+        '''
+        # Given — flat warmup prices, then a spike to trigger golden cross
+        warmup_prices = [100.0] * 7  # 6 completed + 1 forming (dropped by [:-1])
+        interval_prices = [100.0, 120.0, 120.0]  # [-2] is the completed candle = 120
+
+        warmup_ohlc = self._build_ohlc_response(warmup_prices)
+        interval_ohlc = self._build_ohlc_response(interval_prices, base_timestamp=1700001000)
+
+        def mark_filled_side_effect(order_id, price, volume, fee):
+            return BotOrder(
+                bot_id=bot.id, run_id=mock_bot_run_repo.add.return_value.id,
+                exchange_order_id='OREAL-STRAT-BUYSIG', side=Side.BUY,
+                status=OrderStatus.FILLED, price=price, volume=volume, fee=fee,
+                id=order_id,
+            )
+
+        mock_bot_order_repo.mark_filled.side_effect = mark_filled_side_effect
+
+        ohlc_call_count = [0]
+
+        def route_request(url, **kwargs):
+            if 'OHLC' in url:
+                ohlc_call_count[0] += 1
+                if ohlc_call_count[0] == 1:
+                    return self._mock_http_response(warmup_ohlc)
+                return self._mock_http_response(interval_ohlc)
+            elif 'Balance' in url:
+                return self._mock_http_response(balance_response)
+            elif 'AddOrder' in url:
+                return self._mock_http_response(add_order_response)
+            elif 'QueryOrders' in url:
+                return self._mock_http_response(query_orders_filled_response)
+            return self._mock_http_response({'error': ['Unknown'], 'result': {}})
+
+        with (
+            patch(PATCH_HEADERS, return_value=MOCK_HEADERS),
+            patch('requests.get', side_effect=route_request),
+            patch('requests.post', side_effect=lambda url, **kwargs: route_request(url, **kwargs)),
+            patch('time.sleep'),
+        ):
+            executor = TradeExecutor(
+                bot=bot, strategy=strategy, position_sizer=AllInPositionSizer(),
+                bot_run_repo=mock_bot_run_repo, bot_tick_repo=mock_bot_tick_repo,
+                bot_order_repo=mock_bot_order_repo, balance_connector=BalanceConnector(),
+                ohlc_connector=OhlcConnector(), add_order_connector=AddOrderConnector(),
+                query_orders_connector=QueryOrdersConnector(),
+            )
+
+            executor.warm_up()
+            executor.execute_interval()
+
+        # Then — real strategy produced BUY from golden cross
+        tick_arg = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick_arg.signal == Signal.BUY
+
+        # Then — order placed and filled
+        mock_bot_order_repo.add.assert_called_once()
+        order_arg = mock_bot_order_repo.add.call_args[0][0]
+        assert order_arg.side == Side.BUY
+        mock_bot_order_repo.mark_filled.assert_called_once()
+
+        # Then — strategy state updated
+        assert strategy.last_action == Signal.BUY
+
+    def test_warmup_hold_when_no_crossover(
+            self, bot, strategy, mock_bot_run_repo, mock_bot_tick_repo,
+            mock_bot_order_repo, balance_response,
+    ):
+        '''
+        Warmup with flat prices, then interval with same flat price → no crossover → HOLD.
+        Verifies that real indicators correctly produce no signal when there is no trend change.
+        '''
+        warmup_prices = [100.0] * 7
+        interval_prices = [100.0, 100.0, 100.0]  # No change → no crossover
+
+        warmup_ohlc = self._build_ohlc_response(warmup_prices)
+        interval_ohlc = self._build_ohlc_response(interval_prices, base_timestamp=1700001000)
+
+        ohlc_call_count = [0]
+
+        def route_request(url, **kwargs):
+            if 'OHLC' in url:
+                ohlc_call_count[0] += 1
+                if ohlc_call_count[0] == 1:
+                    return self._mock_http_response(warmup_ohlc)
+                return self._mock_http_response(interval_ohlc)
+            elif 'Balance' in url:
+                return self._mock_http_response(balance_response)
+            return self._mock_http_response({'error': ['Unknown'], 'result': {}})
+
+        with (
+            patch(PATCH_HEADERS, return_value=MOCK_HEADERS),
+            patch('requests.get', side_effect=route_request),
+            patch('requests.post', side_effect=lambda url, **kwargs: route_request(url, **kwargs)),
+            patch('time.sleep'),
+        ):
+            executor = TradeExecutor(
+                bot=bot, strategy=strategy, position_sizer=AllInPositionSizer(),
+                bot_run_repo=mock_bot_run_repo, bot_tick_repo=mock_bot_tick_repo,
+                bot_order_repo=mock_bot_order_repo, balance_connector=BalanceConnector(),
+                ohlc_connector=OhlcConnector(), add_order_connector=AddOrderConnector(),
+                query_orders_connector=QueryOrdersConnector(),
+            )
+
+            executor.warm_up()
+            executor.execute_interval()
+
+        # Then — HOLD, no order placed
+        tick_arg = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick_arg.signal == Signal.HOLD
+        mock_bot_order_repo.add.assert_not_called()
+
+    def test_recover_state_then_suppress_duplicate_signal(
+            self, bot, strategy, mock_bot_run_repo, mock_bot_tick_repo,
+            mock_bot_order_repo, balance_response,
+    ):
+        '''
+        Recover last_action=BUY from a previous tick, then feed prices that would
+        produce another BUY crossover. The real strategy's consecutive-signal suppression
+        should convert it to HOLD.
+        '''
+        # Given — recover from a previous BUY
+        previous_tick = BotTick(
+            bot_id=bot.id, run_id=uuid4(),
+            price=Decimal('50000.00'), signal=Signal.BUY,
+            balance_base=Decimal('1.0'), balance_quote=Decimal('0.0'),
+            id=10,
+        )
+        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = previous_tick
+        mock_bot_order_repo.get_by_tick_id.return_value = None
+
+        # Warmup: trending up, so short > long at the end (already in BUY territory)
+        warmup_prices = [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0]
+        # Interval: continued uptrend — short still > long, but it was already above
+        # so there's no *new* crossover. Even if there were, last_action=BUY suppresses it.
+        interval_prices = [106.0, 107.0, 107.0]
+
+        warmup_ohlc = self._build_ohlc_response(warmup_prices)
+        interval_ohlc = self._build_ohlc_response(interval_prices, base_timestamp=1700001000)
+
+        ohlc_call_count = [0]
+
+        def route_request(url, **kwargs):
+            if 'OHLC' in url:
+                ohlc_call_count[0] += 1
+                if ohlc_call_count[0] == 1:
+                    return self._mock_http_response(warmup_ohlc)
+                return self._mock_http_response(interval_ohlc)
+            elif 'Balance' in url:
+                return self._mock_http_response(balance_response)
+            return self._mock_http_response({'error': ['Unknown'], 'result': {}})
+
+        with (
+            patch(PATCH_HEADERS, return_value=MOCK_HEADERS),
+            patch('requests.get', side_effect=route_request),
+            patch('requests.post', side_effect=lambda url, **kwargs: route_request(url, **kwargs)),
+            patch('time.sleep'),
+        ):
+            executor = TradeExecutor(
+                bot=bot, strategy=strategy, position_sizer=AllInPositionSizer(),
+                bot_run_repo=mock_bot_run_repo, bot_tick_repo=mock_bot_tick_repo,
+                bot_order_repo=mock_bot_order_repo, balance_connector=BalanceConnector(),
+                ohlc_connector=OhlcConnector(), add_order_connector=AddOrderConnector(),
+                query_orders_connector=QueryOrdersConnector(),
+            )
+
+            executor.recover_state()
+            executor.warm_up()
+            executor.execute_interval()
+
+        # Then — last_action=BUY recovered
+        assert strategy.last_action == Signal.BUY
+
+        # Then — HOLD (no new crossover, or suppressed duplicate)
+        tick_arg = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick_arg.signal == Signal.HOLD
+        mock_bot_order_repo.add.assert_not_called()
+
+    def test_sell_signal_after_buy_with_real_strategy(
+            self, bot, strategy, mock_bot_run_repo, mock_bot_tick_repo,
+            mock_bot_order_repo, balance_response,
+    ):
+        '''
+        Warmup establishes a BUY crossover, then interval price drops to trigger
+        a death cross → SELL signal through the real strategy.
+
+        SMA(short=3, long=5). Warmup: 8 completed candles after [:-1].
+
+        Warmup candle history (close prices):
+          [100, 100, 100, 100, 100, 106, 106, 106]
+          After candle 5 (100): short=100.0, long=100.0 → first both-populated
+          After candle 6 (106): short=102.0, long=101.2 → cross above → BUY
+          After candle 7 (106): short=104.0, long=102.4 → still above → HOLD
+          After candle 8 (106): short=106.0, long=103.6 → still above → HOLD
+          last_action = BUY after warmup
+
+        Interval candle close=80:
+          short(3): [106, 106, 80] → 97.33
+          long(5): [100, 106, 106, 106, 80] → 99.6
+          prev: short(106.0) >= long(103.6), now short(97.33) < long(99.6) → death cross → SELL
+        '''
+        # Warmup: 9 total (8 completed + 1 forming dropped by [:-1])
+        warmup_prices = [100.0, 100.0, 100.0, 100.0, 100.0, 106.0, 106.0, 106.0, 999.0]
+        interval_prices = [999.0, 80.0, 80.0]  # [-2] = 80.0
+
+        warmup_ohlc = self._build_ohlc_response(warmup_prices)
+        interval_ohlc = self._build_ohlc_response(interval_prices, base_timestamp=1700001000)
+
+        sell_order_response = {
+            'error': [],
+            'result': {
+                'descr': {'order': 'sell 1.5 XXBTZGBP @ market'},
+                'txid': ['OREAL-STRAT-SELLSIG'],
+            }
+        }
+        sell_fill_response = {
+            'error': [],
+            'result': {
+                'OREAL-STRAT-SELLSIG': {
+                    'status': 'closed',
+                    'price': '70.00',
+                    'vol_exec': '1.50000000',
+                    'fee': '0.05',
+                }
+            }
+        }
+
+        post_sell_balance = {
+            'error': [],
+            'result': {'XXBT': '0.00', 'ZGBP': '104.95'},
+        }
+
+        def mark_filled_side_effect(order_id, price, volume, fee):
+            return BotOrder(
+                bot_id=bot.id, run_id=mock_bot_run_repo.add.return_value.id,
+                exchange_order_id='OREAL-STRAT-SELLSIG', side=Side.SELL,
+                status=OrderStatus.FILLED, price=price, volume=volume, fee=fee,
+                id=order_id,
+            )
+
+        mock_bot_order_repo.mark_filled.side_effect = mark_filled_side_effect
+
+        ohlc_call_count = [0]
+        balance_call_count = [0]
+
+        def route_request(url, **kwargs):
+            nonlocal ohlc_call_count, balance_call_count
+            if 'OHLC' in url:
+                ohlc_call_count[0] += 1
+                if ohlc_call_count[0] == 1:
+                    return self._mock_http_response(warmup_ohlc)
+                return self._mock_http_response(interval_ohlc)
+            elif 'Balance' in url:
+                balance_call_count[0] += 1
+                if balance_call_count[0] <= 1:
+                    return self._mock_http_response(balance_response)
+                return self._mock_http_response(post_sell_balance)
+            elif 'AddOrder' in url:
+                return self._mock_http_response(sell_order_response)
+            elif 'QueryOrders' in url:
+                return self._mock_http_response(sell_fill_response)
+            return self._mock_http_response({'error': ['Unknown'], 'result': {}})
+
+        with (
+            patch(PATCH_HEADERS, return_value=MOCK_HEADERS),
+            patch('requests.get', side_effect=route_request),
+            patch('requests.post', side_effect=lambda url, **kwargs: route_request(url, **kwargs)),
+            patch('time.sleep'),
+        ):
+            executor = TradeExecutor(
+                bot=bot, strategy=strategy, position_sizer=AllInPositionSizer(),
+                bot_run_repo=mock_bot_run_repo, bot_tick_repo=mock_bot_tick_repo,
+                bot_order_repo=mock_bot_order_repo, balance_connector=BalanceConnector(),
+                ohlc_connector=OhlcConnector(), add_order_connector=AddOrderConnector(),
+                query_orders_connector=QueryOrdersConnector(),
+            )
+
+            executor.warm_up()
+            executor.execute_interval()
+
+        # Then — real strategy produced SELL from death cross
+        tick_arg = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick_arg.signal == Signal.SELL
+        assert strategy.last_action == Signal.SELL
+
+        # Then — order placed as sell and filled
+        order_arg = mock_bot_order_repo.add.call_args[0][0]
+        assert order_arg.side == Side.SELL
+        mock_bot_order_repo.mark_filled.assert_called_once()
