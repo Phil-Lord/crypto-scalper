@@ -1,5 +1,6 @@
 import logging
 
+from apscheduler.schedulers.background import BlockingScheduler
 import click
 
 from data_system import (
@@ -58,6 +59,20 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
 
         executor.recover_state()
         executor.warm_up()
+
+        minute_expr = '*' if bot.interval == 1 else f'*/{bot.interval}'
+
+        scheduler = BlockingScheduler()
+        scheduler.add_job(
+            executor.execute_interval,
+            'cron',                         # wall-clock-aligned trigger
+            minute=minute_expr,             # respects bot interval (e.g. */5 for 5m)
+            second='5',                     # fire 5s into the minute (Kraken data lag)
+            jitter=3,                       # stagger multi-bot calls by up to ±3s
+            misfire_grace_time=1,           # discard if >1s late; prevents stale catch-up runs
+            max_instances=1,                # prevent overlapping runs for this bot
+        )
+        scheduler.start()
 
 
 if __name__ == '__main__':
