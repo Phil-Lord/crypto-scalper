@@ -173,7 +173,7 @@
 29. **Add `apscheduler` to `pyproject.toml`** by running `uv add "apscheduler>=3.10,<4.0"`. The `<4.0` upper bound is necessary — version 4.x is a complete async rewrite that removed `BlockingScheduler` and `CronTrigger` entirely; without the pin, uv would resolve 4.x and the script would not run. (`supabase` is already present in `pyproject.toml` from the uv migration.)
 
 30. **Rewrite `start_scalping.py`** at `scripts/start_scalping.py`. New flow:
-    - `load_env()` + `logging.basicConfig()` (entry-point responsibilities)
+    - `load_env()` + `logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'), format=LOG_FORMAT)` (entry-point responsibilities). The `LOG_LEVEL` env var allows changing the log level at runtime without redeploying — `fly secrets set LOG_LEVEL=DEBUG` + `fly apps restart` to temporarily enable debug output, `fly secrets unset LOG_LEVEL` to revert to INFO.
     - Click CLI: `--bot-id` (required, `multiple=True`), `--dry-run` (flag, default `False`). Example: `--bot-id btc_1m_001 --bot-id eth_5m_v2 --dry-run`
     - For each `bot_id`:
       1. Look up `Bot` from Supabase via `SupabaseBotRepository.get(bot_id)` — fail if not found
@@ -476,6 +476,7 @@ WHERE completed_at IS NULL;
 - **`strategy_version` is metadata only:** `Bot.strategy_version` is stored in Supabase for auditing and debugging (e.g., "which version of PrecisionTrendStrategy was this bot running?"). It is *not* used by `create_strategy()` or the executor at runtime.
 - **Health monitoring via bot_ticks:** Query `MAX(timestamp)` from `bot_ticks` grouped by `bot_id` to check bot health. No schema changes needed. Gaps in ticks during OHLC failures are acceptable — if OHLC is failing repeatedly, that's worth knowing about.
 - **Text logging for now:** Use existing `LOG_FORMAT` from utils. Logs go to stderr via `logging.basicConfig()`, which Fly.io captures and exposes via `fly logs` — adequate for monitoring during initial deployment. Switch to JSON structured logging when a log aggregation sink (Datadog, Loki) is added — one-line change in the entry-point formatter.
+- **Configurable log level via `LOG_LEVEL` env var:** `logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'))` in the entry-point script. Defaults to INFO for normal operation (HOLD intervals and routine reconciliation are silent). Set to DEBUG via `fly secrets set LOG_LEVEL=DEBUG` + `fly apps restart` to surface per-interval HOLD completions, dry run HOLD output, and "no placed orders to reconcile" messages — useful for diagnosing missed intervals or scheduler issues. Revert with `fly secrets unset LOG_LEVEL`. No code change or redeploy required.
 - **Entrypoint script for multi-bot Docker:** `entrypoint.sh` parses comma-separated `BOT_IDS` env var into `--bot-id` flags, with validation that `BOT_IDS` is set and non-empty. Cleaner than embedding CLI flag format in env vars.
 - **`auto_stop_machines = false` in `fly.toml`:** Explicitly prevents Fly.io from stopping the machine when it detects no inbound HTTP traffic. Critical for an always-on trading bot that only makes outbound API calls.
 - **Post-trade balance recording:** For BUY/SELL intervals, balances are fetched *after* the order flow so `BotTick` records reflect the bot's actual position after acting on its signal. For HOLD intervals, balances are fetched directly (no order flow).
