@@ -43,7 +43,7 @@ class TradeExecutor:
         self.pair_symbols = get_kraken_pair_symbols(bot.pair)
         self.run = self.bot_run_repo.add(BotRun(bot_id=bot.id))
 
-        self.logger.info('TradeExecutor initialised')
+        self.logger.info(f'TradeExecutor initialised (run_id={self.run.id})')
 
     def recover_state(self) -> None:
         '''
@@ -193,7 +193,9 @@ class TradeExecutor:
             if self.strategy.last_action == Signal(order.side.value):
                 opposite = Signal.SELL if order.side == Side.BUY else Signal.BUY
                 self.strategy.last_action = opposite
-                self.logger.warning(f'Rolled back strategy last_action to {opposite.value}')
+                self.logger.warning(
+                    f'Rolled back strategy last_action to {opposite.value} '
+                    f'(order {order.id}, txid={exchange_order.txid})')
 
     def _settle_order(self, order: BotOrder, exchange_order: QueryOrderResult) -> BotOrder | None:
         '''
@@ -204,13 +206,16 @@ class TradeExecutor:
         if exchange_order.status == QueryOrderStatus.CLOSED:
             updated = self.bot_order_repo.mark_filled(
                 order.id, exchange_order.price, exchange_order.volume, exchange_order.fee)
-            self.logger.info(f'Order {order.id} marked as FILLED')
+            self.logger.info(
+                f'Order {order.id} (txid={exchange_order.txid}) marked as FILLED '
+                f'(price={exchange_order.price}, volume={exchange_order.volume}, fee={exchange_order.fee})')
             return updated
         if exchange_order.status in (QueryOrderStatus.CANCELED, QueryOrderStatus.EXPIRED):
             updated = self.bot_order_repo.mark_failed(
                 order.id, exchange_order.price, exchange_order.volume, exchange_order.fee)
             self.logger.warning(
-                f'Order {order.id} marked as FAILED ({exchange_order.status.value} on the exchange)')
+                f'Order {order.id} (txid={exchange_order.txid}) marked as FAILED '
+                f'({exchange_order.status.value} on the exchange)')
             return updated
         return None
 
@@ -295,6 +300,7 @@ class TradeExecutor:
                         self.strategy.last_action = previous_action
                         signal = Signal.HOLD
                         tick_error = f'Order {placed_order.id} failed on exchange'
+                        self.logger.warning(tick_error)
                     balances = self._fetch_balances()
 
             if balances is None:
@@ -306,8 +312,11 @@ class TradeExecutor:
             if placed_order is None:
                 self.strategy.last_action = previous_action
                 signal = Signal.HOLD
+                self.logger.warning('No order was placed, falling back to HOLD')
             else:
                 signal = Signal(placed_order.side.value)
+                self.logger.warning(
+                    f'Order {placed_order.id} was placed, recording signal as {signal.value}')
             if balances is None:
                 try:
                     balances = self._fetch_balances()
