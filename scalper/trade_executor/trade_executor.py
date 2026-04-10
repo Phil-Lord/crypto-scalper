@@ -342,17 +342,22 @@ class TradeExecutor:
             self.logger.info(f'[DRY RUN] Validated order — {exchange_order.order_description}')
             return None
 
-        if exchange_order.txid is None:
-            raise ValueError('AddOrderResult.txid is None after live order placement')
+        if not exchange_order.txid:
+            raise ValueError(
+                'AddOrderResult.txid is missing or empty after live order placement. '
+                f'txid={exchange_order.txid}, '
+                f'order_description={exchange_order.order_description}'
+            )
 
+        exchange_order_id = exchange_order.txid[0]
         order = self.bot_order_repo.add(BotOrder(
             bot_id=self.bot.id,
             run_id=self.run.id,
-            exchange_order_id=exchange_order.txid[0],
+            exchange_order_id=exchange_order_id,
             side=Side(signal.value),
         ))
         self.logger.info(
-            f'Order submitted: txid={exchange_order.txid[0]}, side={signal.value}, size={size}')
+            f'Order submitted: txid={exchange_order_id}, side={signal.value}, size={size}')
         return order
 
     def _persist_results(
