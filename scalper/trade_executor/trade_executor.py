@@ -185,6 +185,15 @@ class TradeExecutor:
             return updated
         return None
 
+    @staticmethod
+    def _candle_to_series(candle) -> pd.Series:
+        return pd.Series({
+            'open': candle.open,
+            'high': candle.high,
+            'low': candle.low,
+            'close': candle.close,
+        })
+
     def _fetch_ohlc(self) -> pd.Series:
         '''
         Fetches the latest completed OHLC candle as a Series with open, high, low, close keys.
@@ -198,13 +207,7 @@ class TradeExecutor:
         candles = self.ohlc_connector.fetch(self.bot.pair, self.bot.interval, since)
         if len(candles) < 2:
             raise ValueError(f'Expected at least 2 OHLC candles but got {len(candles)}')
-        candle = candles[-2]
-        return pd.Series({
-            'open': candle.open,
-            'high': candle.high,
-            'low': candle.low,
-            'close': candle.close
-        })
+        return self._candle_to_series(candles[-2])
 
     def _fetch_ohlc_history(self) -> list[pd.Series]:
         '''
@@ -216,12 +219,7 @@ class TradeExecutor:
         warmup_candles = self.strategy.warmup_candles
         since = int(time.time()) - self.bot.interval * 60 * (min(warmup_candles, 720) + 1)
         candles = self.ohlc_connector.fetch(self.bot.pair, self.bot.interval, since)[:-1]
-        return [pd.Series({
-            'open': c.open,
-            'high': c.high,
-            'low': c.low,
-            'close': c.close
-        }) for c in candles]
+        return [self._candle_to_series(c) for c in candles]
 
     def _fetch_balances(self) -> PairBalances:
         '''
