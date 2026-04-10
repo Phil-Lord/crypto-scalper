@@ -69,6 +69,10 @@
 
 11. **Implement `get_placed_by_bot_id()` in `SupabaseBotOrderRepository`**. Query with `.eq('bot_id', bot_id).eq('status', 'placed').execute()`.
 
+11a. **Add `get_by_tick_id()` to `BotOrderRepository`** at `data_system/repositories/bot_order/bot_order_repository.py`. Signature: `get_by_tick_id(self, tick_id: int) -> BotOrder | None`. Returns the order associated with a given tick ID, or `None` if not found. Used by `recover_state()` to check whether the order recorded at the most recent directional tick ended up FAILED — without fetching all orders for the bot.
+
+11b. **Implement `get_by_tick_id()` in `SupabaseBotOrderRepository`**. Query with `.eq('tick_id', tick_id).execute()`. Returns the first result or `None`.
+
 12. **Add `complete()` method to `BotRunRepository`** at `data_system/repositories/bot_run/bot_run_repository.py`. Signature: `complete(self, id: UUID, completed_at: datetime) -> BotRun`. Abstract method to mark a run as finished by setting `completed_at`.
 
 13. **Implement `complete()` in `SupabaseBotRunRepository`** at `data_system/repositories/bot_run/supabase_bot_run_repository.py`. Uses `client.table('bot_runs').update({'completed_at': completed_at.isoformat()}).eq('id', str(id)).execute()`, then returns the deserialised `BotRun`.
@@ -130,7 +134,7 @@
     - **`_fetch_balances(self) -> PairBalances`**: Private method. Fetches balances via `BalanceConnector`, looks up `self.pair_symbols.base` and `self.pair_symbols.quote` in Kraken's response, converts string values to `Decimal`, handles missing keys (zero balance). Returns a `PairBalances(symbol_base=..., symbol_quote=..., balance_base=..., balance_quote=...)` frozen dataclass instance — all balance and symbol information for the pair in one object.
     - **`warm_up(self) -> None`**: Fetches historical OHLC candles via `self._fetch_ohlc_history()`, feeds them sequentially through `strategy.generate_signal()` to warm up indicators. Logs progress but does **not** persist ticks during warm-up. Logs a completion message with the count of candles processed.
         - **Warm-up validation**: After fetching, check that candle count meets `self.strategy.warmup_candles`. If insufficient (e.g., new trading pair), log a warning that signals may be unreliable for the first N intervals. Bot starts anyway (warn and continue).
-    - **`_reconcile_placed_orders(self) -> None`**: Queries outstanding PLACED orders via `bot_order_repo.get_placed_by_bot_id(bot.id)`. If none, returns immediately. Otherwise collects all `exchange_order_id` values into a list and calls `QueryOrdersConnector.fetch(exchange_order_ids)` once — Kraken's `QueryOrders` endpoint accepts multiple order IDs in one request. Iterates the results: if Kraken reports `closed` → update to FILLED with fill details and `filled_at`; if `cancelled` → update to FAILED; if still `open` → leave as PLACED (will retry next interval). Logs each resolution.
+    - **`_reconcile_placed_orders(self) -> None`**: Queries outstanding PLACED orders via `bot_order_repo.get_placed_by_bot_id(bot.id)`. If none, returns immediately. Otherwise collects all `exchange_order_id` values into a list and calls `QueryOrdersConnector.fetch(exchange_order_ids)` once — Kraken's `QueryOrders` endpoint accepts multiple order IDs in one request. Iterates the results: if Kraken reports `closed` → update to FILLED with fill details and `filled_at`; if `cancelled` → update to FAILED **and roll back `strategy.last_action` to the opposite side (BUY→SELL, SELL→BUY) if `last_action` currently matches the failed order's side** — the order never executed so the strategy's assumed position must be unwound; if still `open` → leave as PLACED (will retry next interval). Logs each resolution.
     - **`execute_interval(self) -> None`**: One decision cycle:
       1. Check `self._shutting_down` — if True, return immediately (graceful drain)
       2. Reconcile outstanding PLACED orders via `self._reconcile_placed_orders()`
@@ -142,20 +146,22 @@
           - Place order via `AddOrderConnector.place(pair, signal, volume, validate=self.dry_run)` → get `AddOrderResult`
           - **If `self.dry_run`:** Log the validated order description from `AddOrderResult`. Skip order persistence, QueryOrders, and post-trade balance fetch — no real order was placed.
           - **If live (not dry run):**
-              - Extract `exchange_order_id = order_result.txid[0]` (guard for `None` — should not happen outside `validate=True` mode)
+              - Extract `exchange_order_id = order_result.txid[0]` (guard for `None` — should not happen outside `validate=True` mode; raise `ValueError` if it is)
               - **Immediately persist** partial `BotOrder` with `exchange_order_id`, status=`PLACED`, fill fields=`None`, `filled_at=None`
-              - **Retry QueryOrders up to 3 times** (1s delay between attempts). Check for Kraken's `status='closed'` (fully filled).
-                  - On fill success (status `closed`): update `BotOrder` with price/volume/fee, `filled_at=datetime.now(utc)`, status=`FILLED` via `bot_order_repo.update()`
-                  - On still open after 3 attempts: leave as `PLACED`, log info — will be reconciled at the start of the next interval
-                  - On `cancelled` status: update to `FAILED`, log warning with `exchange_order_id`
+              - **Retry QueryOrders up to 3 times** (1s delay between attempts) via `_confirm_order()`. Check for Kraken's `status='closed'` (fully filled). `_confirm_order()` returns the updated `BotOrder` in all cases (FILLED, FAILED, or still PLACED after retries) so `execute_interval` always holds the current state when linking the tick.
+                  - On fill success (status `closed`): call `mark_filled()` → returns updated `BotOrder` with status=`FILLED`
+                  - On still open after 3 attempts: leave as `PLACED`, log info — will be reconciled at the start of the next interval; return original `BotOrder`
+                  - On `cancelled` status: call `mark_failed()` → returns updated `BotOrder` with status=`FAILED`
+              - Reassign `placed_order` to the return value of `_confirm_order()` to ensure the correct status is used when linking the tick
+              - **If `placed_order.status == OrderStatus.FAILED` after `_confirm_order()`**: restore `strategy.last_action = previous_action`, set `signal = Signal.HOLD`, set `tick_error` — the order did not execute; recording a BUY/SELL tick or leaving `last_action` advanced would corrupt consecutive-signal suppression
               - Fetch balances again after order flow to get post-trade balances for the tick record
-      6. If signal is `HOLD`: fetch balances via `self._fetch_balances()` (no order flow needed)
+      6. If signal is `HOLD` (or BUY/SELL without entering the order branch): `balances` is still `None` — fetch via `self._fetch_balances()`
       7. **If `self.dry_run`:** Log tick summary (price, signal, balances) and return — no persistence. This prevents dry run ticks from polluting `bot_ticks` and corrupting `_recover_state()` when switching to live mode.
-      8. Construct `BotTick` with `bot_id`, `run_id`, `timestamp`, `price` (from OHLC), `signal` (post-suppression), `balance_base`, `balance_quote` — balances always reflect the bot's position **after** acting on the signal
+      8. Construct `BotTick` with `bot_id`, `run_id`, `timestamp`, `price` (from OHLC, cast to `Decimal`), `signal` (post-suppression), `balance_base`, `balance_quote`, `error` — balances always reflect the bot's position **after** acting on the signal
       9. Persist tick via `bot_tick_repo.add()` → get back tick with DB-generated `id`
-      10. If order was placed: update `BotOrder` with `tick_id` from persisted tick via `bot_order_repo.update()`
+      10. If order was placed: update `BotOrder.tick_id` via `bot_order_repo.update(replace(placed_order, tick_id=tick.id))` — `placed_order` holds the post-`_confirm_order` state (FILLED/FAILED/PLACED), so the update preserves the correct status.
       11. Log results
-    - **Error handling**: If OHLC fetch fails → log error, return (no tick — can't construct BotTick without price). If strategy or order placement fails → persist tick with `error` field set, log error, continue. On fatal errors (Supabase unreachable): log and let the process crash (Fly.io auto-restarts).
+    - **Error handling**: The signal/order block (steps 4–6) is wrapped in a single try/except. Before calling `generate_signal()`, save `previous_action = self.strategy.last_action`. If OHLC fetch fails → log error, return (no tick — can't construct BotTick without price). If strategy or order placement fails → catch the exception, set `tick_error = str(e)`, **if `placed_order is None` restore `self.strategy.last_action = previous_action`** (no order was persisted before the failure, so `generate_signal()`'s mutation of `last_action` must be undone), fall back to `signal = Signal.HOLD`, attempt to fetch balances (return if that also fails), then persist tick with `error` field set. On fatal errors (Supabase unreachable): log and let the process crash (Fly.io auto-restarts).
     - **`shutdown(self) -> None`**: Marks the run as completed via `bot_run_repo.complete(self.run.id, datetime.now(timezone.utc))`. Wraps the DB call in try/except (best-effort cleanup — a Supabase network error should not prevent the process from exiting cleanly). Does **not** call `_reconcile_placed_orders()`: by the time `shutdown()` is called, `scheduler.shutdown(wait=True)` has already blocked until the current interval completed (including its own reconciliation step), and `_shutting_down = True` prevents any new interval from starting. Any order that still has `status='placed'` after that interval's 3-retry window will be picked up by the next run's `get_placed_by_bot_id()` query at the start of its first `execute_interval()` — the same recovery path that handles crash restarts.
     - **No `load_env()`** or `logging.basicConfig()` — these stay in the entry-point script only.
     - **No internal connector instantiation** — all injected via constructor.
@@ -167,7 +173,7 @@
 29. **Add `apscheduler` to `pyproject.toml`** by running `uv add "apscheduler>=3.10,<4.0"`. The `<4.0` upper bound is necessary — version 4.x is a complete async rewrite that removed `BlockingScheduler` and `CronTrigger` entirely; without the pin, uv would resolve 4.x and the script would not run. (`supabase` is already present in `pyproject.toml` from the uv migration.)
 
 30. **Rewrite `start_scalping.py`** at `scripts/start_scalping.py`. New flow:
-    - `load_env()` + `logging.basicConfig()` (entry-point responsibilities)
+    - `load_env()` + `logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'), format=LOG_FORMAT)` (entry-point responsibilities). The `LOG_LEVEL` env var allows changing the log level at runtime without redeploying — `fly secrets set LOG_LEVEL=DEBUG` + `fly apps restart` to temporarily enable debug output, `fly secrets unset LOG_LEVEL` to revert to INFO.
     - Click CLI: `--bot-id` (required, `multiple=True`), `--dry-run` (flag, default `False`). Example: `--bot-id btc_1m_001 --bot-id eth_5m_v2 --dry-run`
     - For each `bot_id`:
       1. Look up `Bot` from Supabase via `SupabaseBotRepository.get(bot_id)` — fail if not found
@@ -249,26 +255,44 @@
     - `test_execute_interval_strategy_error_persists_tick_with_error` — when strategy throws, tick is saved with `error` field
     - `test_execute_interval_query_fill_retries_three_times` — verify QueryOrders called up to 3 times with 1s delay
     - `test_execute_interval_query_fill_still_open_leaves_placed` — order still `open` after 3 attempts, status stays PLACED (not FAILED)
-    - `test_execute_interval_query_fill_cancelled_marks_failed` — Kraken reports `cancelled`, status set to FAILED
+    - `test_execute_interval_query_fill_cancelled_marks_failed` — Kraken reports `cancelled`, status set to FAILED and `strategy.last_action` rolled back to pre-signal value
+    - `test_execute_interval_last_action_rolled_back_on_pre_order_exception` — exception thrown before `placed_order` is persisted (e.g., balance fetch fails); `strategy.last_action` restored to its pre-`generate_signal` value
+    - `test_execute_interval_last_action_not_rolled_back_when_order_persisted` — exception thrown after `placed_order` is persisted; `strategy.last_action` is NOT restored (order is in DB as PLACED, position did change)
     - `test_execute_interval_skipped_when_shutting_down` — verify early return when `_shutting_down` is True
     - `test_reconcile_placed_orders_resolves_filled` — verify outstanding PLACED order updated to FILLED when Kraken reports `closed`
-    - `test_reconcile_placed_orders_resolves_cancelled` — verify outstanding PLACED order updated to FAILED when Kraken reports `cancelled`
+    - `test_reconcile_placed_orders_resolves_cancelled` — verify outstanding PLACED order updated to FAILED when Kraken reports `cancelled`, and `strategy.last_action` rolled back to opposite side. Set `mock_strategy.last_action` to match the placed order's side before the call so the rollback is observable. Note: the existing `test_reconcile_marks_canceled_order_as_failed` covers only `mark_failed` — it must be extended with the `last_action` assertion or superseded by this test
     - `test_reconcile_placed_orders_leaves_open` — verify still-open orders left as PLACED
     - `test_reconcile_called_every_interval` — verify `_reconcile_placed_orders` is called at the start of each `execute_interval`
     - `test_warm_up_feeds_candles_sequentially` — verify OHLC fetched and each candle fed through `generate_signal()`, no ticks persisted
-    - `test_warm_up_uses_strategy_warmup_candles` — verify the `since` param to `OhlcConnector.fetch()` is derived from `strategy.warmup_candles + 1` (the +1 guarantees a full candle count after `[:-1]` drops the forming candle)
+    - `test_warm_up_uses_strategy_warmup_candles` — verify the `since` param to `OhlcConnector.fetch()` is derived from `min(strategy.warmup_candles, 720) + 1` (the 720 cap is applied before the +1; the +1 compensates for `since` landing mid-interval and guarantees a full candle count after `[:-1]` drops the forming candle)
     - `test_warm_up_caps_fetch_at_720_candles` — verify that when `strategy.warmup_candles > 720`, since is derived from 721 intervals (720 cap + 1) and the insufficient-candles warning is logged
     - `test_warm_up_warns_on_insufficient_candles` — verify warning logged when candle count < `strategy.warmup_candles` (covers both new listings and the 720-candle Kraken cap)
     - `test_warm_up_does_not_warn_when_sufficient_candles` — verify no warning when `len(candles) >= strategy.warmup_candles`
     - `test_warm_up_logs_completion_with_candle_count` — verify completion log includes the count of candles processed
-    - `test_recover_state_restores_last_action` — verify `strategy.last_action` set from latest directional tick's signal (uses `get_latest_action_by_bot_id`)
-    - `test_recover_state_skips_hold_ticks` — verify that if the most recent tick is HOLD but there's an earlier BUY tick, `last_action` is set to BUY (not HOLD)
+    - `test_recover_state_restores_last_action` — verify `strategy.last_action` set from latest directional tick's signal (uses `get_latest_action_by_bot_id`). Mock `bot_order_repo.get_by_tick_id` to explicitly return `None` so the test doesn't silently rely on `Mock()`'s default inequality with `OrderStatus.FAILED`
+    - `test_recover_state_skips_hold_ticks` — verify that `get_latest_action_by_bot_id()` is called rather than any general latest-tick method; HOLD filtering is enforced at the repository query level (`signal IN ('buy', 'sell')`), not in the executor. This is effectively a call-site assertion — the method name itself is the guarantee. Signal-correctness is covered by `test_recover_state_sets_last_action_from_buy/sell_tick`
     - `test_recover_state_first_run` — verify no error when no previous tick exists
     - `test_shutdown_marks_run_completed` — verify `bot_run_repo.complete()` called
     - `test_constructor_creates_and_persists_run` — verify `BotRun` created and added to repo
     - `test_execute_interval_dry_run_validates_without_placing` — verify `validate=True` passed to `AddOrderConnector.place()`, no `BotOrder` persisted, no `QueryOrdersConnector` calls, no tick persisted
     - `test_execute_interval_dry_run_logs_tick_without_persisting` — verify tick data (price, signal, balances) is logged but `bot_tick_repo.add()` is never called
     - `test_execute_interval_dry_run_skips_reconciliation` — verify `_reconcile_placed_orders` is a no-op in dry run mode (no PLACED orders exist to reconcile)
+
+    *Regression tests — bugs fixed during review (don't specifically put these in their own test class or section):*
+    - `test_execute_interval_tick_persistence_failure_logs_and_returns` — when `bot_tick_repo.add()` raises, error is logged and `execute_interval` returns without propagating; scheduler is not disrupted
+    - `test_execute_interval_order_link_failure_logs_but_interval_completes` — when `bot_order_repo.update()` raises during `tick_id` linking, error is logged but the interval still completes (tick was already persisted; final log message fires)
+    - `test_execute_interval_exception_after_order_persisted_tick_records_order_direction` — when an exception is raised after `placed_order` is set (e.g., `_fetch_balances` throws), the tick's `signal` is set to the order's actual direction (`BUY` or `SELL`), not `Signal.HOLD`; this ensures crash recovery via `recover_state` reads the correct `last_action`
+    - `test_recover_state_reverses_signal_when_associated_order_failed` — when the order associated with the latest directional tick has `status=FAILED`, `last_action` is set to the *opposite* of the tick's signal (e.g., tick=SELL but order FAILED → `last_action=BUY`); guards against re-entering a position the bot never actually exited
+    - `test_recover_state_uses_tick_signal_when_associated_order_filled` — when the associated order is FILLED, `last_action` is set to the tick's signal as normal (the position change is confirmed)
+    - `test_recover_state_uses_tick_signal_when_no_order_for_tick` — when `get_by_tick_id` returns `None` (tick has no associated order, e.g., a HOLD tick or the order wasn't persisted), `last_action` is set to the tick's signal as normal
+    - `test_execute_interval_bot_order_side_is_side_enum_not_signal_enum` — `BotOrder.side` is a `Side` instance, not a `Signal` instance; both are string enums with matching values so this only fails at the type level without an explicit test
+    - `test_reconcile_exception_does_not_abort_interval` — if `_reconcile_placed_orders` raises, the exception is caught and logged, and `execute_interval` continues to fetch OHLC and produce a tick as normal; verifies the scheduler is never disrupted by a reconciliation outage
+    - `test_execute_interval_failed_order_tick_has_hold_signal` — when `_confirm_order` returns a FAILED order, the persisted tick has `signal=Signal.HOLD` (not BUY/SELL); the order did not execute so the directional tick must not be recorded
+    - `test_execute_interval_failed_order_tick_has_error_set` — when `_confirm_order` returns FAILED, `tick.error` is a non-None string describing the failure
+    - `test_execute_interval_failed_order_still_linked_to_tick` — even when `_confirm_order` returns FAILED and signal becomes HOLD, the `placed_order` is still linked to the tick via `bot_order_repo.update(replace(placed_order, tick_id=tick.id))` — the order record exists and must point to its tick
+    - `test_reconcile_does_not_roll_back_last_action_when_failed_order_side_differs` —edge case) if a FAILED order's side does not match the current `strategy.last_action`, `last_action` is left unchanged; prevents incorrectly flipping state when a stale previous-position order surfaces during reconciliation
+    - `test_reconcile_per_order_exception_does_not_prevent_other_orders` — per-order try/except allows remaining orders in the batch to continue being reconciled even when one throws; verifies all N orders are attempted regardless of individual failures
+    - `test_execute_interval_tick_has_timestamp_set` — `BotTick.timestamp` is set to a UTC datetime when the tick is persisted; regression guard against the required field being omitted from the `BotTick(...)` constructor call
     - All connectors and repositories are mocked (constructor is DI-based)
 
 38. **Unit tests** for `AllInPositionSizer` at `tests/unit/trade_executor/test_position_sizer.py`.
@@ -452,6 +476,7 @@ WHERE completed_at IS NULL;
 - **`strategy_version` is metadata only:** `Bot.strategy_version` is stored in Supabase for auditing and debugging (e.g., "which version of PrecisionTrendStrategy was this bot running?"). It is *not* used by `create_strategy()` or the executor at runtime.
 - **Health monitoring via bot_ticks:** Query `MAX(timestamp)` from `bot_ticks` grouped by `bot_id` to check bot health. No schema changes needed. Gaps in ticks during OHLC failures are acceptable — if OHLC is failing repeatedly, that's worth knowing about.
 - **Text logging for now:** Use existing `LOG_FORMAT` from utils. Logs go to stderr via `logging.basicConfig()`, which Fly.io captures and exposes via `fly logs` — adequate for monitoring during initial deployment. Switch to JSON structured logging when a log aggregation sink (Datadog, Loki) is added — one-line change in the entry-point formatter.
+- **Configurable log level via `LOG_LEVEL` env var:** `logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'))` in the entry-point script. Defaults to INFO for normal operation (HOLD intervals and routine reconciliation are silent). Set to DEBUG via `fly secrets set LOG_LEVEL=DEBUG` + `fly apps restart` to surface per-interval HOLD completions, dry run HOLD output, and "no placed orders to reconcile" messages — useful for diagnosing missed intervals or scheduler issues. Revert with `fly secrets unset LOG_LEVEL`. No code change or redeploy required.
 - **Entrypoint script for multi-bot Docker:** `entrypoint.sh` parses comma-separated `BOT_IDS` env var into `--bot-id` flags, with validation that `BOT_IDS` is set and non-empty. Cleaner than embedding CLI flag format in env vars.
 - **`auto_stop_machines = false` in `fly.toml`:** Explicitly prevents Fly.io from stopping the machine when it detects no inbound HTTP traffic. Critical for an always-on trading bot that only makes outbound API calls.
 - **Post-trade balance recording:** For BUY/SELL intervals, balances are fetched *after* the order flow so `BotTick` records reflect the bot's actual position after acting on its signal. For HOLD intervals, balances are fetched directly (no order flow).

@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from uuid import UUID
@@ -36,7 +36,6 @@ class BotTick:
     run_id: UUID
 
     # Tick data
-    timestamp: datetime
     price: Decimal
     signal: Signal
 
@@ -44,6 +43,7 @@ class BotTick:
     balance_base: Decimal
     balance_quote: Decimal
 
+    # Auto-set fields
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     error: str | None = None
-
     id: int | None = None

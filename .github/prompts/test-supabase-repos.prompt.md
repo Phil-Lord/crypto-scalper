@@ -50,6 +50,8 @@ The `get` methods are **not uniform** across repos — note the differences:
 | `SupabaseBotTickRepository` | `get_latest_action_by_bot_id(bot_id: str)`                                   | `BotTick \| None`  |
 | `SupabaseBotOrderRepository`| `get_by_bot_id(bot_id: str)`                                                 | `list[BotOrder]`   |
 | `SupabaseBotOrderRepository`| `get_placed_by_bot_id(bot_id: str)`                                          | `list[BotOrder]`   |
+| `SupabaseBotOrderRepository`| `get_by_tick_id(tick_id: int)`                                               | `BotOrder \| None` |
+| `SupabaseBotOrderRepository`| `update(bot_order: BotOrder)`                                                | `BotOrder`         |
 | `SupabaseBotOrderRepository`| `mark_filled(order_id: UUID, price: Decimal, volume: Decimal, fee: Decimal)` | `BotOrder`         |
 | `SupabaseBotOrderRepository`| `mark_failed(order_id: UUID, price: Decimal, volume: Decimal, fee: Decimal)` | `BotOrder`         |
 
@@ -60,8 +62,8 @@ Ticks are returned ordered by `timestamp DESC`; orders (both get methods) are re
 For each repo, test both the add and get paths. Cover:
 
 ### `bots`
-- Add a bot with a representative `parameters` dict (nested values, multiple keys)
-- Verify `get(id)` returns a `Bot` that matches exactly — including `parameters` dict and `created_at` timezone
+- Add a bot with all required fields: `id`, `pair`, `strategy_name`, `strategy_version`, `interval`, and a representative `parameters` dict (nested values, multiple keys)
+- Verify `get(id)` returns a `Bot` that matches exactly — including `strategy_version`, `parameters` dict, and `created_at` timezone
 - Add a duplicate `id` and confirm it raises an error (PK constraint)
 - `get` a non-existent `id` and confirm `None` is returned
 
@@ -103,6 +105,12 @@ For each repo, test both the add and get paths. Cover:
 - Insert one `placed` order and one `filled` order for the same `bot_id`
 - Verify `get_placed_by_bot_id` returns **only** the `placed` order, not the `filled` one
 - Verify the returned list is empty when no `placed` orders exist for a given `bot_id`
+
+#### `get_by_tick_id`
+- Insert a tick, then insert an order with `tick_id` set to that tick's ID
+- Verify `get_by_tick_id(tick_id)` returns the correct `BotOrder` with the expected `tick_id`
+- Call `get_by_tick_id` with a `tick_id` that has no associated order — confirm `None` is returned
+- Confirm the `tick_id` field on the returned `BotOrder` is an `int`, not a string
 
 #### `mark_filled`
 - Insert a `placed` order, then call `mark_filled(order_id, price, volume, fee)` with realistic `Decimal` values

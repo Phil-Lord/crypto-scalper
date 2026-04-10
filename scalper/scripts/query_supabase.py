@@ -32,7 +32,8 @@ def query_supabase():
         action = questionary.select('Action:', choices=['add', 'get', 'get_latest_action']).ask()
         bot_tick(action, client)
     elif table == 'bot_orders':
-        action = questionary.select('Action:', choices=['add', 'get', 'get_placed', 'update']).ask()
+        action = questionary.select(
+            'Action:', choices=['add', 'get_by_bot_id', 'get_placed', 'get_by_tick_id', 'update']).ask()
         bot_order(action, client)
 
 
@@ -77,7 +78,6 @@ def bot_tick(action: str, client: SupabaseClient):
         bot_tick = repository.add(BotTick(
             bot_id=ask('bot_id:', required=True),
             run_id=UUID(ask('run_id:', required=True)),
-            timestamp=datetime.now(timezone.utc),
             price=Decimal(ask('price:', required=True)),
             signal=Signal(questionary.select('signal:', choices=['buy', 'hold', 'sell']).ask()),
             balance_base=Decimal(ask('balance_base:', required=True)),
@@ -111,12 +111,15 @@ def bot_order(action: str, client: SupabaseClient):
             fee=Decimal(v) if (v := ask('fee (optional):')) else None,
         ))
         print('Added bot order:', bot_order)
-    elif action == 'get':
+    elif action == 'get_by_bot_id':
         bot_order = repository.get_by_bot_id(ask('bot_id:', required=True))
         print('Retrieved bot orders:', bot_order)
     elif action == 'get_placed':
         placed_orders = repository.get_placed_by_bot_id(ask('bot_id:', required=True))
         print('Retrieved placed bot orders:', placed_orders)
+    elif action == 'get_by_tick_id':
+        order = repository.get_by_tick_id(int(ask('tick_id:', required=True)))
+        print('Retrieved bot order by tick ID:', order)
     elif action == 'update':
         existing_orders = repository.get_by_bot_id(ask('bot_id:', required=True))
         if not existing_orders:

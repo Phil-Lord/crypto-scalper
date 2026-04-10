@@ -33,6 +33,18 @@ class SupabaseBotOrderRepository(BotOrderRepository):
         )
         return [self._to_bot_order(row) for row in response.data]
 
+    def get_by_tick_id(self, tick_id: int) -> BotOrder | None:
+        response = (
+            self.client
+            .table(self.TABLE_NAME)
+            .select('*')
+            .eq('tick_id', tick_id)
+            .execute()
+        )
+        if not response.data:
+            return None
+        return self._to_bot_order(response.data[0])
+
     def update(self, bot_order: BotOrder) -> BotOrder:
         payload = {
             'status': bot_order.status.value,

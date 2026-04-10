@@ -1,4 +1,5 @@
 import logging
+from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
 from unittest.mock import Mock, patch
@@ -8,7 +9,7 @@ import pandas as pd
 import pytest
 
 from data_system.models.bot_model import Bot
-from data_system.models.bot_order_model import BotOrder, Side
+from data_system.models.bot_order_model import BotOrder, OrderStatus, Side
 from data_system.models.bot_run_model import BotRun
 from data_system.models.bot_tick_model import BotTick, Signal
 from data_system.repositories.bot_order.bot_order_repository import BotOrderRepository
@@ -16,6 +17,7 @@ from data_system.repositories.bot_run.bot_run_repository import BotRunRepository
 from data_system.repositories.bot_tick.bot_tick_repository import BotTickRepository
 from exchange_connector.connectors.add_order_connector import AddOrderConnector
 from exchange_connector.connectors.balance_connector import BalanceConnector
+from exchange_connector.models.add_order_result import AddOrderResult
 from exchange_connector.connectors.ohlc_connector import OhlcConnector
 from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
 from exchange_connector.models.ohlc_candle import OhlcCandle
@@ -567,18 +569,22 @@ class TestTradeExecutor:
         mock_bot_tick_repo.get_latest_action_by_bot_id.assert_called_once_with(bot.id)
 
     def test_recover_state_sets_last_action_from_buy_tick(
-            self, executor, mock_bot_tick_repo, mock_strategy, sample_buy_tick,
+            self, executor, mock_bot_tick_repo, mock_bot_order_repo,
+            mock_strategy, sample_buy_tick,
     ):
         mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = sample_buy_tick
+        mock_bot_order_repo.get_by_tick_id.return_value = None
 
         executor.recover_state()
 
         assert mock_strategy.last_action == Signal.BUY
 
     def test_recover_state_sets_last_action_from_sell_tick(
-            self, executor, mock_bot_tick_repo, mock_strategy, sample_sell_tick,
+            self, executor, mock_bot_tick_repo, mock_bot_order_repo,
+            mock_strategy, sample_sell_tick,
     ):
         mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = sample_sell_tick
+        mock_bot_order_repo.get_by_tick_id.return_value = None
 
         executor.recover_state()
 
@@ -604,6 +610,45 @@ class TestTradeExecutor:
 
         info_messages = [str(call.args[0]) for call in executor.logger.info.call_args_list]
         assert any('buy' in msg.lower() for msg in info_messages)
+
+    def test_recover_state_reverses_signal_when_associated_order_failed(
+            self, executor, mock_bot_tick_repo, mock_bot_order_repo,
+            mock_strategy, sample_buy_tick,
+    ):
+        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = sample_buy_tick
+        mock_bot_order_repo.get_by_tick_id.return_value = BotOrder(
+            bot_id='btc_1m_001', run_id=uuid4(),
+            exchange_order_id='TXID-001', side=Side.BUY, status=OrderStatus.FAILED,
+        )
+
+        executor.recover_state()
+
+        assert mock_strategy.last_action == Signal.SELL
+
+    def test_recover_state_uses_tick_signal_when_associated_order_filled(
+            self, executor, mock_bot_tick_repo, mock_bot_order_repo,
+            mock_strategy, sample_buy_tick,
+    ):
+        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = sample_buy_tick
+        mock_bot_order_repo.get_by_tick_id.return_value = BotOrder(
+            bot_id='btc_1m_001', run_id=uuid4(),
+            exchange_order_id='TXID-001', side=Side.BUY, status=OrderStatus.FILLED,
+        )
+
+        executor.recover_state()
+
+        assert mock_strategy.last_action == Signal.BUY
+
+    def test_recover_state_uses_tick_signal_when_no_order_for_tick(
+            self, executor, mock_bot_tick_repo, mock_bot_order_repo,
+            mock_strategy, sample_sell_tick,
+    ):
+        mock_bot_tick_repo.get_latest_action_by_bot_id.return_value = sample_sell_tick
+        mock_bot_order_repo.get_by_tick_id.return_value = None
+
+        executor.recover_state()
+
+        assert mock_strategy.last_action == Signal.SELL
 
     # --- shutdown ---
 
@@ -888,6 +933,36 @@ class TestTradeExecutor:
         warning_messages = [str(call.args[0]) for call in executor.logger.warning.call_args_list]
         assert any('TXID-BBB' in msg and 'not returned' in msg for msg in warning_messages)
 
+    def test_reconcile_rolls_back_last_action_when_canceled_order_matches(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            mock_strategy, sample_placed_orders,
+    ):
+        order = sample_placed_orders[0]  # Side.BUY
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = [order]
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-AAA', QueryOrderStatus.CANCELED),
+        ]
+        mock_strategy.last_action = Signal.BUY
+
+        executor._reconcile_placed_orders()
+
+        assert mock_strategy.last_action == Signal.SELL
+
+    def test_reconcile_does_not_roll_back_last_action_when_failed_order_side_differs(
+            self, executor, mock_bot_order_repo, mock_query_orders_connector,
+            mock_strategy, sample_placed_orders,
+    ):
+        order = sample_placed_orders[0]  # Side.BUY
+        mock_bot_order_repo.get_placed_by_bot_id.return_value = [order]
+        mock_query_orders_connector.fetch.return_value = [
+            self._make_exchange_order('TXID-AAA', QueryOrderStatus.CANCELED),
+        ]
+        mock_strategy.last_action = Signal.SELL  # Does not match order side (BUY)
+
+        executor._reconcile_placed_orders()
+
+        assert mock_strategy.last_action == Signal.SELL
+
     # --- _fetch_ohlc with different intervals ---
 
     def test_fetch_ohlc_since_calculation_with_five_minute_interval(
@@ -917,3 +992,595 @@ class TestTradeExecutor:
         expected_since = int(frozen_time) - 5 * 60 * 2
         args = mock_ohlc_connector.fetch.call_args[0]
         assert args[2] == expected_since
+
+    # --- execute_interval ---
+
+    @pytest.fixture
+    def exec_executor(
+            self, executor, mock_strategy, mock_position_sizer,
+            mock_bot_tick_repo, mock_bot_order_repo
+    ):
+        ''' Executor pre-configured for execute_interval tests with a HOLD baseline. '''
+        executor._reconcile_placed_orders = Mock()
+        executor._fetch_ohlc = Mock(return_value=pd.Series({
+            'open': 49990.0, 'high': 50100.0, 'low': 49900.0, 'close': 50000.0,
+        }))
+        executor._fetch_balances = Mock(return_value=PairBalances(
+            symbol_base='XXBT', symbol_quote='ZGBP',
+            balance_base=Decimal('1.5'), balance_quote=Decimal('10000.00'),
+        ))
+        executor.logger = Mock()
+        mock_strategy.last_action = Signal.SELL
+        mock_strategy.generate_signal.return_value = {'signal': Signal.HOLD}
+        mock_position_sizer.calculate_volume.return_value = Decimal('10000.00')
+        mock_bot_tick_repo.add.side_effect = lambda tick: replace(tick, id=1)
+        mock_bot_order_repo.add.side_effect = lambda order: order
+        return executor
+
+    def _make_order(self, executor, side=Side.BUY, status=OrderStatus.FILLED) -> BotOrder:
+        return BotOrder(
+            bot_id='btc_1m_001',
+            run_id=executor.run.id,
+            exchange_order_id='TXID-001',
+            side=side,
+            status=status,
+            price=Decimal('50000.00') if status == OrderStatus.FILLED else Decimal('0'),
+            volume=Decimal('0.001') if status == OrderStatus.FILLED else Decimal('0'),
+            fee=Decimal('0.50') if status == OrderStatus.FILLED else Decimal('0'),
+        )
+
+    def _setup_order_signal(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            signal, confirmed_order
+    ):
+        ''' Helper to configure a BUY/SELL signal with order placement and confirmation mocks. '''
+        mock_strategy.generate_signal.return_value = {'signal': signal}
+        mock_add_order_connector.place.return_value = AddOrderResult(
+            txid=['TXID-001'],
+            order_description=f'{signal.value} 0.001 XXBTZGBP @ market',
+        )
+        exec_executor._confirm_order = Mock(return_value=confirmed_order)
+
+    # Shutdown
+
+    def test_execute_interval_skipped_when_shutting_down(
+            self, exec_executor, mock_bot_tick_repo
+    ):
+        exec_executor._shutting_down = True
+
+        exec_executor.execute_interval()
+
+        exec_executor._reconcile_placed_orders.assert_not_called()
+        exec_executor._fetch_ohlc.assert_not_called()
+        mock_bot_tick_repo.add.assert_not_called()
+
+    # Reconciliation
+
+    def test_execute_interval_calls_reconcile_at_start(self, exec_executor):
+        exec_executor.execute_interval()
+
+        exec_executor._reconcile_placed_orders.assert_called_once()
+
+    def test_reconcile_exception_does_not_abort_interval(
+            self, exec_executor, mock_bot_tick_repo
+    ):
+        exec_executor._reconcile_placed_orders.side_effect = Exception('Supabase timeout')
+
+        exec_executor.execute_interval()
+
+        mock_bot_tick_repo.add.assert_called_once()
+
+    # OHLC failure
+
+    def test_execute_interval_ohlc_failure_skips_tick(
+            self, exec_executor, mock_strategy, mock_bot_tick_repo,
+    ):
+        exec_executor._fetch_ohlc.side_effect = Exception('Kraken unavailable')
+
+        exec_executor.execute_interval()
+
+        mock_strategy.generate_signal.assert_not_called()
+        mock_bot_tick_repo.add.assert_not_called()
+
+    # HOLD signal — happy path
+
+    def test_execute_interval_hold_persists_tick_only(
+            self, exec_executor, mock_bot_tick_repo, mock_bot_order_repo,
+            mock_add_order_connector,
+    ):
+        exec_executor.execute_interval()
+
+        mock_add_order_connector.place.assert_not_called()
+        mock_bot_order_repo.add.assert_not_called()
+        mock_bot_tick_repo.add.assert_called_once()
+        tick = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick.signal == Signal.HOLD
+        assert tick.bot_id == 'btc_1m_001'
+        assert tick.price == Decimal('50000.0')
+        assert tick.balance_base == Decimal('1.5')
+        assert tick.balance_quote == Decimal('10000.00')
+        assert tick.error is None
+
+    def test_execute_interval_hold_fetches_balances_once(self, exec_executor):
+        exec_executor.execute_interval()
+        exec_executor._fetch_balances.assert_called_once()
+
+    def test_execute_interval_tick_has_correct_run_id(
+            self, exec_executor, mock_bot_tick_repo,
+    ):
+        exec_executor.execute_interval()
+        tick = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick.run_id == exec_executor.run.id
+
+    def test_execute_interval_tick_has_utc_timestamp(
+            self, exec_executor, mock_bot_tick_repo,
+    ):
+        exec_executor.execute_interval()
+        tick = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick.timestamp.tzinfo is not None
+        assert tick.timestamp.tzinfo.utcoffset(tick.timestamp).total_seconds() == 0
+
+    # BUY signal — order FILLED
+
+    def test_execute_interval_buy_persists_tick_and_order(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_bot_tick_repo, mock_bot_order_repo,
+    ):
+        filled = self._make_order(exec_executor, side=Side.BUY, status=OrderStatus.FILLED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        mock_bot_tick_repo.add.assert_called_once()
+        tick = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick.signal == Signal.BUY
+        assert tick.price == Decimal('50000.0')
+        assert tick.error is None
+
+        mock_bot_order_repo.add.assert_called_once()
+        order = mock_bot_order_repo.add.call_args[0][0]
+        assert order.exchange_order_id == 'TXID-001'
+        assert order.side == Side.BUY
+
+    def test_execute_interval_sell_persists_tick_and_order(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_bot_tick_repo, mock_bot_order_repo,
+    ):
+        mock_strategy.last_action = Signal.BUY
+        filled = self._make_order(exec_executor, side=Side.SELL, status=OrderStatus.FILLED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.SELL, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        tick = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick.signal == Signal.SELL
+        order = mock_bot_order_repo.add.call_args[0][0]
+        assert order.side == Side.SELL
+
+    def test_execute_interval_buy_fetches_balances_after_order(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+    ):
+        filled = self._make_order(exec_executor)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        # Pre-order balances + post-order balances
+        assert exec_executor._fetch_balances.call_count == 2
+
+    def test_execute_interval_buy_links_order_to_tick(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_bot_order_repo,
+    ):
+        filled = self._make_order(exec_executor)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        mock_bot_order_repo.update.assert_called_once()
+        linked_order = mock_bot_order_repo.update.call_args[0][0]
+        assert linked_order.tick_id == 1
+
+    def test_execute_interval_bot_order_side_is_side_enum_not_signal_enum(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_bot_order_repo,
+    ):
+        filled = self._make_order(exec_executor)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        order = mock_bot_order_repo.add.call_args[0][0]
+        assert isinstance(order.side, Side)
+
+    # BUY signal — order FAILED
+
+    def test_execute_interval_failed_order_tick_has_hold_signal(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_bot_tick_repo,
+    ):
+        failed = self._make_order(exec_executor, status=OrderStatus.FAILED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, failed,
+        )
+
+        exec_executor.execute_interval()
+
+        tick = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick.signal == Signal.HOLD
+
+    def test_execute_interval_failed_order_tick_has_error_set(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_bot_tick_repo,
+    ):
+        failed = self._make_order(exec_executor, status=OrderStatus.FAILED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, failed,
+        )
+
+        exec_executor.execute_interval()
+
+        tick = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick.error is not None
+        assert 'failed' in tick.error.lower()
+
+    def test_execute_interval_failed_order_rolls_back_last_action(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+    ):
+        # Given — last action is SELL, strategy generates BUY, order fails
+        mock_strategy.last_action = Signal.SELL
+        failed = self._make_order(exec_executor, status=OrderStatus.FAILED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, failed,
+        )
+
+        exec_executor.execute_interval()
+
+        assert mock_strategy.last_action == Signal.SELL
+
+    def test_execute_interval_failed_order_still_linked_to_tick(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_bot_order_repo,
+    ):
+        failed = self._make_order(exec_executor, status=OrderStatus.FAILED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, failed,
+        )
+
+        exec_executor.execute_interval()
+
+        mock_bot_order_repo.update.assert_called_once()
+        linked_order = mock_bot_order_repo.update.call_args[0][0]
+        assert linked_order.tick_id == 1
+
+    # Dry run
+
+    def test_execute_interval_dry_run_validates_without_placing(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_bot_order_repo, mock_bot_tick_repo,
+    ):
+        exec_executor.dry_run = True
+        mock_strategy.generate_signal.return_value = {'signal': Signal.BUY}
+        mock_add_order_connector.place.return_value = AddOrderResult(
+            txid=None, order_description='buy 0.001 XXBTZGBP @ market',
+        )
+
+        exec_executor.execute_interval()
+
+        mock_add_order_connector.place.assert_called_once_with(
+            'XXBTZGBP', Signal.BUY, Decimal('10000.00'), validate=True,
+        )
+        mock_bot_order_repo.add.assert_not_called()
+        mock_bot_tick_repo.add.assert_not_called()
+
+    def test_execute_interval_dry_run_logs_without_persisting_tick(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_bot_tick_repo,
+    ):
+        exec_executor.dry_run = True
+        mock_strategy.generate_signal.return_value = {'signal': Signal.BUY}
+        mock_add_order_connector.place.return_value = AddOrderResult(
+            txid=None, order_description='buy 0.001 XXBTZGBP @ market',
+        )
+
+        exec_executor.execute_interval()
+
+        mock_bot_tick_repo.add.assert_not_called()
+        log_messages = [str(call.args[1]) for call in exec_executor.logger.log.call_args_list]
+        assert any('DRY RUN' in msg and '50000.0' in msg for msg in log_messages)
+
+    def test_execute_interval_dry_run_hold_logs_at_debug_level(self, exec_executor, mock_strategy):
+        exec_executor.dry_run = True
+        mock_strategy.generate_signal.return_value = {'signal': Signal.HOLD}
+
+        exec_executor.execute_interval()
+
+        log_calls = exec_executor.logger.log.call_args_list
+        dry_run_calls = [c for c in log_calls if 'DRY RUN' in str(c.args[1])]
+        assert len(dry_run_calls) == 1
+        assert dry_run_calls[0].args[0] == logging.DEBUG
+
+    def test_execute_interval_dry_run_buy_logs_at_info_level(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+    ):
+        exec_executor.dry_run = True
+        mock_strategy.generate_signal.return_value = {'signal': Signal.BUY}
+        mock_add_order_connector.place.return_value = AddOrderResult(
+            txid=None, order_description='buy 0.001 XXBTZGBP @ market',
+        )
+
+        exec_executor.execute_interval()
+
+        log_calls = exec_executor.logger.log.call_args_list
+        dry_run_calls = [c for c in log_calls if 'DRY RUN' in str(c.args[1])]
+        assert len(dry_run_calls) == 1
+        assert dry_run_calls[0].args[0] == logging.INFO
+
+    # Logging — signal and order submission
+
+    def test_execute_interval_buy_logs_signal_and_price(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+    ):
+        filled = self._make_order(exec_executor, side=Side.BUY, status=OrderStatus.FILLED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        info_messages = [str(call.args[0]) for call in exec_executor.logger.info.call_args_list]
+        assert any('Signal generated: signal=buy' in msg and '50000.0' in msg for msg in info_messages)
+
+    def test_execute_interval_buy_logs_order_submission_details(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+    ):
+        filled = self._make_order(exec_executor, side=Side.BUY, status=OrderStatus.FILLED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        info_messages = [str(call.args[0]) for call in exec_executor.logger.info.call_args_list]
+        assert any(
+            'TXID-001' in msg and 'buy' in msg and '10000' in msg
+            for msg in info_messages
+        )
+
+    # Logging — interval completion levels
+
+    def test_execute_interval_hold_logs_completion_at_debug_level(self, exec_executor):
+        exec_executor.execute_interval()
+
+        debug_messages = [str(call.args[0]) for call in exec_executor.logger.debug.call_args_list]
+        assert any('Interval complete' in msg and 'hold' in msg for msg in debug_messages)
+
+    def test_execute_interval_buy_logs_completion_at_info_level_with_balances(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+    ):
+        filled = self._make_order(exec_executor, side=Side.BUY, status=OrderStatus.FILLED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        info_messages = [str(call.args[0]) for call in exec_executor.logger.info.call_args_list]
+        assert any(
+            'Interval complete' in msg and 'balance_base' in msg
+            for msg in info_messages
+        )
+
+    # Error flows — strategy exception
+
+    def test_execute_interval_strategy_error_persists_tick_with_error(
+            self, exec_executor, mock_strategy, mock_bot_tick_repo,
+    ):
+        mock_strategy.generate_signal.side_effect = Exception('Strategy failed oh no!')
+
+        exec_executor.execute_interval()
+
+        mock_bot_tick_repo.add.assert_called_once()
+        tick = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick.signal == Signal.HOLD
+        assert tick.error == 'Strategy failed oh no!'
+
+    def test_execute_interval_last_action_rolled_back_on_pre_order_exception(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+    ):
+        # Given — BUY signal but balance fetch (pre-order) raises before order creation
+        mock_strategy.last_action = Signal.SELL
+
+        def mock_generate_signal(ohlc):
+            mock_strategy.last_action = Signal.BUY
+            return {'signal': Signal.BUY}
+
+        mock_strategy.generate_signal.side_effect = mock_generate_signal
+        exec_executor._fetch_balances = Mock(side_effect=[
+            Exception('Balance unavailable'),
+            PairBalances(
+                symbol_base='XXBT', symbol_quote='ZGBP',
+                balance_base=Decimal('0'), balance_quote=Decimal('0'),
+            ),
+        ])
+
+        exec_executor.execute_interval()
+
+        assert mock_strategy.last_action == Signal.SELL
+        mock_add_order_connector.place.assert_not_called()
+
+    # Error flows — post-order exception
+
+    def test_execute_interval_exception_after_order_persisted_tick_records_order_direction(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_bot_tick_repo,
+    ):
+        # Given — BUY signal, order placed, then _confirm_order raises
+        mock_strategy.generate_signal.return_value = {'signal': Signal.BUY}
+        mock_add_order_connector.place.return_value = AddOrderResult(
+            txid=['TXID-001'], order_description='buy 0.001 XXBTZGBP @ market',
+        )
+        exec_executor._confirm_order = Mock(side_effect=Exception('Confirm failed oh no!'))
+
+        exec_executor.execute_interval()
+
+        tick = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick.signal == Signal.BUY
+        assert tick.error == 'Confirm failed oh no!'
+
+    def test_execute_interval_last_action_not_rolled_back_when_order_persisted(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+    ):
+        # Given — strategy changes last_action to BUY, then error after order persisted
+        mock_strategy.last_action = Signal.SELL
+
+        def mock_generate_signal(ohlc):
+            mock_strategy.last_action = Signal.BUY
+            return {'signal': Signal.BUY}
+
+        mock_strategy.generate_signal.side_effect = mock_generate_signal
+        mock_add_order_connector.place.return_value = AddOrderResult(
+            txid=['TXID-001'], order_description='buy 0.001 XXBTZGBP @ market',
+        )
+        exec_executor._confirm_order = Mock(side_effect=Exception('Confirm failed oh no!'))
+
+        exec_executor.execute_interval()
+
+        # last_action NOT rolled back because placed_order exists
+        assert mock_strategy.last_action == Signal.BUY
+
+    def test_execute_interval_balance_error_in_error_handler_returns_early(
+            self, exec_executor, mock_strategy, mock_bot_tick_repo,
+    ):
+        # Given — strategy raises, then balance fetch in error handler also raises
+        mock_strategy.generate_signal.side_effect = Exception('Strategy error')
+        exec_executor._fetch_balances = Mock(side_effect=Exception('Balance error'))
+
+        exec_executor.execute_interval()
+
+        mock_bot_tick_repo.add.assert_not_called()
+
+    # Tick and order persistence errors
+
+    def test_execute_interval_tick_persistence_failure_logs_and_returns(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_bot_tick_repo, mock_bot_order_repo,
+    ):
+        # Given — BUY signal with order, but tick persistence fails
+        filled = self._make_order(exec_executor)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+        mock_bot_tick_repo.add.side_effect = Exception('Supabase write failed')
+
+        exec_executor.execute_interval()
+
+        exec_executor.logger.error.assert_called()
+        mock_bot_order_repo.update.assert_not_called()
+
+    def test_execute_interval_order_link_failure_logs_but_interval_completes(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_bot_order_repo,
+    ):
+        filled = self._make_order(exec_executor)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+        mock_bot_order_repo.update.side_effect = Exception('Update failed')
+
+        exec_executor.execute_interval()
+
+        exec_executor.logger.error.assert_called()
+        log_messages = [str(call.args[0]) for call in exec_executor.logger.info.call_args_list]
+        assert any('complete' in msg.lower() for msg in log_messages)
+
+    # Dry run — reconciliation
+
+    def test_execute_interval_dry_run_still_reconciles(
+            self, exec_executor,
+    ):
+        exec_executor.dry_run = True
+        exec_executor.execute_interval()
+        exec_executor._reconcile_placed_orders.assert_called_once()
+
+    # --- _confirm_order ---
+
+    def test_confirm_order_retries_three_times_when_still_open(
+            self, executor, mock_query_orders_connector, mock_bot_order_repo,
+    ):
+        order = BotOrder(
+            bot_id='btc_1m_001', run_id=executor.run.id,
+            exchange_order_id='TXID-001', side=Side.BUY,
+        )
+        mock_query_orders_connector.fetch.return_value = [
+            QueryOrderResult(
+                txid='TXID-001', price=Decimal('0'), volume=Decimal('0'),
+                fee=Decimal('0'), status=QueryOrderStatus.OPEN,
+            ),
+        ]
+        executor.logger = Mock()
+
+        with patch('time.sleep'):
+            result = executor._confirm_order(order)
+
+        assert mock_query_orders_connector.fetch.call_count == 3
+        assert result.status == OrderStatus.PLACED
+
+    def test_confirm_order_marks_filled_when_closed(
+            self, executor, mock_query_orders_connector, mock_bot_order_repo,
+    ):
+        order = BotOrder(
+            bot_id='btc_1m_001', run_id=executor.run.id,
+            exchange_order_id='TXID-001', side=Side.BUY,
+        )
+        filled_order = replace(
+            order, status=OrderStatus.FILLED, price=Decimal('50000.00'),
+            volume=Decimal('0.001'), fee=Decimal('0.50'),
+        )
+        mock_query_orders_connector.fetch.return_value = [
+            QueryOrderResult(
+                txid='TXID-001', price=Decimal('50000.00'), volume=Decimal('0.001'),
+                fee=Decimal('0.50'), status=QueryOrderStatus.CLOSED,
+            ),
+        ]
+        mock_bot_order_repo.mark_filled.return_value = filled_order
+        executor.logger = Mock()
+
+        result = executor._confirm_order(order)
+
+        mock_bot_order_repo.mark_filled.assert_called_once_with(
+            order.id, Decimal('50000.00'), Decimal('0.001'), Decimal('0.50'),
+        )
+        assert result.status == OrderStatus.FILLED
+
+    def test_confirm_order_marks_failed_when_cancelled(
+            self, executor, mock_query_orders_connector, mock_bot_order_repo,
+    ):
+        order = BotOrder(
+            bot_id='btc_1m_001', run_id=executor.run.id,
+            exchange_order_id='TXID-001', side=Side.BUY,
+        )
+        failed_order = replace(order, status=OrderStatus.FAILED)
+        mock_query_orders_connector.fetch.return_value = [
+            QueryOrderResult(
+                txid='TXID-001', price=Decimal('0'), volume=Decimal('0'),
+                fee=Decimal('0'), status=QueryOrderStatus.CANCELED,
+            ),
+        ]
+        mock_bot_order_repo.mark_failed.return_value = failed_order
+        executor.logger = Mock()
+
+        result = executor._confirm_order(order)
+
+        mock_bot_order_repo.mark_failed.assert_called_once()
+        assert result.status == OrderStatus.FAILED
