@@ -1339,7 +1339,7 @@ class TestTradeExecutor:
         exec_executor.execute_interval()
 
         info_messages = [str(call.args[0]) for call in exec_executor.logger.info.call_args_list]
-        assert any('Signal: buy' in msg and '50000.0' in msg for msg in info_messages)
+        assert any('Signal generated: signal=buy' in msg and '50000.0' in msg for msg in info_messages)
 
     def test_execute_interval_buy_logs_order_submission_details(
             self, exec_executor, mock_strategy, mock_add_order_connector,
