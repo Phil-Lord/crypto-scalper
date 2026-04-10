@@ -1506,12 +1506,12 @@ class TestTradeExecutor:
 
     # Dry run — reconciliation
 
-    def test_execute_interval_dry_run_skips_reconciliation(
-            self, exec_executor, mock_bot_order_repo,
+    def test_execute_interval_dry_run_still_reconciles(
+            self, exec_executor,
     ):
         exec_executor.dry_run = True
         exec_executor.execute_interval()
-        mock_bot_order_repo.get_placed_by_bot_id.assert_not_called()
+        exec_executor._reconcile_placed_orders.assert_called_once()
 
     # --- _confirm_order ---
 
