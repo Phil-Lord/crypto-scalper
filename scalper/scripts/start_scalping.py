@@ -56,6 +56,9 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
             dry_run=dry_run
         )
 
+        executor.recover_state()
+        executor.warm_up()
+
 
 if __name__ == '__main__':
     start_scalping()
