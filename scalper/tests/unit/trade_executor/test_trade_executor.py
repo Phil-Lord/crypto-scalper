@@ -1296,8 +1296,90 @@ class TestTradeExecutor:
         exec_executor.execute_interval()
 
         mock_bot_tick_repo.add.assert_not_called()
-        log_messages = [str(call.args[0]) for call in exec_executor.logger.info.call_args_list]
+        log_messages = [str(call.args[1]) for call in exec_executor.logger.log.call_args_list]
         assert any('DRY RUN' in msg and '50000.0' in msg for msg in log_messages)
+
+    def test_execute_interval_dry_run_hold_logs_at_debug_level(self, exec_executor, mock_strategy):
+        exec_executor.dry_run = True
+        mock_strategy.generate_signal.return_value = {'signal': Signal.HOLD}
+
+        exec_executor.execute_interval()
+
+        log_calls = exec_executor.logger.log.call_args_list
+        dry_run_calls = [c for c in log_calls if 'DRY RUN' in str(c.args[1])]
+        assert len(dry_run_calls) == 1
+        assert dry_run_calls[0].args[0] == logging.DEBUG
+
+    def test_execute_interval_dry_run_buy_logs_at_info_level(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+    ):
+        exec_executor.dry_run = True
+        mock_strategy.generate_signal.return_value = {'signal': Signal.BUY}
+        mock_add_order_connector.place.return_value = AddOrderResult(
+            txid=None, order_description='buy 0.001 XXBTZGBP @ market',
+        )
+
+        exec_executor.execute_interval()
+
+        log_calls = exec_executor.logger.log.call_args_list
+        dry_run_calls = [c for c in log_calls if 'DRY RUN' in str(c.args[1])]
+        assert len(dry_run_calls) == 1
+        assert dry_run_calls[0].args[0] == logging.INFO
+
+    # Logging — signal and order submission
+
+    def test_execute_interval_buy_logs_signal_and_price(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+    ):
+        filled = self._make_order(exec_executor, side=Side.BUY, status=OrderStatus.FILLED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        info_messages = [str(call.args[0]) for call in exec_executor.logger.info.call_args_list]
+        assert any('Signal: buy' in msg and '50000.0' in msg for msg in info_messages)
+
+    def test_execute_interval_buy_logs_order_submission_details(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+    ):
+        filled = self._make_order(exec_executor, side=Side.BUY, status=OrderStatus.FILLED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        info_messages = [str(call.args[0]) for call in exec_executor.logger.info.call_args_list]
+        assert any(
+            'TXID-001' in msg and 'buy' in msg and '10000' in msg
+            for msg in info_messages
+        )
+
+    # Logging — interval completion levels
+
+    def test_execute_interval_hold_logs_completion_at_debug_level(self, exec_executor):
+        exec_executor.execute_interval()
+
+        debug_messages = [str(call.args[0]) for call in exec_executor.logger.debug.call_args_list]
+        assert any('Interval complete' in msg and 'hold' in msg for msg in debug_messages)
+
+    def test_execute_interval_buy_logs_completion_at_info_level_with_balances(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+    ):
+        filled = self._make_order(exec_executor, side=Side.BUY, status=OrderStatus.FILLED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        info_messages = [str(call.args[0]) for call in exec_executor.logger.info.call_args_list]
+        assert any(
+            'Interval complete' in msg and 'balance_base' in msg
+            for msg in info_messages
+        )
 
     # Error flows — strategy exception
 
