@@ -46,7 +46,12 @@ class TradeExecutor:
         self.logger.info('TradeExecutor initialised')
 
     def recover_state(self) -> None:
-        ''' Sets latest directional action on strategy from database. '''
+        '''
+        Restores strategy.last_action from the most recent bot tick in the database.
+
+        If the tick's associated order failed, the action is reversed (the position
+        never actually changed). Defaults to SELL if no previous tick exists.
+        '''
         latest_tick = self.bot_tick_repo.get_latest_action_by_bot_id(self.bot.id)
         if latest_tick:
             associated_order = self.bot_order_repo.get_by_tick_id(latest_tick.id)
@@ -80,6 +85,16 @@ class TradeExecutor:
         self.logger.info(f'Warm-up complete: processed {len(candles)} candles')
 
     def execute_interval(self) -> None:
+        '''
+        Executes a single interval of the bot's strategy:
+
+        1. Reconciles any previously placed orders against the exchange.
+        2. Fetches the latest completed OHLC candle.
+        3. Generates a signal and places an order if BUY/SELL.
+        4. Persists a tick with signal, balances, and any errors (skipped in dry-run mode).
+
+        No-ops if a shutdown has been requested. Returns early if OHLC data is unavailable.
+        '''
         if self._shutting_down:
             self.logger.info('Shutdown in progress, skipping interval execution')
             return
@@ -125,6 +140,12 @@ class TradeExecutor:
         self.logger.info('Shutdown complete')
 
     def _reconcile_placed_orders(self) -> None:
+        '''
+        Queries the exchange for the status of all PLACED orders for this bot, settles each as
+        FILLED or FAILED, and rolls back strategy.last_action if an order was cancelled/expired.
+
+        Logs a warning for any order not returned by the exchange.
+        '''
         placed_orders = self.bot_order_repo.get_placed_by_bot_id(self.bot.id)
         if not placed_orders:
             self.logger.info('No placed orders to reconcile')
@@ -148,7 +169,11 @@ class TradeExecutor:
                     f'Order {order.id} (txid={exchange_id}) not returned by exchange')
 
     def _reconcile_order(self, order: BotOrder, exchange_order: QueryOrderResult) -> None:
-        ''' Reconciles a single placed order against its exchange status. '''
+        '''
+        Settles a single order via _settle_order. No-ops if still open/pending.
+        If the order was cancelled/expired, rolls back strategy.last_action to
+        the opposite signal (the position change never happened).
+        '''
         if exchange_order.status in (QueryOrderStatus.PENDING, QueryOrderStatus.OPEN):
             self.logger.info(
                 f'Order {order.id} is still open on the exchange '
@@ -341,6 +366,11 @@ class TradeExecutor:
         self.logger.info(f'Interval execution complete with signal {signal}')
 
     def _confirm_order(self, order: BotOrder) -> BotOrder:
+        '''
+        Polls the exchange up to 3 times to settle a newly placed order.
+        Returns the settled order (FILLED/FAILED), or the original PLACED
+        order if still unsettled — to be reconciled next interval.
+        '''
         for attempt in range(3):
             if attempt > 0:
                 time.sleep(1)
