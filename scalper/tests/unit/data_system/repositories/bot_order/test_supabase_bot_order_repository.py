@@ -650,20 +650,22 @@ class TestSupabaseBotOrderRepository:
         assert isinstance(result.status, OrderStatus)
 
     def test_get_by_tick_id_parses_null_fill_fields(self, mock_supabase_client, sample_placed_order: BotOrder, mock_placed_response_data: dict):
-        # Given
-        self._set_select_eq_response(mock_supabase_client, [mock_placed_response_data])
+        # Given — use a real tick_id (int) to match the method's contract
+        tick_id = 42
+        response_data = {**mock_placed_response_data, 'tick_id': tick_id}
+        self._set_select_eq_response(mock_supabase_client, [response_data])
         repository = SupabaseBotOrderRepository(mock_supabase_client)
 
         # When
-        result = repository.get_by_tick_id(sample_placed_order.tick_id)
+        result = repository.get_by_tick_id(tick_id)
 
         # Then
         assert result is not None
+        assert result.tick_id == tick_id
         assert result.filled_at is None
         assert result.price is None
         assert result.volume is None
         assert result.fee is None
-        assert result.tick_id is None
 
     # --- get_placed_by_bot_id ---
 
