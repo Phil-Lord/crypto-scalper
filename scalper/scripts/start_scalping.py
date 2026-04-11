@@ -109,6 +109,8 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
         )
 
     def _shutdown(signum: int, frame: FrameType | None) -> None:
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
         for executor in executors:
             executor.request_shutdown()
         scheduler.shutdown(wait=True)

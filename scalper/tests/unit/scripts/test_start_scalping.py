@@ -314,12 +314,37 @@ class TestStartScalping:
         )
         shutdown_handler = sigterm_call.args[1]
 
+        # Reset call tracking so we only see calls from the shutdown handler
+        all_mocks['signal'].signal.reset_mock()
+
         # Invoke the shutdown handler
         shutdown_handler(all_mocks['signal'].SIGTERM, None)
 
         executor.request_shutdown.assert_called_once()
         all_mocks['scheduler'].shutdown.assert_called_once_with(wait=True)
         executor.shutdown.assert_called_once()
+
+    def test_shutdown_handler_resets_signal_handlers_to_default(self, all_mocks):
+        all_mocks['bot_repo'].get.return_value = _make_bot()
+
+        start_scalping.main(['--bot-id', 'btc_1m_001'], standalone_mode=False)
+
+        sigterm_call = next(
+            c for c in all_mocks['signal'].signal.call_args_list
+            if c.args[0] is all_mocks['signal'].SIGTERM
+        )
+        shutdown_handler = sigterm_call.args[1]
+        all_mocks['signal'].signal.reset_mock()
+
+        shutdown_handler(all_mocks['signal'].SIGTERM, None)
+
+        # Verify signal handlers were reset to SIG_DFL to prevent double-shutdown
+        all_mocks['signal'].signal.assert_any_call(
+            all_mocks['signal'].SIGTERM, all_mocks['signal'].SIG_DFL
+        )
+        all_mocks['signal'].signal.assert_any_call(
+            all_mocks['signal'].SIGINT, all_mocks['signal'].SIG_DFL
+        )
 
     def test_aborts_when_warm_up_fails(self, all_mocks):
         all_mocks['bot_repo'].get.return_value = _make_bot()
