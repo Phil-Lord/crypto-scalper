@@ -94,6 +94,9 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
             executor.recover_state()
         except Exception:
             logger.exception(f'Failed to initialise bot {bot.id}, aborting')
+            executor.shutdown()
+            for prev in executors:
+                prev.shutdown()
             return
         executors.append(executor)
 
