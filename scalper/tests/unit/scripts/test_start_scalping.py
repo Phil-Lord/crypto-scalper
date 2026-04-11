@@ -321,6 +321,24 @@ class TestStartScalping:
         all_mocks['scheduler'].shutdown.assert_called_once_with(wait=True)
         executor.shutdown.assert_called_once()
 
+    def test_aborts_when_warm_up_fails(self, all_mocks):
+        all_mocks['bot_repo'].get.return_value = _make_bot()
+        executor = all_mocks['trade_executor_cls'].return_value
+        executor.warm_up.side_effect = RuntimeError('Kraken unavailable')
+
+        start_scalping.main(['--bot-id', 'btc_1m_001'], standalone_mode=False)
+
+        all_mocks['scheduler'].start.assert_not_called()
+
+    def test_aborts_when_recover_state_fails(self, all_mocks):
+        all_mocks['bot_repo'].get.return_value = _make_bot()
+        executor = all_mocks['trade_executor_cls'].return_value
+        executor.recover_state.side_effect = RuntimeError('DB unavailable')
+
+        start_scalping.main(['--bot-id', 'btc_1m_001'], standalone_mode=False)
+
+        all_mocks['scheduler'].start.assert_not_called()
+
 
 @pytest.mark.scripts
 @pytest.mark.start_scalping

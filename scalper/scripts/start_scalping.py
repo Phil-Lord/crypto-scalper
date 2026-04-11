@@ -89,8 +89,12 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
             dry_run=dry_run
         )
 
-        executor.warm_up()
-        executor.recover_state()
+        try:
+            executor.warm_up()
+            executor.recover_state()
+        except Exception:
+            logger.exception(f'Failed to initialise bot {bot.id}, aborting')
+            return
         executors.append(executor)
 
         cron_kwargs = interval_to_cron(bot.interval)
