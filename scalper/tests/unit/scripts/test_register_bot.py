@@ -25,10 +25,11 @@ class TestRegisterBot:
             '-par', '{"sma_period": 20}',
         ]
 
-    @patch('scripts.register_bot.BotRepository')
+    @patch('scripts.register_bot.SupabaseClient')
+    @patch('scripts.register_bot.SupabaseBotRepository')
     @patch('scripts.register_bot.Bot')
     def test_register_bot_creates_bot_and_calls_add(
-        self, mock_bot_cls, mock_repo_cls, runner: CliRunner, cli_args: list[str]
+        self, mock_bot_cls, mock_repo_cls, mock_client_cls, runner: CliRunner, cli_args: list[str]
     ):
         # Given
         mock_bot = MagicMock()
@@ -45,12 +46,14 @@ class TestRegisterBot:
         mock_bot_cls.assert_called_once_with(
             'btc_1m_001', 'XXBTZGBP', 'SmaStrategy', 'v1.0.0', 1, {'sma_period': 20},
         )
+        mock_repo_cls.assert_called_once_with(mock_client_cls.return_value)
         mock_repo.add.assert_called_once_with(mock_bot)
 
-    @patch('scripts.register_bot.BotRepository')
+    @patch('scripts.register_bot.SupabaseClient')
+    @patch('scripts.register_bot.SupabaseBotRepository')
     @patch('scripts.register_bot.Bot')
     def test_register_bot_echoes_success_message(
-        self, mock_bot_cls, mock_repo_cls, runner: CliRunner, cli_args: list[str]
+        self, mock_bot_cls, mock_repo_cls, mock_client_cls, runner: CliRunner, cli_args: list[str]
     ):
         mock_bot = MagicMock()
         mock_bot.__str__ = lambda self: 'Bot(btc_1m_001)'
@@ -92,10 +95,11 @@ class TestRegisterBot:
         ])
         assert result.exit_code != 0
 
-    @patch('scripts.register_bot.BotRepository')
+    @patch('scripts.register_bot.SupabaseClient')
+    @patch('scripts.register_bot.SupabaseBotRepository')
     @patch('scripts.register_bot.Bot')
     def test_register_bot_propagates_repository_error(
-        self, mock_bot_cls, mock_repo_cls, runner: CliRunner, cli_args: list[str]
+        self, mock_bot_cls, mock_repo_cls, mock_client_cls, runner: CliRunner, cli_args: list[str]
     ):
         mock_repo = MagicMock()
         mock_repo.add.side_effect = RuntimeError('Connection failed')

@@ -2,7 +2,7 @@ import json
 
 import click
 
-from data_system import Bot, BotRepository
+from data_system import Bot, SupabaseBotRepository, SupabaseClient
 
 
 @click.command()
@@ -21,7 +21,7 @@ def register_bot(
         parameters: str
 ) -> None:
     parsed_parameters = json.loads(parameters)
-    bot_repository = BotRepository()
+    bot_repository = SupabaseBotRepository(SupabaseClient())
     added_bot = bot_repository.add(
         Bot(id, pair, strategy_name, strategy_version, interval, parsed_parameters)
     )
