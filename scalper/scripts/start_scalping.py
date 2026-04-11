@@ -1,4 +1,5 @@
 import logging
+import os
 
 from apscheduler.schedulers.background import BlockingScheduler
 import click
@@ -21,7 +22,7 @@ from strategy_manager import create_strategy
 from utils import load_env, LOG_FORMAT
 
 load_env()
-logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'), format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
 
