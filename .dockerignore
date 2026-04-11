@@ -24,4 +24,3 @@ scalper/backtesting_engine/
 scalper/study_analyser/
 Dockerfile
 .dockerignore
-entrypoint.sh
