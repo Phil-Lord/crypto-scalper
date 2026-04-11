@@ -12,10 +12,6 @@ test/scripts:
 test/utils:
 	pytest -m utils
 
-# Run all scripts tests
-test/scripts:
-	pytest -m scripts
-
 # Run all data_system tests
 test/data_system:
 	pytest -m data_system
