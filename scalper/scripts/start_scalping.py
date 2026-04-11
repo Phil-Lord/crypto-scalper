@@ -1,5 +1,6 @@
 import logging
 import os
+import signal
 
 from apscheduler.schedulers.background import BlockingScheduler
 import click
@@ -37,6 +38,8 @@ logger = logging.getLogger(__name__)
 def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
     client = SupabaseClient()
     bot_repository = SupabaseBotRepository(client)
+    executors: list[TradeExecutor] = []
+    scheduler = BlockingScheduler()
 
     for id in bot_id:
         bot = bot_repository.get(id)
@@ -62,10 +65,9 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
 
         executor.warm_up()
         executor.recover_state()
+        executors.append(executor)
 
         minute_expr = '*' if bot.interval == 1 else f'*/{bot.interval}'
-
-        scheduler = BlockingScheduler()
         scheduler.add_job(
             executor.execute_interval,
             'cron',                         # wall-clock-aligned trigger
@@ -75,7 +77,18 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
             misfire_grace_time=1,           # discard if >1s late; prevents stale catch-up runs
             max_instances=1,                # prevent overlapping runs for this bot
         )
-        scheduler.start()
+
+    def _shutdown(signum, frame):
+        for executor in executors:
+            executor.request_shutdown()
+        scheduler.shutdown(wait=True)
+        for executor in executors:
+            executor.shutdown()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
+    scheduler.start()
 
 
 if __name__ == '__main__':
