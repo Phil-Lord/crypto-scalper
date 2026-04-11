@@ -56,7 +56,7 @@ class TestRegisterBot:
         self, mock_bot_cls, mock_repo_cls, mock_client_cls, runner: CliRunner, cli_args: list[str]
     ):
         mock_bot = MagicMock()
-        mock_bot.__str__ = lambda self: 'Bot(btc_1m_001)'
+        mock_bot.__str__.return_value = 'Bot(btc_1m_001)'
         mock_repo = MagicMock()
         mock_repo.add.return_value = mock_bot
         mock_repo_cls.return_value = mock_repo
