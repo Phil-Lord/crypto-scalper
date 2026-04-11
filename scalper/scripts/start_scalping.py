@@ -78,6 +78,10 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
             max_instances=1,                # prevent overlapping runs for this bot
         )
 
+    if not executors:
+        logger.error('No valid bots found, exiting')
+        return
+
     def _shutdown(signum, frame):
         for executor in executors:
             executor.request_shutdown()
