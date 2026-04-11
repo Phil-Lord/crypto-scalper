@@ -23,6 +23,8 @@ from utils import load_env, LOG_FORMAT
 
 load_env()
 logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'), format=LOG_FORMAT)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('apscheduler.executors.default').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
