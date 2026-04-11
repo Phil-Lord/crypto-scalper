@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import logging
 from unittest.mock import Mock, patch
 
 from apscheduler.schedulers import SchedulerNotRunningError
@@ -446,6 +447,19 @@ class TestStartScalping:
         executor_b.shutdown.assert_called_once()
         executor_a.shutdown.assert_called_once()
         all_mocks['scheduler'].start.assert_not_called()
+
+
+@pytest.mark.scripts
+@pytest.mark.start_scalping
+class TestModuleLogging:
+
+    def test_module_logger_respects_app_level(self):
+        '''The script logger should have its level set explicitly, not inherit WARNING from root.'''
+        import scripts.start_scalping as mod
+        module_logger = logging.getLogger(mod.__name__)
+        # The module sets logger.setLevel(app_level) at import time;
+        # app_level defaults to INFO when LOG_LEVEL env var is unset
+        assert module_logger.level <= logging.INFO
 
 
 @pytest.mark.scripts

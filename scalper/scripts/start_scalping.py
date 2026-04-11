@@ -37,6 +37,7 @@ for name in ('trade_executor', 'exchange_connector', 'data_system', 'strategy_ma
     logging.getLogger(name).setLevel(app_level)
 
 logger = logging.getLogger(__name__)
+logger.setLevel(app_level)
 
 INTERVAL_CRON_MAP: dict[int, dict[str, str]] = {
     1: {'minute': '*'},
