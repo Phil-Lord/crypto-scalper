@@ -67,7 +67,7 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
         bots.append(bot)
 
     executors: list[TradeExecutor] = []
-    scheduler = BlockingScheduler()
+    scheduler = BlockingScheduler(timezone=timezone.utc)
 
     for bot in bots:
         strategy = create_strategy(bot.strategy_name, bot.parameters)
