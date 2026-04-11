@@ -99,6 +99,17 @@ class TestRegisterBot:
             '-sv', 'v1.0.0', '-int', '1', '-par', 'not-json',
         ])
         assert result.exit_code != 0
+        assert 'Invalid JSON' in result.output
+        assert '--parameters' in result.output
+
+    def test_register_bot_fails_when_parameters_is_not_a_dict(self, runner: CliRunner):
+        result = runner.invoke(register_bot, [
+            '-i', 'btc_1m_001', '-p', 'XXBTZGBP', '-sn', 'SmaStrategy',
+            '-sv', 'v1.0.0', '-int', '1', '-par', '[1, 2, 3]',
+        ])
+        assert result.exit_code != 0
+        assert 'Parameters must be a JSON object' in result.output
+        assert '--parameters' in result.output
 
     @patch('scripts.register_bot.SupabaseClient')
     @patch('scripts.register_bot.SupabaseBotRepository')

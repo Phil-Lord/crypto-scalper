@@ -25,7 +25,13 @@ def register_bot(
         interval: int,
         parameters: str
 ) -> None:
-    parsed_parameters = json.loads(parameters)
+    try:
+        parsed_parameters = json.loads(parameters)
+    except json.JSONDecodeError as e:
+        raise click.BadParameter(f'Invalid JSON: {e}', param_hint="'--parameters'")
+    if not isinstance(parsed_parameters, dict):
+        raise click.BadParameter(
+            'Parameters must be a JSON object (e.g. {\'key\': value})', param_hint="'--parameters'")
     bot_repository = SupabaseBotRepository(SupabaseClient())
     added_bot = bot_repository.add(
         Bot(
