@@ -58,8 +58,8 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
             dry_run=dry_run
         )
 
-        executor.recover_state()
         executor.warm_up()
+        executor.recover_state()
 
         minute_expr = '*' if bot.interval == 1 else f'*/{bot.interval}'
 
