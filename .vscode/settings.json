@@ -20,6 +20,11 @@
         "diffEditor.ignoreTrimWhitespace": false,
     },
 
+    // File associations
+    "files.associations": {
+        ".dockerignore": "plaintext"
+    },
+
     // GitHub Copilot settings
     "github.copilot.chat.askQuestions.enabled": true,
     "inlineChat.renderMode": "hover"
