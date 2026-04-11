@@ -35,6 +35,18 @@ for name in ('trade_executor', 'exchange_connector', 'data_system', 'strategy_ma
 
 logger = logging.getLogger(__name__)
 
+INTERVAL_CRON_MAP: dict[int, dict[str, str]] = {
+    1: {'minute': '*'},
+    5: {'minute': '*/5'},
+    15: {'minute': '*/15'},
+    30: {'minute': '*/30'},
+    60: {'minute': '0'},
+    240: {'minute': '0', 'hour': '*/4'},
+    1440: {'minute': '0', 'hour': '0'},
+    10080: {'minute': '0', 'hour': '0', 'day_of_week': '0'},
+    21600: {'minute': '0', 'hour': '0', 'day': '1,16'},
+}
+
 
 @click.command()
 @click.option(
@@ -79,11 +91,11 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
         executor.recover_state()
         executors.append(executor)
 
-        minute_expr = '*' if bot.interval == 1 else f'*/{bot.interval}'
+        cron_kwargs = interval_to_cron(bot.interval)
         scheduler.add_job(
             executor.execute_interval,
             'cron',                         # wall-clock-aligned trigger
-            minute=minute_expr,             # respects bot interval (e.g. */5 for 5m)
+            **cron_kwargs,                  # e.g. minute='*/5' for 5m, hour='*/4' for 4h interval
             second='5',                     # fire 5s into the minute (Kraken data lag)
             jitter=3,                       # stagger multi-bot calls by up to ±3s
             misfire_grace_time=1,           # discard if >1s late; prevents stale catch-up runs
@@ -101,6 +113,26 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
     signal.signal(signal.SIGINT, _shutdown)
 
     scheduler.start()
+
+
+def interval_to_cron(interval: int) -> dict[str, str]:
+    '''
+    Converts a bot interval (in minutes) to APScheduler cron keyword arguments.
+
+    APScheduler's cron minute field only supports 0-59, so intervals >= 60
+    must be expressed using hour/day_of_week fields instead.
+
+    :param interval: OHLC interval in minutes (must be a valid Kraken interval).
+    :return: Dict of cron trigger kwargs (minute, hour, etc.).
+    :raises ValueError: If the interval is not supported for scheduling.
+    '''
+    cron_kwargs = INTERVAL_CRON_MAP.get(interval)
+    if cron_kwargs is None:
+        raise ValueError(
+            f'Unsupported interval {interval}m for cron scheduling. '
+            f'Supported: {sorted(INTERVAL_CRON_MAP)}'
+        )
+    return cron_kwargs
 
 
 if __name__ == '__main__':
