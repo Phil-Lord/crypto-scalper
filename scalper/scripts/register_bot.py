@@ -1,8 +1,13 @@
 import json
+import logging
 
 import click
 
 from data_system import Bot, SupabaseBotRepository, SupabaseClient
+from utils import LOG_FORMAT, load_env
+
+load_env()
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 
 @click.command()
