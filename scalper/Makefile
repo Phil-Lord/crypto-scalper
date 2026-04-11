@@ -4,6 +4,10 @@
 test:
 	pytest
 
+# Run all scripts tests
+test/scripts:
+	pytest -m scripts
+
 # Run all utils tests
 test/utils:
 	pytest -m utils

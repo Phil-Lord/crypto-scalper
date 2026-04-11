@@ -45,6 +45,21 @@ class TradeExecutor:
 
         self.logger.info(f'TradeExecutor initialised (run_id={self.run.id})')
 
+    def warm_up(self) -> None:
+        ''' Feeds historical OHLC data through the strategy to warm up indicators. '''
+        self.logger.info('Warming up strategy...')
+
+        candles = self._fetch_ohlc_history()
+        if len(candles) < self.strategy.warmup_candles:
+            self.logger.warning(
+                f'Received {len(candles)} candles but {self.strategy.warmup_candles} required '
+                f'(Kraken cap is 720); signals may be unreliable for the first few intervals'
+            )
+
+        for ohlc in candles:
+            self.strategy.generate_signal(ohlc)
+        self.logger.info(f'Warm-up complete: processed {len(candles)} candles')
+
     def recover_state(self) -> None:
         '''
         Restores strategy.last_action from the most recent bot tick in the database.
@@ -68,21 +83,6 @@ class TradeExecutor:
         else:
             self.strategy.last_action = Signal.SELL
             self.logger.info('No previous action found, starting fresh')
-
-    def warm_up(self) -> None:
-        ''' Feeds historical OHLC data through the strategy to warm up indicators. '''
-        self.logger.info('Warming up strategy...')
-
-        candles = self._fetch_ohlc_history()
-        if len(candles) < self.strategy.warmup_candles:
-            self.logger.warning(
-                f'Received {len(candles)} candles but {self.strategy.warmup_candles} required '
-                f'(Kraken cap is 720); signals may be unreliable for the first few intervals'
-            )
-
-        for ohlc in candles:
-            self.strategy.generate_signal(ohlc)
-        self.logger.info(f'Warm-up complete: processed {len(candles)} candles')
 
     def execute_interval(self) -> None:
         '''
