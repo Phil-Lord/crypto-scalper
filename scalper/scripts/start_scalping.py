@@ -36,8 +36,7 @@ logger = logging.getLogger(__name__)
 )
 @click.option('--dry-run', is_flag=True, default=False, help='Run the bot in dry-run mode')
 def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
-    client = SupabaseClient()
-    bot_repository = SupabaseBotRepository(client)
+    bot_repository = SupabaseBotRepository(SupabaseClient())
     executors: list[TradeExecutor] = []
     scheduler = BlockingScheduler()
 
@@ -49,6 +48,7 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
 
         strategy = create_strategy(bot.strategy_name, bot.parameters)
         sizer = AllInPositionSizer()
+        client = SupabaseClient()
         executor = TradeExecutor(
             bot,
             strategy,
