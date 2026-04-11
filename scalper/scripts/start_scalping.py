@@ -1,6 +1,8 @@
+from datetime import timezone
 import logging
 import os
 import signal
+from types import FrameType
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 import click
@@ -102,7 +104,7 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
             max_instances=1,                # prevent overlapping runs for this bot
         )
 
-    def _shutdown(signum, frame):
+    def _shutdown(signum: int, frame: FrameType | None) -> None:
         for executor in executors:
             executor.request_shutdown()
         scheduler.shutdown(wait=True)
