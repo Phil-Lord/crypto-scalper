@@ -48,7 +48,7 @@ INTERVAL_CRON_MAP: dict[int, dict[str, str]] = {
     240: {'minute': '0', 'hour': '*/4'},
     1440: {'minute': '0', 'hour': '0'},
     10080: {'minute': '0', 'hour': '0', 'day_of_week': '0'},
-    21600: {'minute': '0', 'hour': '0', 'day': '1,16'},
+    21600: {'minute': '0', 'hour': '0', 'day': '1,16'}  # run on 1st and 16th of each month
 }
 
 
