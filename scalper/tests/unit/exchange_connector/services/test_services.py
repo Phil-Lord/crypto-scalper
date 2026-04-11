@@ -483,6 +483,34 @@ class TestOhlcService:
         assert params['interval'] == 5
         assert params['since'] == 1704000000
 
+    def test_fetch_ohlc_raises_on_invalid_interval(self, mock_client):
+        from exchange_connector.services.ohlc_service import OhlcService
+        service = OhlcService(mock_client)
+
+        with pytest.raises(ValueError, match='Invalid OHLC interval: 2'):
+            service.fetch_ohlc('XXBTZGBP', 2, 1704000000)
+
+    def test_fetch_ohlc_raises_on_invalid_interval_includes_valid_list(self, mock_client):
+        from exchange_connector.services.ohlc_service import OhlcService
+        service = OhlcService(mock_client)
+
+        with pytest.raises(ValueError, match='Kraken supports:'):
+            service.fetch_ohlc('XXBTZGBP', 3, 1704000000)
+
+    @pytest.mark.parametrize('interval', [1, 5, 15, 30, 60, 240, 1440, 10080, 21600])
+    def test_fetch_ohlc_accepts_all_valid_intervals(self, mock_client, interval):
+        # Given
+        from exchange_connector.services.ohlc_service import OhlcService
+        service = OhlcService(mock_client)
+        ohlc_data = [[1704067200, '50000', '50100', '49900', '50050', '100', '5000000', 10]]
+        mock_client.make_request.return_value = {
+            'result': {'XXBTZGBP': ohlc_data, 'last': 1704067200},
+            'error': []
+        }
+
+        # When / Then (no exception raised)
+        service.fetch_ohlc('XXBTZGBP', interval, 1704000000)
+
 
 @pytest.mark.exchange_connector
 @pytest.mark.services
