@@ -1,3 +1,5 @@
+import json
+
 import click
 
 from data_system import Bot, BotRepository
@@ -18,9 +20,10 @@ def register_bot(
         interval: int,
         parameters: str
 ) -> None:
+    parsed_parameters = json.loads(parameters)
     bot_repository = BotRepository()
     added_bot = bot_repository.add(
-        Bot(id, pair, strategy_name, strategy_version, interval, parameters)
+        Bot(id, pair, strategy_name, strategy_version, interval, parsed_parameters)
     )
     click.echo(f'Bot registered successfully: {added_bot}')
 

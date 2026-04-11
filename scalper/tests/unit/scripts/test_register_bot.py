@@ -43,7 +43,7 @@ class TestRegisterBot:
         # Then
         assert result.exit_code == 0
         mock_bot_cls.assert_called_once_with(
-            'btc_1m_001', 'XXBTZGBP', 'SmaStrategy', 'v1.0.0', 1, '{"sma_period": 20}',
+            'btc_1m_001', 'XXBTZGBP', 'SmaStrategy', 'v1.0.0', 1, {'sma_period': 20},
         )
         mock_repo.add.assert_called_once_with(mock_bot)
 
@@ -82,6 +82,13 @@ class TestRegisterBot:
         result = runner.invoke(register_bot, [
             '-i', 'btc_1m_001', '-p', 'XXBTZGBP', '-sn', 'SmaStrategy',
             '-sv', 'v1.0.0', '-int', 'abc', '-par', '{}',
+        ])
+        assert result.exit_code != 0
+
+    def test_register_bot_fails_when_parameters_is_invalid_json(self, runner: CliRunner):
+        result = runner.invoke(register_bot, [
+            '-i', 'btc_1m_001', '-p', 'XXBTZGBP', '-sn', 'SmaStrategy',
+            '-sv', 'v1.0.0', '-int', '1', '-par', 'not-json',
         ])
         assert result.exit_code != 0
 
