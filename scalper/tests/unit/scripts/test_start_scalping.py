@@ -364,6 +364,68 @@ class TestStartScalping:
 
         all_mocks['scheduler'].start.assert_not_called()
 
+    # --- Initialisation failure cleanup ---
+
+    def test_shuts_down_failing_executor_on_warm_up_failure(self, all_mocks):
+        all_mocks['bot_repo'].get.return_value = _make_bot()
+        executor = all_mocks['trade_executor_cls'].return_value
+        executor.warm_up.side_effect = RuntimeError('Kraken unavailable')
+
+        start_scalping.main(['--bot-id', 'btc_1m_001'], standalone_mode=False)
+
+        executor.shutdown.assert_called_once()
+
+    def test_shuts_down_failing_executor_on_recover_state_failure(self, all_mocks):
+        all_mocks['bot_repo'].get.return_value = _make_bot()
+        executor = all_mocks['trade_executor_cls'].return_value
+        executor.recover_state.side_effect = RuntimeError('DB unavailable')
+
+        start_scalping.main(['--bot-id', 'btc_1m_001'], standalone_mode=False)
+
+        executor.shutdown.assert_called_once()
+
+    def test_shuts_down_previous_executors_when_later_bot_fails(self, all_mocks):
+        '''If bot B fails warm-up, bot A's executor (already initialised) must be shut down.'''
+        bot_a = _make_bot('bot_a', interval=1)
+        bot_b = _make_bot('bot_b', interval=5)
+        all_mocks['bot_repo'].get.side_effect = [bot_a, bot_b]
+
+        executor_a = Mock()
+        executor_b = Mock()
+        executor_b.warm_up.side_effect = RuntimeError('Kraken unavailable')
+        all_mocks['trade_executor_cls'].side_effect = [executor_a, executor_b]
+
+        start_scalping.main(
+            ['--bot-id', 'bot_a', '--bot-id', 'bot_b'], standalone_mode=False,
+        )
+
+        executor_b.shutdown.assert_called_once()
+        executor_a.shutdown.assert_called_once()
+        all_mocks['scheduler'].start.assert_not_called()
+
+    def test_shuts_down_all_previous_executors_when_third_bot_fails(self, all_mocks):
+        '''If bot C fails, both bot A and bot B executors must be shut down.'''
+        bot_a = _make_bot('bot_a', interval=1)
+        bot_b = _make_bot('bot_b', interval=5)
+        bot_c = _make_bot('bot_c', interval=15)
+        all_mocks['bot_repo'].get.side_effect = [bot_a, bot_b, bot_c]
+
+        executor_a = Mock()
+        executor_b = Mock()
+        executor_c = Mock()
+        executor_c.recover_state.side_effect = RuntimeError('DB unavailable')
+        all_mocks['trade_executor_cls'].side_effect = [executor_a, executor_b, executor_c]
+
+        start_scalping.main(
+            ['--bot-id', 'bot_a', '--bot-id', 'bot_b', '--bot-id', 'bot_c'],
+            standalone_mode=False,
+        )
+
+        executor_c.shutdown.assert_called_once()
+        executor_b.shutdown.assert_called_once()
+        executor_a.shutdown.assert_called_once()
+        all_mocks['scheduler'].start.assert_not_called()
+
 
 @pytest.mark.scripts
 @pytest.mark.start_scalping
