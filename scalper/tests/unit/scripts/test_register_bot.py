@@ -44,7 +44,12 @@ class TestRegisterBot:
         # Then
         assert result.exit_code == 0
         mock_bot_cls.assert_called_once_with(
-            'btc_1m_001', 'XXBTZGBP', 'SmaStrategy', 'v1.0.0', 1, {'sma_period': 20},
+            id='btc_1m_001',
+            pair='XXBTZGBP',
+            strategy_name='SmaStrategy',
+            strategy_version='v1.0.0',
+            interval=1,
+            parameters={'sma_period': 20},
         )
         mock_repo_cls.assert_called_once_with(mock_client_cls.return_value)
         mock_repo.add.assert_called_once_with(mock_bot)

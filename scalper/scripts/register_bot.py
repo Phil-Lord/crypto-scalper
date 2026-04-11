@@ -28,7 +28,14 @@ def register_bot(
     parsed_parameters = json.loads(parameters)
     bot_repository = SupabaseBotRepository(SupabaseClient())
     added_bot = bot_repository.add(
-        Bot(id, pair, strategy_name, strategy_version, interval, parsed_parameters)
+        Bot(
+            id=id,
+            pair=pair,
+            strategy_name=strategy_name,
+            strategy_version=strategy_version,
+            interval=interval,
+            parameters=parsed_parameters
+        )
     )
     click.echo(f'Bot registered successfully: {added_bot}')
 
