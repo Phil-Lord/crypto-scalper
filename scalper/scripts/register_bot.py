@@ -1,5 +1,7 @@
 import click
 
+from data_system import Bot, BotRepository
+
 
 @click.command()
 @click.option('-i', '--id', required=True, help='Unique identifier for the bot')
@@ -16,7 +18,11 @@ def register_bot(
         interval: int,
         parameters: str
 ) -> None:
-    pass
+    bot_repository = BotRepository()
+    added_bot = bot_repository.add(
+        Bot(id, pair, strategy_name, strategy_version, interval, parameters)
+    )
+    click.echo(f'Bot registered successfully: {added_bot}')
 
 
 if __name__ == '__main__':
