@@ -4,6 +4,7 @@ import os
 import signal
 from types import FrameType
 
+from apscheduler.schedulers import SchedulerNotRunningError
 from apscheduler.schedulers.blocking import BlockingScheduler
 import click
 
@@ -116,7 +117,10 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
         signal.signal(signal.SIGINT, signal.SIG_DFL)
         for executor in executors:
             executor.request_shutdown()
-        scheduler.shutdown(wait=True)
+        try:
+            scheduler.shutdown(wait=True)
+        except SchedulerNotRunningError:
+            pass
         for executor in executors:
             executor.shutdown()
 

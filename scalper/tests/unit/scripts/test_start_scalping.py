@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
+from apscheduler.schedulers import SchedulerNotRunningError
 import pytest
 
 from data_system.models.bot_model import Bot
@@ -345,6 +346,26 @@ class TestStartScalping:
         all_mocks['signal'].signal.assert_any_call(
             all_mocks['signal'].SIGINT, all_mocks['signal'].SIG_DFL
         )
+
+    def test_shutdown_handler_tolerates_scheduler_not_running(self, all_mocks):
+        ''' If SIGTERM arrives before scheduler.start(), shutdown should not raise. '''
+        all_mocks['bot_repo'].get.return_value = _make_bot()
+        all_mocks['scheduler'].shutdown.side_effect = SchedulerNotRunningError()
+
+        start_scalping.main(['--bot-id', 'btc_1m_001'], standalone_mode=False)
+
+        sigterm_call = next(
+            c for c in all_mocks['signal'].signal.call_args_list
+            if c.args[0] is all_mocks['signal'].SIGTERM
+        )
+        shutdown_handler = sigterm_call.args[1]
+
+        # Should not raise — the SchedulerNotRunningError is caught
+        shutdown_handler(all_mocks['signal'].SIGTERM, None)
+
+        executor = all_mocks['trade_executor_cls'].return_value
+        executor.request_shutdown.assert_called_once()
+        executor.shutdown.assert_called_once()
 
     def test_aborts_when_warm_up_fails(self, all_mocks):
         all_mocks['bot_repo'].get.return_value = _make_bot()
