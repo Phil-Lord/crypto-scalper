@@ -11,6 +11,9 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.6 /uv /uvx /bin/
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-group dev --no-group docs
 
+# Make venv python the default
+ENV PATH="/app/.venv/bin:$PATH"
+
 # Copy the application code and entrypoint script
 COPY scalper/ ./scalper/
 COPY entrypoint.sh .
