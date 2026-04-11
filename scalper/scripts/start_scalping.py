@@ -61,10 +61,10 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
 
     # Validate all bot IDs before initialising any executors
     bots: list[Bot] = []
-    for id in bot_id:
-        bot = bot_repository.get(id)
+    for bid in bot_id:
+        bot = bot_repository.get(bid)
         if not bot:
-            logger.error(f'Bot with ID {id} not found, aborting')
+            logger.error(f'Bot with ID {bid} not found, aborting')
             return
         bots.append(bot)
 
