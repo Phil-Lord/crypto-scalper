@@ -24,9 +24,15 @@ from strategy_manager import create_strategy
 from utils import load_env, LOG_FORMAT
 
 load_env()
-logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'), format=LOG_FORMAT)
-logging.getLogger('httpx').setLevel(logging.WARNING)
-logging.getLogger('apscheduler.executors.default').setLevel(logging.WARNING)
+
+# Default log level is WARNING to reduce noise from httpcore, hpack, etc.
+logging.basicConfig(level=logging.WARNING, format=LOG_FORMAT)
+
+# Application log level is set from env var, defaulting to INFO
+app_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+for name in ('trade_executor', 'exchange_connector', 'data_system', 'strategy_manager', 'scripts'):
+    logging.getLogger(name).setLevel(app_level)
+
 logger = logging.getLogger(__name__)
 
 
