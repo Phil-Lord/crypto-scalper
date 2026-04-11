@@ -171,18 +171,12 @@ class TestStartScalping:
 
     # --- Bot not found ---
 
-    def test_skips_unknown_bot(self, all_mocks):
+    def test_aborts_when_bot_not_found(self, all_mocks):
         all_mocks['bot_repo'].get.return_value = None
 
         start_scalping.main(['--bot-id', 'unknown_bot'], standalone_mode=False)
 
         all_mocks['trade_executor_cls'].assert_not_called()
-
-    def test_exits_when_no_valid_bots(self, all_mocks):
-        all_mocks['bot_repo'].get.return_value = None
-
-        start_scalping.main(['--bot-id', 'unknown_bot'], standalone_mode=False)
-
         all_mocks['scheduler'].start.assert_not_called()
 
     # --- Multiple bots ---
@@ -197,14 +191,24 @@ class TestStartScalping:
         assert all_mocks['trade_executor_cls'].call_count == 2
         assert all_mocks['scheduler'].add_job.call_count == 2
 
-    def test_skips_missing_bot_but_runs_valid_one(self, all_mocks):
+    def test_aborts_without_creating_executors_when_any_bot_missing(self, all_mocks):
+        '''If the second bot ID is invalid, no executors should be created — prevents orphaned runs.'''
+        bot = _make_bot('valid_bot')
+        all_mocks['bot_repo'].get.side_effect = [bot, None]
+
+        start_scalping.main(['--bot-id', 'valid_bot', '--bot-id', 'missing'], standalone_mode=False)
+
+        all_mocks['trade_executor_cls'].assert_not_called()
+        all_mocks['scheduler'].start.assert_not_called()
+
+    def test_aborts_when_first_bot_missing_even_if_second_valid(self, all_mocks):
         bot = _make_bot('valid_bot')
         all_mocks['bot_repo'].get.side_effect = [None, bot]
 
         start_scalping.main(['--bot-id', 'missing', '--bot-id', 'valid_bot'], standalone_mode=False)
 
-        assert all_mocks['trade_executor_cls'].call_count == 1
-        all_mocks['scheduler'].start.assert_called_once()
+        all_mocks['trade_executor_cls'].assert_not_called()
+        all_mocks['scheduler'].start.assert_not_called()
 
     # --- Strategy creation ---
 

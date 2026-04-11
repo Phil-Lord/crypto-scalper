@@ -6,6 +6,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 import click
 
 from data_system import (
+    Bot,
     SupabaseClient,
     SupabaseBotRepository,
     SupabaseBotOrderRepository,
@@ -37,15 +38,20 @@ logger = logging.getLogger(__name__)
 @click.option('--dry-run', is_flag=True, default=False, help='Run the bot in dry-run mode')
 def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
     bot_repository = SupabaseBotRepository(SupabaseClient())
-    executors: list[TradeExecutor] = []
-    scheduler = BlockingScheduler()
 
+    # Validate all bot IDs before initialising any executors
+    bots: list[Bot] = []
     for id in bot_id:
         bot = bot_repository.get(id)
         if not bot:
-            logger.error(f'Bot with ID {id} not found')
-            continue
+            logger.error(f'Bot with ID {id} not found, aborting')
+            return
+        bots.append(bot)
 
+    executors: list[TradeExecutor] = []
+    scheduler = BlockingScheduler()
+
+    for bot in bots:
         strategy = create_strategy(bot.strategy_name, bot.parameters)
         sizer = AllInPositionSizer()
         client = SupabaseClient()
@@ -77,10 +83,6 @@ def start_scalping(bot_id: tuple[str, ...], dry_run: bool) -> None:
             misfire_grace_time=1,           # discard if >1s late; prevents stale catch-up runs
             max_instances=1,                # prevent overlapping runs for this bot
         )
-
-    if not executors:
-        logger.error('No valid bots found, exiting')
-        return
 
     def _shutdown(signum, frame):
         for executor in executors:
