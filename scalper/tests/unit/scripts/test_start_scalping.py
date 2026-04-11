@@ -115,14 +115,16 @@ class TestStartScalping:
         assert call_args.args[0] is bot
         assert call_args.kwargs.get('dry_run', False) is False
 
-    def test_calls_warm_up_and_recover_state(self, all_mocks):
+    def test_calls_warm_up_then_recover_state_in_order(self, all_mocks):
         all_mocks['bot_repo'].get.return_value = _make_bot()
         executor = all_mocks['trade_executor_cls'].return_value
+        call_order = []
+        executor.warm_up.side_effect = lambda: call_order.append('warm_up')
+        executor.recover_state.side_effect = lambda: call_order.append('recover_state')
 
         start_scalping.main(['--bot-id', 'btc_1m_001'], standalone_mode=False)
 
-        executor.warm_up.assert_called_once()
-        executor.recover_state.assert_called_once()
+        assert call_order == ['warm_up', 'recover_state']
 
     def test_schedules_job_with_correct_interval(self, all_mocks):
         all_mocks['bot_repo'].get.return_value = _make_bot(interval=5)
