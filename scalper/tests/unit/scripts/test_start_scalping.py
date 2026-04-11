@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from data_system.models.bot_model import Bot
-from scripts.start_scalping import start_scalping
+from scripts.start_scalping import interval_to_cron, start_scalping
 
 
 def _make_bot(bot_id: str = 'btc_1m_001', interval: int = 1) -> Bot:
@@ -141,6 +141,55 @@ class TestStartScalping:
         kwargs = all_mocks['scheduler'].add_job.call_args.kwargs
         assert kwargs['minute'] == '*'
 
+    # --- Cron scheduling for larger intervals ---
+
+    def test_schedules_hourly_interval(self, all_mocks):
+        all_mocks['bot_repo'].get.return_value = _make_bot(interval=60)
+
+        start_scalping.main(['--bot-id', 'btc_1m_001'], standalone_mode=False)
+
+        kwargs = all_mocks['scheduler'].add_job.call_args.kwargs
+        assert kwargs['minute'] == '0'
+        assert 'hour' not in kwargs  # every hour, no hour constraint
+
+    def test_schedules_4h_interval(self, all_mocks):
+        all_mocks['bot_repo'].get.return_value = _make_bot(interval=240)
+
+        start_scalping.main(['--bot-id', 'btc_1m_001'], standalone_mode=False)
+
+        kwargs = all_mocks['scheduler'].add_job.call_args.kwargs
+        assert kwargs['minute'] == '0'
+        assert kwargs['hour'] == '*/4'
+
+    def test_schedules_daily_interval(self, all_mocks):
+        all_mocks['bot_repo'].get.return_value = _make_bot(interval=1440)
+
+        start_scalping.main(['--bot-id', 'btc_1m_001'], standalone_mode=False)
+
+        kwargs = all_mocks['scheduler'].add_job.call_args.kwargs
+        assert kwargs['minute'] == '0'
+        assert kwargs['hour'] == '0'
+
+    def test_schedules_weekly_interval(self, all_mocks):
+        all_mocks['bot_repo'].get.return_value = _make_bot(interval=10080)
+
+        start_scalping.main(['--bot-id', 'btc_1m_001'], standalone_mode=False)
+
+        kwargs = all_mocks['scheduler'].add_job.call_args.kwargs
+        assert kwargs['minute'] == '0'
+        assert kwargs['hour'] == '0'
+        assert kwargs['day_of_week'] == '0'
+
+    def test_schedules_monthly_interval(self, all_mocks):
+        all_mocks['bot_repo'].get.return_value = _make_bot(interval=21600)
+
+        start_scalping.main(['--bot-id', 'btc_1m_001'], standalone_mode=False)
+
+        kwargs = all_mocks['scheduler'].add_job.call_args.kwargs
+        assert kwargs['minute'] == '0'
+        assert kwargs['hour'] == '0'
+        assert kwargs['day'] == '1,16'
+
     def test_starts_scheduler(self, all_mocks):
         all_mocks['bot_repo'].get.return_value = _make_bot()
 
@@ -269,3 +318,26 @@ class TestStartScalping:
         executor.request_shutdown.assert_called_once()
         all_mocks['scheduler'].shutdown.assert_called_once_with(wait=True)
         executor.shutdown.assert_called_once()
+
+
+@pytest.mark.scripts
+@pytest.mark.start_scalping
+class TestIntervalToCron:
+
+    @pytest.mark.parametrize('interval, expected', [
+        (1, {'minute': '*'}),
+        (5, {'minute': '*/5'}),
+        (15, {'minute': '*/15'}),
+        (30, {'minute': '*/30'}),
+        (60, {'minute': '0'}),
+        (240, {'minute': '0', 'hour': '*/4'}),
+        (1440, {'minute': '0', 'hour': '0'}),
+        (10080, {'minute': '0', 'hour': '0', 'day_of_week': '0'}),
+        (21600, {'minute': '0', 'hour': '0', 'day': '1,16'}),
+    ])
+    def test_returns_correct_cron_kwargs(self, interval: int, expected: dict):
+        assert interval_to_cron(interval) == expected
+
+    def test_raises_for_unsupported_interval(self):
+        with pytest.raises(ValueError, match='Unsupported interval 7m'):
+            interval_to_cron(7)
