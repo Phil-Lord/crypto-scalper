@@ -2,7 +2,7 @@ import logging
 import os
 import signal
 
-from apscheduler.schedulers.background import BlockingScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
 import click
 
 from data_system import (
