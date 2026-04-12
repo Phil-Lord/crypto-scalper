@@ -30,7 +30,7 @@ if [[ -z "$BOT_ID_FLAGS" ]]; then
 fi
 
 # Build the base command
-CMD="python -m scalper.scripts.start_scalping$BOT_ID_FLAGS"
+CMD="python -m scripts.start_scalping$BOT_ID_FLAGS"
 
 # Append --dry-run flag if DRY_RUN=true
 if [[ "${DRY_RUN:-}" == "true" ]]; then
