@@ -1,0 +1,14 @@
+app = "crypto-scalper"
+primary_region = "lhr"
+
+# Prevent Fly from force-killing mid-interval: an order could be placed on
+# the exchange but not yet persisted, leaving it unlinked and unreconciled.
+kill_timeout = 60
+
+[[vm]]
+    size = "shared-cpu-1x"
+    memory = "256mb"
+
+# Restart the machine when it exits with a non-zero exit code
+[[restart]]
+    policy = "on-failure"
