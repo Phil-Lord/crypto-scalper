@@ -1,3 +1,5 @@
+import threading
+
 import pytest
 from unittest.mock import Mock, patch
 
@@ -46,7 +48,7 @@ class TestKrakenApiClient:
                 raise_for_status=Mock()
             )
             mock_headers.return_value = {'API-Key': 'key', 'API-Sign': 'sign'}
-            params = {'nonce': '123', 'pair': 'XXBTZGBP'}
+            params = {'pair': 'XXBTZGBP'}
 
             # When
             result = client.make_request('POST', '/0/private/Balance', params)
@@ -103,7 +105,7 @@ class TestKrakenApiClient:
             mock_headers.return_value = {'API-Key': 'key', 'API-Sign': 'sign'}
 
             # When
-            client.make_request('POST', '/0/private/Balance', {'nonce': '123'})
+            client.make_request('POST', '/0/private/Balance', {})
 
             # Then
             expected_url = 'https://api.kraken.com/0/private/Balance'
@@ -133,7 +135,7 @@ class TestKrakenApiClient:
                 raise_for_status=Mock()
             )
             mock_headers.return_value = {'API-Key': 'key', 'API-Sign': 'sign'}
-            params = {'nonce': '123', 'pair': 'XXBTZGBP'}
+            params = {'pair': 'XXBTZGBP'}
 
             # When
             client.make_request('POST', '/0/private/AddOrder', params)
@@ -198,6 +200,70 @@ class TestKrakenApiClient:
         # Given / When / Then
         with pytest.raises(ValueError, match='Unsupported HTTP method: DELETE'):
             client.make_request('DELETE', '/0/public/Ticker', {})
+
+    def test_make_request_post_injects_nonce(self, client, mock_response):
+        # Given
+        with patch('requests.post') as mock_post, \
+                patch('exchange_connector.api.kraken_api_client.get_headers') as mock_headers:
+            mock_post.return_value = Mock(
+                json=Mock(return_value=mock_response),
+                raise_for_status=Mock()
+            )
+            mock_headers.return_value = {'API-Key': 'key', 'API-Sign': 'sign'}
+
+            # When - caller passes no nonce
+            client.make_request('POST', '/0/private/Balance', {})
+
+            # Then - client injected a nanosecond timestamp nonce
+            data_sent = mock_post.call_args[1]['data']
+            assert 'nonce' in data_sent
+            assert len(data_sent['nonce']) >= 19
+
+    def test_make_request_get_does_not_inject_nonce(self, client, mock_response):
+        # Given
+        with patch('requests.get') as mock_get:
+            mock_get.return_value = Mock(
+                json=Mock(return_value=mock_response),
+                raise_for_status=Mock()
+            )
+            params = {'pair': 'XXBTZGBP'}
+
+            # When
+            client.make_request('GET', '/0/public/Ticker', params)
+
+            # Then - nonce must not be added to public GET requests
+            assert 'nonce' not in mock_get.call_args[1]['params']
+
+    def test_make_request_post_nonces_are_ordered_under_concurrency(self, mock_response):
+        # Given - capture nonces in the order they reach requests.post
+        # Each time a thread calls requests.post, we record the nonce from the data dict;
+        # this is the nonce as received by the socket (dispatch order, not assignment order).
+
+        nonces_received = []
+
+        def capture_post(url, data, headers):
+            nonces_received.append(int(data['nonce']))
+            return Mock(json=Mock(return_value=mock_response), raise_for_status=Mock())
+
+        with patch('requests.post', side_effect=capture_post), \
+                patch('exchange_connector.api.kraken_api_client.get_headers') as mock_headers:
+            mock_headers.return_value = {'API-Key': 'key', 'API-Sign': 'sign'}
+            client = KrakenApiClient()
+            threads = [
+                threading.Thread(target=client.make_request,
+                                 args=('POST', '/0/private/Balance', {}))
+                for _ in range(20)
+            ]
+
+            # When
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+            # Then - every nonce dispatched is strictly greater than the previous
+            assert len(nonces_received) == 20
+            assert all(nonces_received[i] < nonces_received[i + 1] for i in range(19))
 
 
 @pytest.mark.exchange_connector

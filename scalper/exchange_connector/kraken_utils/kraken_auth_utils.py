@@ -2,30 +2,12 @@ import base64
 import hashlib
 import hmac
 import os
-import threading
 import time
 import urllib
 
 
-_nonce_lock = threading.Lock()
-_last_nonce = 0
-
-
 def get_nonce() -> str:
-    '''
-    Returns a strictly increasing nonce string for Kraken API requests.
-
-    Thread-safe: guarantees monotonic ordering across concurrent threads sharing
-    the same API key. Kraken rejects any request whose nonce is less than or equal
-    to the previously accepted nonce for that key.
-    '''
-    global _last_nonce
-    with _nonce_lock:
-        nonce = time.time_ns()
-        if nonce <= _last_nonce:
-            nonce = _last_nonce + 1
-        _last_nonce = nonce
-        return str(nonce)
+    return str(time.time_ns())
 
 
 def get_headers(params: dict, endpoint: str) -> dict[str, str]:

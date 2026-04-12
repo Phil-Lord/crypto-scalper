@@ -1,3 +1,5 @@
+import threading
+
 import requests
 from typing import Any
 
@@ -7,7 +9,7 @@ from .exceptions import (
     KrakenNetworkError,
     KrakenParseError,
 )
-from exchange_connector.kraken_utils import get_headers
+from exchange_connector.kraken_utils import get_headers, get_nonce
 
 
 class KrakenApiClient:
@@ -16,6 +18,11 @@ class KrakenApiClient:
 
     Handles request construction, authentication headers, and error parsing.
     '''
+
+    # Shared across all instances — serialises private API calls so nonces are
+    # assigned and dispatched in strict order, preventing EAPI:Invalid nonce
+    # errors when multiple bots share the same API key.
+    _private_lock = threading.Lock()
 
     BASE_URL = 'https://api.kraken.com'
 
@@ -39,8 +46,10 @@ class KrakenApiClient:
             if method.upper() == 'GET':
                 response = requests.get(url, params=params)
             elif method.upper() == 'POST':
-                headers = get_headers(params, endpoint)
-                response = requests.post(url, data=params, headers=headers)
+                with KrakenApiClient._private_lock:
+                    params['nonce'] = get_nonce()
+                    headers = get_headers(params, endpoint)
+                    response = requests.post(url, data=params, headers=headers)
             response.raise_for_status()
             json_response = response.json()
             self._handle_errors(json_response)

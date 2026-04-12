@@ -175,14 +175,13 @@ class TestAddOrderService:
         service = AddOrderService(mock_client)
         mock_client.make_request.return_value = {'result': {'txid': ['ORDER-123']}, 'error': []}
 
-        with patch('exchange_connector.services.add_order_service.get_nonce', return_value='123456'):
-            # When
-            service.add_order('XXBTZGBP', 'buy', Decimal('100.0'))
+        # When
+        service.add_order('XXBTZGBP', 'buy', Decimal('100.0'))
 
-            # Then
-            call_args = mock_client.make_request.call_args
-            params = call_args[0][2]
-            assert params['oflags'] == 'viqc'
+        # Then
+        call_args = mock_client.make_request.call_args
+        params = call_args[0][2]
+        assert params['oflags'] == 'viqc'
 
     def test_add_order_sell_does_not_include_viqc_flag(self, mock_client):
         # Given
@@ -190,14 +189,13 @@ class TestAddOrderService:
         service = AddOrderService(mock_client)
         mock_client.make_request.return_value = {'result': {'txid': ['ORDER-123']}, 'error': []}
 
-        with patch('exchange_connector.services.add_order_service.get_nonce', return_value='123456'):
-            # When
-            service.add_order('XXBTZGBP', 'sell', Decimal('0.001'))
+        # When
+        service.add_order('XXBTZGBP', 'sell', Decimal('0.001'))
 
-            # Then
-            call_args = mock_client.make_request.call_args
-            params = call_args[0][2]
-            assert 'oflags' not in params
+        # Then
+        call_args = mock_client.make_request.call_args
+        params = call_args[0][2]
+        assert 'oflags' not in params
 
     def test_add_order_validates_pair(self, mock_client):
         # Given
@@ -214,18 +212,16 @@ class TestAddOrderService:
         service = AddOrderService(mock_client)
         mock_client.make_request.return_value = {'result': {'txid': ['ORDER-123']}, 'error': []}
 
-        with patch('exchange_connector.services.add_order_service.get_nonce', return_value='987654'):
-            # When
-            service.add_order('XXBTZGBP', 'buy', Decimal('50.0'))
+        # When
+        service.add_order('XXBTZGBP', 'buy', Decimal('50.0'))
 
-            # Then
-            call_args = mock_client.make_request.call_args
-            params = call_args[0][2]
-            assert params['pair'] == 'XXBTZGBP'
-            assert params['type'] == 'buy'
-            assert params['volume'] == Decimal('50.0')
-            assert params['ordertype'] == 'market'
-            assert params['nonce'] == '987654'
+        # Then
+        call_args = mock_client.make_request.call_args
+        params = call_args[0][2]
+        assert params['pair'] == 'XXBTZGBP'
+        assert params['type'] == 'buy'
+        assert params['volume'] == Decimal('50.0')
+        assert params['ordertype'] == 'market'
 
     def test_add_order_uses_post_method(self, mock_client):
         # Given
@@ -233,14 +229,13 @@ class TestAddOrderService:
         service = AddOrderService(mock_client)
         mock_client.make_request.return_value = {'result': {'txid': ['ORDER-123']}, 'error': []}
 
-        with patch('exchange_connector.services.add_order_service.get_nonce', return_value='123456'):
-            # When
-            service.add_order('XXBTZGBP', 'sell', Decimal('0.5'))
+        # When
+        service.add_order('XXBTZGBP', 'sell', Decimal('0.5'))
 
-            # Then
-            call_args = mock_client.make_request.call_args
-            assert call_args[0][0] == 'POST'
-            assert call_args[0][1] == '/0/private/AddOrder'
+        # Then
+        call_args = mock_client.make_request.call_args
+        assert call_args[0][0] == 'POST'
+        assert call_args[0][1] == '/0/private/AddOrder'
 
     def test_add_order_includes_validate_false_by_default(self, mock_client):
         # Given
@@ -248,14 +243,13 @@ class TestAddOrderService:
         service = AddOrderService(mock_client)
         mock_client.make_request.return_value = {'result': {'txid': ['ORDER-123']}, 'error': []}
 
-        with patch('exchange_connector.services.add_order_service.get_nonce', return_value='123456'):
-            # When
-            service.add_order('XXBTZGBP', 'buy', Decimal('100.0'))
+        # When
+        service.add_order('XXBTZGBP', 'buy', Decimal('100.0'))
 
-            # Then
-            call_args = mock_client.make_request.call_args
-            params = call_args[0][2]
-            assert params['validate'] is False
+        # Then
+        call_args = mock_client.make_request.call_args
+        params = call_args[0][2]
+        assert params['validate'] is False
 
     def test_add_order_includes_validate_true_when_specified(self, mock_client):
         # Given
@@ -264,14 +258,13 @@ class TestAddOrderService:
         mock_client.make_request.return_value = {
             'result': {'descr': {'order': 'test'}}, 'error': []}
 
-        with patch('exchange_connector.services.add_order_service.get_nonce', return_value='123456'):
-            # When
-            service.add_order('XXBTZGBP', 'buy', Decimal('100.0'), validate=True)
+        # When
+        service.add_order('XXBTZGBP', 'buy', Decimal('100.0'), validate=True)
 
-            # Then
-            call_args = mock_client.make_request.call_args
-            params = call_args[0][2]
-            assert params['validate'] is True
+        # Then
+        call_args = mock_client.make_request.call_args
+        params = call_args[0][2]
+        assert params['validate'] is True
 
 
 @pytest.mark.exchange_connector
@@ -339,28 +332,26 @@ class TestBalanceService:
         service = BalanceService(mock_client)
         mock_client.make_request.return_value = {'result': {'XXBT': '1.5'}, 'error': []}
 
-        with patch('exchange_connector.services.balance_service.get_nonce', return_value='123456'):
-            # When
-            service.fetch_balances()
+        # When
+        service.fetch_balances()
 
-            # Then
-            call_args = mock_client.make_request.call_args
-            assert call_args[0][0] == 'POST'
+        # Then
+        call_args = mock_client.make_request.call_args
+        assert call_args[0][0] == 'POST'
 
-    def test_fetch_balances_includes_nonce(self, mock_client):
+    def test_fetch_balances_passes_empty_params(self, mock_client):
         # Given
         from exchange_connector.services.balance_service import BalanceService
         service = BalanceService(mock_client)
         mock_client.make_request.return_value = {'result': {'XXBT': '1.5'}, 'error': []}
 
-        with patch('exchange_connector.services.balance_service.get_nonce', return_value='999888'):
-            # When
-            service.fetch_balances()
+        # When
+        service.fetch_balances()
 
-            # Then
-            call_args = mock_client.make_request.call_args
-            params = call_args[0][2]
-            assert params['nonce'] == '999888'
+        # Then
+        call_args = mock_client.make_request.call_args
+        params = call_args[0][2]
+        assert params == {}
 
     def test_fetch_balances_returns_balance_dict(self, mock_client):
         # Given
@@ -369,12 +360,11 @@ class TestBalanceService:
         expected_balances = {'XXBT': '1.5', 'ZGBP': '5000.0', 'XETH': '10.0'}
         mock_client.make_request.return_value = {'result': expected_balances, 'error': []}
 
-        with patch('exchange_connector.services.balance_service.get_nonce', return_value='123456'):
-            # When
-            result = service.fetch_balances()
+        # When
+        result = service.fetch_balances()
 
-            # Then
-            assert result == expected_balances
+        # Then
+        assert result == expected_balances
 
 
 @pytest.mark.exchange_connector
@@ -679,13 +669,12 @@ class TestQueryOrdersService:
             'error': []
         }
 
-        with patch('exchange_connector.services.query_orders_service.get_nonce', return_value='123456'):
-            # When
-            service.fetch_orders('ORDER-456')
+        # When
+        service.fetch_orders('ORDER-456')
 
         # Then
         call_args = mock_client.make_request.call_args
-        assert call_args[0][2] == {'nonce': '123456', 'txid': 'ORDER-456'}
+        assert call_args[0][2] == {'txid': 'ORDER-456'}
 
     def test_fetch_orders_returns_result(self, mock_client):
         # Given
