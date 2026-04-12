@@ -22,5 +22,6 @@ scalper/logs/
 scalper/tests/
 scalper/backtesting_engine/
 scalper/study_analyser/
+scalper/Makefile
 Dockerfile
 .dockerignore
