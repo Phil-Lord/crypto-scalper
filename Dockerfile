@@ -17,8 +17,15 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Add scalper/ to Python path so top-level module imports (data_system, etc.) resolve
 ENV PYTHONPATH="/app/scalper"
 
-# Copy the application code and entrypoint script
-COPY scalper/ ./scalper/
+# Copy application code
+COPY scalper/data_system/               ./scalper/data_system/
+COPY scalper/exchange_connector/        ./scalper/exchange_connector/
+COPY scalper/scripts/start_scalping.py  ./scalper/scripts/start_scalping.py
+COPY scalper/strategy_manager/          ./scalper/strategy_manager/
+COPY scalper/trade_executor/            ./scalper/trade_executor/
+COPY scalper/utils/                     ./scalper/utils/
+
+# Copy entrypoint script
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 

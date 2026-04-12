@@ -9,12 +9,6 @@ site/
 legacy/
 docs/
 mkdocs.yml
-
-# Docker config
-Dockerfile
-.dockerignore
-
-# Python config
 .venv/
 venv/
 .python-version
@@ -22,11 +16,5 @@ pytest.ini
 __pycache__/
 *.pyc
 *.pyo
-
-# Scalper code unused in live trading
-scalper/local_storage/
-scalper/logs/
-scalper/tests/
-scalper/backtesting_engine/
-scalper/study_analyser/
-scalper/Makefile
+Dockerfile
+.dockerignore
