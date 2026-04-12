@@ -20,6 +20,7 @@ ENV PYTHONPATH="/app/scalper"
 # Copy application code
 COPY scalper/data_system/               ./scalper/data_system/
 COPY scalper/exchange_connector/        ./scalper/exchange_connector/
+COPY scalper/scripts/__init__.py        ./scalper/scripts/__init__.py
 COPY scalper/scripts/start_scalping.py  ./scalper/scripts/start_scalping.py
 COPY scalper/strategy_manager/          ./scalper/strategy_manager/
 COPY scalper/trade_executor/            ./scalper/trade_executor/
