@@ -33,7 +33,7 @@ def get_signature(private_key: str, params: dict, nonce: str, endpoint: str) -> 
     :param endpoint: API endpoint path.
     :return: Base64-encoded HMAC-SHA512 signature.
     '''
-    post_params = urllib.parse.urlencode(params)
+    post_params = urllib.parse.urlencode(params, doseq=True)
     message = endpoint.encode() + hashlib.sha256((nonce + post_params).encode()).digest()
     return sign(private_key, message)
 

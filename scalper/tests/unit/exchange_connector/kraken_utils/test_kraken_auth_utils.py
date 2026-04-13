@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch
 
-from exchange_connector.kraken_utils.kraken_auth_utils import get_nonce, get_headers
+from exchange_connector.kraken_utils.kraken_auth_utils import get_nonce, get_headers, get_signature
 
 
 @pytest.mark.exchange_connector
@@ -91,3 +91,46 @@ class TestKrakenAuthUtils:
             # When / Then
             with pytest.raises(ValueError, match='Kraken API keys are not set'):
                 get_headers({'nonce': '123'}, '/0/private/Balance')
+
+
+@pytest.mark.exchange_connector
+@pytest.mark.kraken_utils
+@pytest.mark.kraken_auth_utils
+class TestGetSignature:
+    def test_signature_is_identical_for_str_enum_and_plain_str(self):
+        '''
+        Verify that params containing str-based Enum values produce the same
+        signature as params with plain string values. This prevents HMAC
+        mismatches when requests.post encodes the body with the enum's str
+        value while the signature is computed over the repr.
+        '''
+        from enum import Enum
+
+        class Signal(str, Enum):
+            BUY = 'buy'
+
+        private_key = 'dGVzdF9wcml2YXRlX2tleQ=='
+        nonce = '123456789'
+        endpoint = '/0/private/AddOrder'
+
+        params_with_enum = {
+            'nonce': nonce,
+            'ordertype': 'market',
+            'type': Signal.BUY,
+            'pair': 'XXBTZGBP',
+            'volume': '0.001',
+        }
+
+        params_with_str = {
+            'nonce': nonce,
+            'ordertype': 'market',
+            'type': 'buy',
+            'pair': 'XXBTZGBP',
+            'volume': '0.001',
+        }
+
+        sig_enum = get_signature(private_key, params_with_enum, nonce, endpoint)
+        sig_str = get_signature(private_key, params_with_str, nonce, endpoint)
+
+        assert sig_enum == sig_str
+        assert isinstance(sig_enum, str)
