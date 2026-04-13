@@ -7,7 +7,7 @@ kill_timeout = 60
 
 [[vm]]
     size = "shared-cpu-1x"
-    memory = "256mb"
+    memory = "512mb"
 
 # Restart the machine when it exits with a non-zero exit code
 [[restart]]
