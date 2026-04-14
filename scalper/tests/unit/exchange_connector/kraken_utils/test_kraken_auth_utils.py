@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from exchange_connector.kraken_utils.kraken_auth_utils import get_headers, get_signature
 
