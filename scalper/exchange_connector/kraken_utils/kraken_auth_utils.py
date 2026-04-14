@@ -2,12 +2,7 @@ import base64
 import hashlib
 import hmac
 import os
-import time
 import urllib
-
-
-def get_nonce() -> str:
-    return str(time.time_ns())
 
 
 def get_headers(params: dict, endpoint: str) -> dict[str, str]:

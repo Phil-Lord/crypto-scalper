@@ -1,4 +1,5 @@
 import threading
+import time
 
 import requests
 from typing import Any
@@ -9,7 +10,7 @@ from .exceptions import (
     KrakenNetworkError,
     KrakenParseError,
 )
-from exchange_connector.kraken_utils import get_headers, get_nonce
+from exchange_connector.kraken_utils import get_headers
 
 
 class KrakenApiClient:
@@ -23,6 +24,7 @@ class KrakenApiClient:
     # assigned and dispatched in strict order, preventing EAPI:Invalid nonce
     # errors when multiple bots share the same API key.
     _private_lock = threading.Lock()
+    _last_nonce: int = 0
 
     BASE_URL = 'https://api.kraken.com'
 
@@ -47,7 +49,7 @@ class KrakenApiClient:
                 response = requests.get(url, params=params)
             elif method.upper() == 'POST':
                 with KrakenApiClient._private_lock:
-                    post_params = {**params, 'nonce': get_nonce()}
+                    post_params = {**params, 'nonce': self._next_nonce()}
                     headers = get_headers(post_params, endpoint)
                     response = requests.post(url, data=post_params, headers=headers)
             response.raise_for_status()
@@ -58,6 +60,11 @@ class KrakenApiClient:
             raise KrakenNetworkError(f'Error making request to {endpoint}: {e}')
         except ValueError as e:
             raise KrakenParseError(f'Failed to parse JSON response: {e}')
+
+    def _next_nonce(self) -> str:
+        '''Must be called inside _private_lock.'''
+        KrakenApiClient._last_nonce = max(time.time_ns(), KrakenApiClient._last_nonce + 1)
+        return str(KrakenApiClient._last_nonce)
 
     def _handle_errors(self, response: dict[str, Any]) -> None:
         if 'error' in response and response['error']:

@@ -274,6 +274,53 @@ class TestKrakenApiClient:
 
 @pytest.mark.exchange_connector
 @pytest.mark.api
+@pytest.mark.kraken_api_client
+class TestNextNonce:
+    @pytest.fixture(autouse=True)
+    def reset_last_nonce(self):
+        KrakenApiClient._last_nonce = 0
+        yield
+        KrakenApiClient._last_nonce = 0
+
+    def test_returns_string(self):
+        nonce = KrakenApiClient()._next_nonce()
+        assert isinstance(nonce, str)
+
+    def test_returns_nanosecond_precision(self):
+        nonce = KrakenApiClient()._next_nonce()
+        assert len(nonce) >= 19
+
+    def test_successive_calls_are_strictly_increasing(self):
+        client = KrakenApiClient()
+        nonce1 = int(client._next_nonce())
+        nonce2 = int(client._next_nonce())
+        assert nonce2 > nonce1
+
+    def test_uses_increment_when_clock_is_frozen(self):
+        # When time.time_ns() returns the same value on every call, nonce still strictly increases
+        fixed_time = 1_000_000_000_000_000_000
+        client = KrakenApiClient()
+        with patch('time.time_ns', return_value=fixed_time):
+            nonce1 = int(client._next_nonce())
+            nonce2 = int(client._next_nonce())
+        assert nonce1 == fixed_time
+        assert nonce2 == fixed_time + 1
+
+    def test_uses_increment_when_clock_goes_backwards(self):
+        # When time.time_ns() goes backwards (NTP adjustment), nonce still strictly increases
+        client = KrakenApiClient()
+        future_time = 2_000_000_000_000_000_000
+        with patch('time.time_ns', return_value=future_time):
+            first = int(client._next_nonce())
+        past_time = 1_000_000_000_000_000_000
+        with patch('time.time_ns', return_value=past_time):
+            second = int(client._next_nonce())
+        assert first == future_time
+        assert second == future_time + 1
+
+
+@pytest.mark.exchange_connector
+@pytest.mark.api
 @pytest.mark.kraken_too_many_requests_error
 class TestKrakenTooManyRequestsError:
     def test_exception_has_message(self):

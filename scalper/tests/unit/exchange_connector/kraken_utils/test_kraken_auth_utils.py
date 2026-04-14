@@ -1,36 +1,13 @@
 import pytest
 from unittest.mock import patch
 
-from exchange_connector.kraken_utils.kraken_auth_utils import get_nonce, get_headers, get_signature
+from exchange_connector.kraken_utils.kraken_auth_utils import get_headers, get_signature
 
 
 @pytest.mark.exchange_connector
 @pytest.mark.kraken_utils
 @pytest.mark.kraken_auth_utils
 class TestKrakenAuthUtils:
-    def test_get_nonce_returns_string(self):
-        # When
-        nonce = get_nonce()
-
-        # Then
-        assert isinstance(nonce, str)
-
-    def test_get_nonce_returns_nanosecond_timestamp(self):
-        # When
-        nonce = get_nonce()
-
-        # Then
-        # Should be 19 digits (nanoseconds since epoch)
-        assert len(nonce) >= 19
-
-    def test_get_nonce_is_increasing(self):
-        # When
-        nonce1 = get_nonce()
-        nonce2 = get_nonce()
-
-        # Then
-        assert int(nonce2) >= int(nonce1)
-
     def test_get_headers_includes_api_key(self):
         # Given
         with patch('exchange_connector.kraken_utils.kraken_auth_utils.os.getenv') as mock_env:
