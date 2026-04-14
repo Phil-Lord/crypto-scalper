@@ -47,9 +47,9 @@ class KrakenApiClient:
                 response = requests.get(url, params=params)
             elif method.upper() == 'POST':
                 with KrakenApiClient._private_lock:
-                    params['nonce'] = get_nonce()
-                    headers = get_headers(params, endpoint)
-                    response = requests.post(url, data=params, headers=headers)
+                    post_params = {**params, 'nonce': get_nonce()}
+                    headers = get_headers(post_params, endpoint)
+                    response = requests.post(url, data=post_params, headers=headers)
             response.raise_for_status()
             json_response = response.json()
             self._handle_errors(json_response)

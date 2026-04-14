@@ -55,7 +55,10 @@ class TestKrakenApiClient:
 
             # Then
             assert result == mock_response
-            mock_headers.assert_called_once_with(params, '/0/private/Balance')
+            call_args = mock_headers.call_args[0]
+            assert call_args[0]['pair'] == 'XXBTZGBP'
+            assert 'nonce' in call_args[0]
+            assert call_args[1] == '/0/private/Balance'
 
     def test_make_request_raises_network_error_on_request_failure(self, client):
         # Given
@@ -141,7 +144,10 @@ class TestKrakenApiClient:
             client.make_request('POST', '/0/private/AddOrder', params)
 
             # Then
-            assert mock_post.call_args[1]['data'] == params
+            post_data = mock_post.call_args[1]['data']
+            assert post_data['pair'] == 'XXBTZGBP'
+            assert 'nonce' in post_data
+            assert params == {'pair': 'XXBTZGBP'}  # original not mutated
 
     def test_handle_errors_does_nothing_on_empty_error_list(self, client):
         # Given
