@@ -18,3 +18,11 @@ __pycache__/
 *.pyo
 Dockerfile
 .dockerignore
+
+# Scalper code unused in live trading
+scalper/backtesting_engine/
+scalper/local_storage/
+scalper/logs/
+scalper/study_analyser/
+scalper/tests/
+scalper/Makefile
