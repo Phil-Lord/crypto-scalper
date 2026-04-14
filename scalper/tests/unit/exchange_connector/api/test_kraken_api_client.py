@@ -225,6 +225,46 @@ class TestKrakenApiClient:
             assert 'nonce' in data_sent
             assert len(data_sent['nonce']) >= 19
 
+    def test_make_request_get_includes_timeout(self, client, mock_response):
+        # Given
+        with patch('requests.get') as mock_get:
+            mock_get.return_value = Mock(
+                json=Mock(return_value=mock_response),
+                raise_for_status=Mock()
+            )
+
+            # When
+            client.make_request('GET', '/0/public/Ticker', {'pair': 'XXBTZGBP'})
+
+            # Then
+            assert mock_get.call_args[1]['timeout'] == 10
+
+    def test_make_request_post_includes_timeout(self, client, mock_response):
+        # Given
+        with patch('requests.post') as mock_post, \
+                patch('exchange_connector.api.kraken_api_client.get_headers') as mock_headers:
+            mock_post.return_value = Mock(
+                json=Mock(return_value=mock_response),
+                raise_for_status=Mock()
+            )
+            mock_headers.return_value = {'API-Key': 'key', 'API-Sign': 'sign'}
+
+            # When
+            client.make_request('POST', '/0/private/Balance', {})
+
+            # Then
+            assert mock_post.call_args[1]['timeout'] == 10
+
+    def test_make_request_raises_network_error_on_timeout(self, client):
+        # Given
+        import requests
+        with patch('requests.get') as mock_get:
+            mock_get.side_effect = requests.Timeout('Request timed out')
+
+            # When / Then
+            with pytest.raises(KrakenNetworkError, match='Error making request'):
+                client.make_request('GET', '/0/public/Ticker', {'pair': 'XXBTZGBP'})
+
     def test_make_request_get_does_not_inject_nonce(self, client, mock_response):
         # Given
         with patch('requests.get') as mock_get:
@@ -247,7 +287,7 @@ class TestKrakenApiClient:
 
         nonces_received = []
 
-        def capture_post(url, data, headers):
+        def capture_post(url, data, headers, **kwargs):
             nonces_received.append(int(data['nonce']))
             return Mock(json=Mock(return_value=mock_response), raise_for_status=Mock())
 

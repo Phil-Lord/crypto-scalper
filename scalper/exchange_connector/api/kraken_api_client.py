@@ -46,12 +46,12 @@ class KrakenApiClient:
         try:
             url = self.BASE_URL + endpoint
             if method.upper() == 'GET':
-                response = requests.get(url, params=params)
+                response = requests.get(url, params=params, timeout=10)
             elif method.upper() == 'POST':
                 with KrakenApiClient._private_lock:
                     post_params = {**params, 'nonce': self._next_nonce()}
                     headers = get_headers(post_params, endpoint)
-                    response = requests.post(url, data=post_params, headers=headers)
+                    response = requests.post(url, data=post_params, headers=headers, timeout=10)
             response.raise_for_status()
             json_response = response.json()
             self._handle_errors(json_response)
