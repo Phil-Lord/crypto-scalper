@@ -1,3 +1,6 @@
+import threading
+import time
+
 import requests
 from typing import Any
 
@@ -16,6 +19,12 @@ class KrakenApiClient:
 
     Handles request construction, authentication headers, and error parsing.
     '''
+
+    # Shared across all instances — serialises private API calls so nonces are
+    # assigned and dispatched in strict order, preventing EAPI:Invalid nonce
+    # errors when multiple bots share the same API key.
+    _private_lock = threading.Lock()
+    _last_nonce: int = 0
 
     BASE_URL = 'https://api.kraken.com'
 
@@ -37,18 +46,26 @@ class KrakenApiClient:
         try:
             url = self.BASE_URL + endpoint
             if method.upper() == 'GET':
-                response = requests.get(url, params=params)
+                response = requests.get(url, params=params, timeout=10)
             elif method.upper() == 'POST':
-                headers = get_headers(params, endpoint)
-                response = requests.post(url, data=params, headers=headers)
+                with KrakenApiClient._private_lock:
+                    post_params = {**params, 'nonce': self._next_nonce()}
+                    headers = get_headers(post_params, endpoint)
+                    response = requests.post(url, data=post_params, headers=headers, timeout=10)
             response.raise_for_status()
-            json_response = response.json()
+            try:
+                json_response = response.json()
+            except requests.exceptions.JSONDecodeError as e:
+                raise KrakenParseError(f'Failed to parse JSON response: {e}')
             self._handle_errors(json_response)
             return json_response
         except requests.RequestException as e:
             raise KrakenNetworkError(f'Error making request to {endpoint}: {e}')
-        except ValueError as e:
-            raise KrakenParseError(f'Failed to parse JSON response: {e}')
+
+    def _next_nonce(self) -> str:
+        '''Must be called inside _private_lock.'''
+        KrakenApiClient._last_nonce = max(time.time_ns(), KrakenApiClient._last_nonce + 1)
+        return str(KrakenApiClient._last_nonce)
 
     def _handle_errors(self, response: dict[str, Any]) -> None:
         if 'error' in response and response['error']:

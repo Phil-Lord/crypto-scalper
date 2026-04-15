@@ -1,7 +1,6 @@
 from decimal import Decimal
 from typing import Any
 
-from exchange_connector.kraken_utils import get_nonce
 from .kraken_service import KrakenService
 
 
@@ -10,7 +9,6 @@ class AddOrderService(KrakenService):
         self.validate_pair(pair)
         endpoint = '/0/private/AddOrder'
         params = {
-            'nonce': get_nonce(),
             'ordertype': 'market',
             'type': signal,
             'pair': pair,

@@ -199,9 +199,9 @@
     - Copy `pyproject.toml` and `uv.lock` first, then install dependencies:
       ```dockerfile
       COPY pyproject.toml uv.lock ./
-      RUN pip install uv && uv sync --frozen --no-group dev --no-group docs
+      RUN pip install uv && uv sync --locked --no-group dev --no-group docs
       ```
-      `--frozen` ensures the lockfile is used exactly (no re-resolution at build time). `--no-group dev --no-group docs` keeps test and docs tooling out of the image.
+      `--locked` asserts that uv.lock exists and must match pyproject.toml exactly. `--no-group dev --no-group docs` keeps test and docs tooling out of the image.
     - Copy `scalper/` source
     - Copy `entrypoint.sh`
     - `ENTRYPOINT ["./entrypoint.sh"]`
