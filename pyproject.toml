@@ -6,6 +6,7 @@ dependencies = [
     "apscheduler>=3.10,<4.0",
     "click>=8.0",
     "matplotlib>=3.9",
+    "nicegui>=3.10.0",
     "numpy>=2.0",
     "optuna>=4.0",
     "optuna-dashboard>=0.19",
