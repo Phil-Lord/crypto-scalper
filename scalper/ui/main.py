@@ -20,5 +20,6 @@ def main():
     )
 
 # Colours:
-# #3ecf8e - light green
-# #016339 - dark green
+# #3ecf8e - light green (icons)
+# #03c574 - bright green (links - white on hover)
+# #016339 - dark green (buttons)
