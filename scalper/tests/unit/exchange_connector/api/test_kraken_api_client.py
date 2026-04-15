@@ -1,6 +1,7 @@
 import threading
 
 import pytest
+import requests
 from unittest.mock import Mock, patch
 
 from exchange_connector.api.exceptions import (
@@ -74,13 +75,24 @@ class TestKrakenApiClient:
         # Given
         with patch('requests.get') as mock_get:
             mock_get.return_value = Mock(
-                json=Mock(side_effect=ValueError('Invalid JSON')),
+                json=Mock(side_effect=requests.exceptions.JSONDecodeError('Invalid JSON', '', 0)),
                 raise_for_status=Mock()
             )
 
             # When / Then
             with pytest.raises(KrakenParseError, match='Failed to parse JSON'):
                 client.make_request('GET', '/0/public/Ticker', {'pair': 'XXBTZGBP'})
+
+    def test_make_request_propagates_value_error_when_api_keys_missing(self, client):
+        # Given
+        with patch('requests.post') as mock_post, \
+                patch('exchange_connector.api.kraken_api_client.get_headers') as mock_headers:
+            mock_post.return_value = Mock(raise_for_status=Mock())
+            mock_headers.side_effect = ValueError('Kraken API keys are not set')
+
+            # When / Then — must not be swallowed into KrakenParseError
+            with pytest.raises(ValueError, match='Kraken API keys are not set'):
+                client.make_request('POST', '/0/private/Balance', {})
 
     def test_make_request_constructs_correct_url_for_get(self, client, mock_response):
         # Given

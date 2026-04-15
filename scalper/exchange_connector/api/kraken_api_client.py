@@ -53,13 +53,14 @@ class KrakenApiClient:
                     headers = get_headers(post_params, endpoint)
                     response = requests.post(url, data=post_params, headers=headers, timeout=10)
             response.raise_for_status()
-            json_response = response.json()
+            try:
+                json_response = response.json()
+            except requests.exceptions.JSONDecodeError as e:
+                raise KrakenParseError(f'Failed to parse JSON response: {e}')
             self._handle_errors(json_response)
             return json_response
         except requests.RequestException as e:
             raise KrakenNetworkError(f'Error making request to {endpoint}: {e}')
-        except ValueError as e:
-            raise KrakenParseError(f'Failed to parse JSON response: {e}')
 
     def _next_nonce(self) -> str:
         '''Must be called inside _private_lock.'''
