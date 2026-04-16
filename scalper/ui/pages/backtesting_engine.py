@@ -16,7 +16,12 @@ def backtesting_engine():
         ui.label('Backtesting Engine').classes('text-3xl font-bold')
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=trades['timestamp'], y=trades['price'], mode='lines'))
+        fig.add_trace(go.Scatter(
+            x=trades['timestamp'],
+            y=trades['price'],
+            mode='lines',
+            line=dict(color='#3ecf8e')
+        ))
         fig.update_layout(template='plotly_dark', margin=dict(l=0, r=0, t=0, b=0))
 
         ui.plotly(fig).classes('w-full h-96')
