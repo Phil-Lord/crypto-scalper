@@ -16,21 +16,21 @@ def backtesting_engine():
         ui.label('Backtesting Engine').classes('text-3xl font-bold')
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=[trade.timestamp for trade in trades],
-            y=[trade.price for trade in trades],
-            mode='lines'
-        ))
+        fig.add_trace(go.Scatter(x=trades['timestamp'], y=trades['price'], mode='lines'))
         fig.update_layout(template='plotly_dark', margin=dict(l=0, r=0, t=0, b=0))
 
         ui.plotly(fig).classes('w-full h-96')
 
 
-def get_trades():
+def get_trades() -> pd.DataFrame:
     client = SQLAlchemyClient()
     repository = SQLAlchemyTradeRepository(client)
 
     start = get_second_timestamp(*parse_datetime('2026-4'))
     end = get_second_timestamp(*parse_datetime('2026-4-15'))
 
-    return repository.get('XXBTZGBP', start, end)
+    trades = repository.get('XXBTZGBP', start, end)
+    trades_df = pd.DataFrame([{'timestamp': t.timestamp, 'price': t.price} for t in trades])
+    trades_df['timestamp'] = pd.to_datetime(trades_df['timestamp'], unit='s')
+
+    return trades_df
