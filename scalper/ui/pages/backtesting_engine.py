@@ -1,9 +1,8 @@
-import pandas as pd
 from nicegui import ui
-import plotly.graph_objects as go
 
-from ui.theme import GREEN_BRIGHT, GREEN_DARK
+from ui.components.chart import build_chart
 from ui.services.trades import get_trades
+from ui.theme import GREEN_DARK
 
 
 @ui.page('/')
@@ -34,22 +33,3 @@ def backtesting_engine():
         ).classes('w-full text-white')
 
     chart = ui.plotly(build_chart([])).classes('w-full h-full gap-4')
-
-
-def build_chart(trades: pd.DataFrame) -> go.Figure:
-    fig = go.Figure()
-    if len(trades):
-        fig.add_trace(go.Scatter(
-            x=trades['timestamp'],
-            y=trades['price'],
-            mode='lines',
-            line=dict(color=GREEN_BRIGHT)
-        ))
-    fig.update_layout(
-        template='plotly_dark',
-        margin=dict(l=0, r=0, t=0, b=0),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-    )
-
-    return fig
