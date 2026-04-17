@@ -2,6 +2,7 @@ from nicegui import ui
 
 from ui.components.chart import build_chart
 from ui.components.header import render_header
+from ui.components.sidebar import render_sidebar
 from ui.services.trades import get_trades
 from ui.theme import GREEN_DARK
 
@@ -11,7 +12,7 @@ def backtesting_engine():
     ui.dark_mode().enable()
     render_header()
 
-    with ui.left_drawer().classes('bg-neutral-900 border-r border-neutral-800 p-4 gap-4'):
+    with render_sidebar():
         ui.label('Symbol').classes('text-xs text-neutral-400 uppercase tracking-wide')
         symbol = ui.select(['XXBTZGBP', 'XETHZGBP'], value='XXBTZGBP').classes('w-full')
 
