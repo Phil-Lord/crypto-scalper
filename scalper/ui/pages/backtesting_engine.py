@@ -2,7 +2,7 @@ from nicegui import ui
 
 from ui.components import build_chart, render_header, render_sidebar
 from ui.services import get_trades
-from ui.theme import primary_button, sidebar_input, sidebar_label, sidebar_select
+from ui.theme import primary_button, sidebar_input, sidebar_select
 
 
 @ui.page('/')
@@ -11,14 +11,9 @@ def backtesting_engine():
     render_header()
 
     with render_sidebar():
-        sidebar_label('Symbol')
-        symbol = sidebar_select(['XXBTZGBP', 'XETHZGBP'], value='XXBTZGBP')
-
-        sidebar_label('Start date')
-        start_date = sidebar_input(value='2026-04-01')
-
-        sidebar_label('End date')
-        end_date = sidebar_input(value='2026-04-15')
+        symbol = sidebar_select('Symbol', ['XXBTZGBP', 'XETHZGBP'], 'XXBTZGBP')
+        start_date = sidebar_input('Start date', '2026-04-01')
+        end_date = sidebar_input('End date', '2026-04-15')
 
         ui.space()
         primary_button(
