@@ -1,9 +1,7 @@
 from nicegui import ui
 
-from ui.components.chart import build_chart
-from ui.components.header import render_header
-from ui.components.sidebar import render_sidebar
-from ui.services.trades import get_trades
+from ui.components import build_chart, render_header, render_sidebar
+from ui.services import get_trades
 from ui.theme import primary_button, sidebar_input, sidebar_label, sidebar_select
 
 
