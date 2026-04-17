@@ -5,7 +5,7 @@ from .pages import backtesting_engine
 app.add_static_files('/static', 'ui/static')
 
 
-def main():
+def main() -> None:
     ui.run(
         title='Scalper',
         favicon='ui/static/dog-park-96x96.png',
