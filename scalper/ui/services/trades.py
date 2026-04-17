@@ -8,8 +8,8 @@ def get_trades(pair: str, start_date: str, end_date: str) -> pd.DataFrame:
     client = SQLAlchemyClient()
     repository = SQLAlchemyTradeRepository(client)
 
-    start = get_second_timestamp(*parse_datetime(start_date))
-    end = get_second_timestamp(*parse_datetime(end_date))
+    start = get_second_timestamp(*parse_datetime(start_date)) if start_date else None
+    end = get_second_timestamp(*parse_datetime(end_date)) if end_date else None
 
     trades = repository.get(pair, start, end)
     trades_df = pd.DataFrame([{'timestamp': t.timestamp, 'price': t.price} for t in trades])
