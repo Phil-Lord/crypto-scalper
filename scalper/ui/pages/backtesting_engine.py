@@ -1,6 +1,7 @@
 from nicegui import ui
 
 from ui.components.chart import build_chart
+from ui.components.header import render_header
 from ui.services.trades import get_trades
 from ui.theme import GREEN_DARK
 
@@ -8,11 +9,7 @@ from ui.theme import GREEN_DARK
 @ui.page('/')
 def backtesting_engine():
     ui.dark_mode().enable()
-
-    with ui.header().classes('bg-neutral-900 border-b border-neutral-800 px-6 py-3 flex items-center gap-6'):
-        ui.label('Scalper').classes('text-white font-bold text-lg')
-        ui.label('Backtesting').classes('text-neutral-300 text-sm cursor-pointer')
-        ui.label('Live Trading').classes('text-neutral-500 text-sm cursor-pointer')
+    render_header()
 
     with ui.left_drawer().classes('bg-neutral-900 border-r border-neutral-800 p-4 gap-4'):
         ui.label('Symbol').classes('text-xs text-neutral-400 uppercase tracking-wide')
