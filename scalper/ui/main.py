@@ -3,6 +3,7 @@ from nicegui import app, ui
 from .pages import backtesting_engine
 
 app.add_static_files('/static', 'ui/static')
+ui.add_css(open('ui/static/theme.css').read(), shared=True)
 
 
 def main() -> None:

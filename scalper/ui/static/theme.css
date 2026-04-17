@@ -1,0 +1,6 @@
+:root,
+body,
+.body--dark,
+#q-app {
+    --q-primary: #03c574 !important;
+}
