@@ -12,8 +12,3 @@ def main():
         port=8080,
         reload=True
     )
-
-# Colours:
-# #3ecf8e - light green (icons)
-# #03c574 - bright green (links - white on hover)
-# #016339 - dark green (buttons)

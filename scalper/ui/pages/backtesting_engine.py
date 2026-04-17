@@ -2,6 +2,7 @@ import pandas as pd
 from nicegui import ui
 import plotly.graph_objects as go
 
+from ui.theme import GREEN_BRIGHT, GREEN_DARK
 from ui.services.trades import get_trades
 
 
@@ -27,7 +28,7 @@ def backtesting_engine():
         ui.space()
         ui.button(
             'Load Trades',
-            color='#016339',
+            color=GREEN_DARK,
             on_click=lambda: chart.update_figure(build_chart(
                 get_trades(symbol.value, start_date.value, end_date.value)))
         ).classes('w-full text-white')
@@ -42,7 +43,7 @@ def build_chart(trades: pd.DataFrame) -> go.Figure:
             x=trades['timestamp'],
             y=trades['price'],
             mode='lines',
-            line=dict(color='#03c574')
+            line=dict(color=GREEN_BRIGHT)
         ))
     fig.update_layout(
         template='plotly_dark',
