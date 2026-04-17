@@ -2,8 +2,7 @@ import pandas as pd
 from nicegui import ui
 import plotly.graph_objects as go
 
-from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
-from utils import get_second_timestamp, parse_datetime
+from ui.services.trades import get_trades
 
 
 @ui.page('/')
@@ -34,19 +33,6 @@ def backtesting_engine():
         ).classes('w-full text-white')
 
     chart = ui.plotly(build_chart([])).classes('w-full h-full gap-4')
-
-
-def get_trades(pair: str, start_date: str, end_date: str) -> pd.DataFrame:
-    client = SQLAlchemyClient()
-    repository = SQLAlchemyTradeRepository(client)
-
-    start = get_second_timestamp(*parse_datetime(start_date))
-    end = get_second_timestamp(*parse_datetime(end_date))
-
-    trades = repository.get(pair, start, end)
-    trades_df = pd.DataFrame([{'timestamp': t.timestamp, 'price': t.price} for t in trades])
-    trades_df['timestamp'] = pd.to_datetime(trades_df['timestamp'], unit='s')
-    return trades_df
 
 
 def build_chart(trades: pd.DataFrame) -> go.Figure:
