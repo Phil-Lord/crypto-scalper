@@ -19,6 +19,13 @@ class Job:
 
 
 async def run_in_thread(job: Job, fn, *args):
+    '''
+    Run an async blocking function in a separate thread.
+
+    - Ideal for I/O-bound and short CPU-bound tasks.
+    - The task lives and dies with the app process.
+    - Progress updates are streamed back to the UI via the Job.message field.
+    '''
     job.status = JobStatus.RUNNING
     try:
         result = await asyncio.to_thread(fn, *args)
@@ -31,6 +38,12 @@ async def run_in_thread(job: Job, fn, *args):
 
 
 async def run_subprocess(job: Job, cmd: list[str]):
+    '''
+    Spawn a separate OS process which runs independently of the UI.
+
+    - This is for long-running, CPU-bound tasks which need to survive if the UI crashes.
+    - The subprocess streams progress updates back to the UI via the Job.message field.
+    '''
     job.status = JobStatus.RUNNING
     try:
         proc = await asyncio.create_subprocess_exec(
