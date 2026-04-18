@@ -13,5 +13,8 @@ from .bot_order.supabase_bot_order_repository import SupabaseBotOrderRepository
 from .generalisation_evaluation.generalisation_evaluation_repository import GeneralisationEvaluationRepository
 from .generalisation_evaluation.sqlalchemy_generalisation_evaluation_repository import SQLAlchemyGeneralisationEvaluationRepository
 
+from .job.job_repository import JobRepository
+from .job.sqlalchemy_job_repository import SQLAlchemyJobRepository
+
 from .trade.sqlalchemy_trade_repository import SQLAlchemyTradeRepository
 from .trade.trade_repository import TradeRepository
