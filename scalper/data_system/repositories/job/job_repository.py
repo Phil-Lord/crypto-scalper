@@ -5,22 +5,20 @@ from data_system.models import Job, JobType
 
 class JobRepository(ABC):
     @abstractmethod
-    def add(self, job: Job) -> Job:
+    def add(self, job: Job) -> None:
         '''
         Inserts a job into the database.
 
         :param job: Job domain object to persist.
-        :return: The persisted Job domain object with updated fields (e.g., ID).
         '''
         pass
 
     @abstractmethod
-    def update(self, job: Job) -> Job:
+    def update(self, job: Job) -> None:
         '''
         Updates an existing job in the database.
 
         :param job: Job domain object with updated fields. Must have a valid ID.
-        :return: The updated Job domain object.
         '''
         pass
 
