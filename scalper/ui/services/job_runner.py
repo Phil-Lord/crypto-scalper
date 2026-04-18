@@ -37,7 +37,7 @@ async def run_in_thread(job: Job, fn, *args):
         raise
 
 
-async def run_subprocess(job: Job, cmd: list[str]):
+async def run_subprocess(job: Job, cmd: list[str], on_progress: callable = None):
     '''
     Spawn a separate OS process which runs independently of the UI.
 
@@ -53,6 +53,8 @@ async def run_subprocess(job: Job, cmd: list[str]):
         )
         async for line in proc.stdout:
             job.message = line.decode().strip()  # stream tqdm progress
+            if on_progress:
+                on_progress(job.message)
         await proc.wait()
         job.status = JobStatus.DONE if proc.returncode == 0 else JobStatus.ERROR
     except Exception as e:
