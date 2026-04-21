@@ -29,6 +29,14 @@ class Job:
         message (str): Optional message for status updates or error details.
         created_at (datetime): Timestamp when the job was created, default is now.
         updated_at (datetime): Timestamp when the job was last updated, default is now.
+
+    Database Mapping:
+        - id: TEXT PRIMARY KEY (UUID stored as string)
+        - job_type: TEXT NOT NULL
+        - status: TEXT NOT NULL DEFAULT 'pending'
+        - message: TEXT
+        - created_at: REAL NOT NULL
+        - updated_at: REAL NOT NULL
     '''
     job_type: JobType
     id: UUID = field(default_factory=uuid4)
