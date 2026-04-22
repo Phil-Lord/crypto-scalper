@@ -1,7 +1,10 @@
 import pandas as pd
+import plotly.graph_objects as go
 
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
 from utils import get_second_timestamp, parse_datetime
+
+MAX_POINTS = 2000
 
 
 def get_trades(pair: str, start_date: str, end_date: str) -> pd.DataFrame:
@@ -15,3 +18,26 @@ def get_trades(pair: str, start_date: str, end_date: str) -> pd.DataFrame:
     trades_df = pd.DataFrame([{'timestamp': t.timestamp, 'price': t.price} for t in trades])
     trades_df['timestamp'] = pd.to_datetime(trades_df['timestamp'], unit='s')
     return trades_df
+
+
+def plot_trades(trades: pd.DataFrame, layout: go.Layout) -> go.Figure:
+    ohlc = convert_trades_to_ohlc(trades)
+    figure = go.Figure(layout=layout)
+    figure.add_trace(go.Candlestick(
+        x=ohlc['timestamp'],
+        open=ohlc['open'],
+        high=ohlc['high'],
+        low=ohlc['low'],
+        close=ohlc['close']
+    ))
+    return figure
+
+
+def convert_trades_to_ohlc(trades: pd.DataFrame) -> pd.DataFrame:
+    ''' Converts trades to OHLC, downsampling to a maximum number of points for plotting. '''
+    if len(trades) == 0:
+        return trades
+    interval = max(1, len(trades) // MAX_POINTS)
+    trades.set_index('timestamp', inplace=True)
+    ohlc = trades['price'].resample(f'{interval}min').ohlc().dropna()
+    return ohlc.reset_index()

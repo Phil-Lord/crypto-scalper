@@ -1,12 +1,10 @@
-import asyncio
-
 from nicegui import ui
 
 from core import run_in_thread
 from data_system import Job, JobType, SQLAlchemyClient, SQLAlchemyJobRepository
 
-from ui.components import build_chart, render_header, render_sidebar
-from ui.services import get_trades
+from ui.components import chart_layout, render_chart, render_header, render_sidebar
+from ui.services import get_trades, plot_trades
 from ui.theme import primary_button, sidebar_input, sidebar_select
 
 
@@ -24,7 +22,7 @@ class BacktestingEnginePage:
             self.status_label = ui.label('').classes('text-neutral-400 text-xs')
             self.load_button = primary_button('Load Trades', on_click=self._load_trades)
 
-        self.chart = ui.plotly(build_chart([])).classes('w-full h-full gap-4')
+        self.chart = render_chart()
         self.job_repo = SQLAlchemyJobRepository(SQLAlchemyClient())
 
     async def _load_trades(self):
@@ -42,7 +40,8 @@ class BacktestingEnginePage:
                 self.start_date.value,
                 self.end_date.value
             )
-            self.chart.update_figure(build_chart(trades))
+            figure = plot_trades(trades, chart_layout())
+            self.chart.update_figure(figure)
         except Exception as e:
             self.status_label.set_text(f'Error: {job.message}')
         finally:

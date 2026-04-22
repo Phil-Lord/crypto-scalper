@@ -1,1 +1,1 @@
-from .trades import get_trades
+from .trades import get_trades, plot_trades
