@@ -2,8 +2,11 @@ import asyncio
 
 from nicegui import background_tasks, ui
 
+from data_system import Job, JobType, SQLAlchemyClient, SQLAlchemyJobRepository
+from core import run_in_thread
+
 from ui.components import build_chart, render_header, render_sidebar
-from ui.services import get_trades, Job, run_in_thread
+from ui.services import get_trades
 from ui.theme import primary_button, sidebar_input, sidebar_select
 
 
@@ -11,6 +14,7 @@ class BacktestingEnginePage:
     def __init__(self):
         ui.dark_mode().enable()
         render_header()
+        self.job_repo = SQLAlchemyJobRepository(SQLAlchemyClient())
 
         with render_sidebar():
             self.symbol = sidebar_select('Symbol', ['XXBTZGBP', 'XETHZGBP'], 'XXBTZGBP')
@@ -24,7 +28,7 @@ class BacktestingEnginePage:
         self.chart = ui.plotly(build_chart([])).classes('w-full h-full gap-4')
 
     async def load_trades(self):
-        job = Job()
+        job = Job(job_type=JobType.GET_TRADES)
         self.load_button.props('loading')
         self.load_button.disable()
         self.status_label.set_text('Loading trades...')
@@ -33,7 +37,12 @@ class BacktestingEnginePage:
     async def _run_load_trades(self, job: Job):
         try:
             trades = await run_in_thread(
-                job, get_trades, self.symbol.value, self.start_date.value, self.end_date.value
+                self.job_repo,
+                job,
+                get_trades,
+                self.symbol.value,
+                self.start_date.value,
+                self.end_date.value
             )
             self.status_label.set_text('Plotting trades...')
             figure = await asyncio.to_thread(build_chart, trades)
