@@ -28,9 +28,7 @@ class BacktestingEnginePage:
 
     async def _load_trades(self):
         job = Job(job_type=JobType.GET_TRADES)
-        self.load_button.props('loading')
-        self.load_button.disable()
-        self.status_label.set_text('Loading trades...')
+        self._set_loading(True, self.load_button)
 
         try:
             trades = await run_in_thread(
@@ -47,15 +45,11 @@ class BacktestingEnginePage:
             self.status_label.set_text(f'Error: {job.message}')
             print(f'Error loading trades: {e}')
         finally:
-            self.load_button.props(remove='loading')
-            self.load_button.enable()
-            self.status_label.set_text('')
+            self._set_loading(False)
 
     async def _run_backtest(self):
         job = Job(job_type=JobType.RUN_BACKTEST)
-        self.backtest_button.props('loading')
-        self.backtest_button.disable()
-        self.status_label.set_text('Running backtest...')
+        self._set_loading(True, self.backtest_button)
 
         try:
             results = await run_in_thread(
@@ -72,9 +66,17 @@ class BacktestingEnginePage:
             self.status_label.set_text(f'Error: {job.message}')
             print(f'Error running backtest: {e}')
         finally:
-            self.backtest_button.props(remove='loading')
-            self.backtest_button.enable()
-            self.status_label.set_text('')
+            self._set_loading(False)
+
+    def _set_loading(self, is_loading: bool, button_clicked: ui.button = None) -> None:
+        for button in [self.load_button, self.backtest_button]:
+            if not is_loading:
+                button.props(remove='loading')
+                button.enable()
+                continue
+            if button == button_clicked:
+                button.props('loading')
+            button.disable()
 
 
 @ui.page('/')
