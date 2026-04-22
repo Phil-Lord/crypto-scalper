@@ -42,14 +42,13 @@ class BacktestingEnginePage:
                 self.start_date.value,
                 self.end_date.value
             )
-            figure = await asyncio.to_thread(build_chart, trades)
-            self.chart.update_figure(figure)
-            self.status_label.set_text('')
+            self.chart.update_figure(build_chart(trades))
         except Exception as e:
             self.status_label.set_text(f'Error: {job.message}')
         finally:
             self.load_button.props(remove='loading')
             self.load_button.enable()
+            self.status_label.set_text('')
 
 
 @ui.page('/')
