@@ -21,8 +21,10 @@ Dockerfile
 
 # Scalper code unused in live trading
 scalper/backtesting_engine/
+scalper/core
 scalper/local_storage/
 scalper/logs/
 scalper/study_analyser/
 scalper/tests/
+scalper/ui
 scalper/Makefile
