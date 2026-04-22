@@ -44,3 +44,11 @@ class Job:
     message: str = ''
     created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+
+    def update(self, status: JobStatus = None, message: str = None) -> None:
+        ''' Update the job's status and message, refreshing the updated_at timestamp. '''
+        if status is not None:
+            self.status = status
+        if message is not None:
+            self.message = message
+        self.updated_at = datetime.now(timezone.utc)

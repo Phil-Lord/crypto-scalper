@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime, timezone
 
 import questionary
 
@@ -41,9 +40,7 @@ def update(repository: JobRepository):
     status = questionary.select('Status:', choices=[status.value for status in JobStatus]).ask()
     message = questionary.text('Message (optional):').ask()
 
-    job.status = JobStatus(status)
-    job.message = message
-    job.updated_at = datetime.now(timezone.utc)
+    job.update(status=JobStatus(status), message=message)
     repository.update(job)
     print('Updated job:', job)
 
