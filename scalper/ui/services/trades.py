@@ -17,11 +17,12 @@ def get_trades(pair: str, start_date: str, end_date: str) -> pd.DataFrame:
     trades = repository.get(pair, start, end)
     trades_df = pd.DataFrame([{'timestamp': t.timestamp, 'price': t.price} for t in trades])
     trades_df['timestamp'] = pd.to_datetime(trades_df['timestamp'], unit='s')
+    trades_df.set_index('timestamp', inplace=True)
     return trades_df
 
 
 def plot_trades(trades: pd.DataFrame, figure: go.Figure) -> go.Figure:
-    ohlc = convert_trades_to_ohlc(trades)
+    ohlc = convert_prices_to_ohlc(trades)
     figure.data = []
     figure.add_trace(go.Candlestick(
         x=ohlc['timestamp'],
@@ -33,11 +34,10 @@ def plot_trades(trades: pd.DataFrame, figure: go.Figure) -> go.Figure:
     return figure
 
 
-def convert_trades_to_ohlc(trades: pd.DataFrame) -> pd.DataFrame:
-    ''' Converts trades to OHLC, downsampling to a maximum number of points for plotting. '''
-    if len(trades) == 0:
-        return trades
-    interval = max(1, len(trades) // MAX_POINTS)
-    trades.set_index('timestamp', inplace=True)
-    ohlc = trades['price'].resample(f'{interval}min').ohlc().dropna()
+def convert_prices_to_ohlc(prices: pd.DataFrame) -> pd.DataFrame:
+    ''' Converts prices to OHLC, downsampling to a maximum number of points for plotting. '''
+    if len(prices) == 0:
+        return prices
+    interval = max(1, len(prices) // MAX_POINTS)
+    ohlc = prices['price'].resample(f'{interval}min').ohlc().dropna()
     return ohlc.reset_index()

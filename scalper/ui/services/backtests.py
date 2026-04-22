@@ -6,6 +6,8 @@ from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
 from strategy_manager import create_strategy
 from utils import get_second_timestamp, parse_datetime, PRECISION_TREND_CONFIG
 
+from .trades import convert_prices_to_ohlc
+
 
 def run_backtest(symbol, start_date, end_date) -> pd.DataFrame:
     strategy = create_strategy('PrecisionTrendStrategy', PRECISION_TREND_CONFIG)
@@ -17,12 +19,16 @@ def run_backtest(symbol, start_date, end_date) -> pd.DataFrame:
 
 
 def plot_backtest_results(results: pd.DataFrame, figure: go.Figure) -> go.Figure:
+    ohlc = convert_prices_to_ohlc(results)
     figure.data = []
-    figure.add_trace(go.Scatter(
+
+    figure.add_trace(go.Candlestick(
         name='Price',
-        x=results.index,
-        y=results['price'],
-        mode='lines'
+        x=ohlc['timestamp'],
+        open=ohlc['open'],
+        high=ohlc['high'],
+        low=ohlc['low'],
+        close=ohlc['close']
     ))
 
     buys = results[results['signal'] == 'buy']
