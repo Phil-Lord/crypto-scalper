@@ -17,5 +17,30 @@ def run_backtest(symbol, start_date, end_date) -> pd.DataFrame:
 
 
 def plot_backtest_results(results: pd.DataFrame, figure: go.Figure) -> go.Figure:
-    print('Plotting backtest results...')
+    figure.data = []
+    figure.add_trace(go.Scatter(
+        name='Price',
+        x=results.index,
+        y=results['price'],
+        mode='lines'
+    ))
+
+    buys = results[results['signal'] == 'buy']
+    figure.add_trace(go.Scatter(
+        name='Buy',
+        x=buys.index,
+        y=buys['price'],
+        mode='markers',
+        marker=dict(color='green', symbol='triangle-up', size=12)
+    ))
+
+    sells = results[results['signal'] == 'sell']
+    figure.add_trace(go.Scatter(
+        name='Sell',
+        x=sells.index,
+        y=sells['price'],
+        mode='markers',
+        marker=go.scatter.Marker(color='red', symbol='triangle-down', size=12)
+    ))
+
     return figure
