@@ -20,9 +20,9 @@ def get_trades(pair: str, start_date: str, end_date: str) -> pd.DataFrame:
     return trades_df
 
 
-def plot_trades(trades: pd.DataFrame, layout: go.Layout) -> go.Figure:
+def plot_trades(trades: pd.DataFrame, figure: go.Figure) -> go.Figure:
     ohlc = convert_trades_to_ohlc(trades)
-    figure = go.Figure(layout=layout)
+    figure.data = []
     figure.add_trace(go.Candlestick(
         x=ohlc['timestamp'],
         open=ohlc['open'],

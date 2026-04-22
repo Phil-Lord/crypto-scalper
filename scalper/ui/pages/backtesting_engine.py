@@ -3,7 +3,7 @@ from nicegui import ui
 from core import run_in_thread
 from data_system import Job, JobType, SQLAlchemyClient, SQLAlchemyJobRepository
 
-from ui.components import chart_layout, render_chart, render_header, render_sidebar
+from ui.components import render_chart, render_header, render_sidebar
 from ui.services import get_trades, plot_trades
 from ui.theme import primary_button, sidebar_input, sidebar_select
 
@@ -40,10 +40,11 @@ class BacktestingEnginePage:
                 self.start_date.value,
                 self.end_date.value
             )
-            figure = plot_trades(trades, chart_layout())
+            figure = plot_trades(trades, self.chart.figure)
             self.chart.update_figure(figure)
         except Exception as e:
             self.status_label.set_text(f'Error: {job.message}')
+            print(f'Error loading trades: {e}')
         finally:
             self.load_button.props(remove='loading')
             self.load_button.enable()
