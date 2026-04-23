@@ -37,7 +37,7 @@ def plot_backtest_results(results: pd.DataFrame, figure: go.Figure) -> go.Figure
         x=buys.index,
         y=buys['price'],
         mode='markers',
-        marker=dict(color='green', symbol='triangle-up', size=12)
+        marker=go.scatter.Marker(color='green', symbol='circle', size=12)
     ))
 
     sells = results[results['signal'] == 'sell']
@@ -46,7 +46,7 @@ def plot_backtest_results(results: pd.DataFrame, figure: go.Figure) -> go.Figure
         x=sells.index,
         y=sells['price'],
         mode='markers',
-        marker=go.scatter.Marker(color='red', symbol='triangle-down', size=12)
+        marker=go.scatter.Marker(color='red', symbol='circle', size=12)
     ))
 
     return figure
