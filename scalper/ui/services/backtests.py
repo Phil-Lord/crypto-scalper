@@ -32,21 +32,18 @@ def plot_backtest_results(results: pd.DataFrame, figure: go.Figure) -> go.Figure
     ))
 
     buys = results[results['signal'] == 'buy']
-    figure.add_trace(go.Scatter(
-        name='Buy',
-        x=buys.index,
-        y=buys['price'],
-        mode='markers',
-        marker=go.scatter.Marker(color='green', symbol='circle', size=12)
-    ))
+    figure.add_trace(create_scatter(buys, 'green'))
 
     sells = results[results['signal'] == 'sell']
-    figure.add_trace(go.Scatter(
-        name='Sell',
-        x=sells.index,
-        y=sells['price'],
-        mode='markers',
-        marker=go.scatter.Marker(color='red', symbol='circle', size=12)
-    ))
+    figure.add_trace(create_scatter(sells, 'red'))
 
     return figure
+
+
+def create_scatter(results: pd.DataFrame, colour: str) -> go.Figure:
+    return go.Scatter(
+        x=results.index,
+        y=results['price'],
+        mode='markers',
+        marker=go.scatter.Marker(color=colour, symbol='circle', size=12)
+    )
