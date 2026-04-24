@@ -10,11 +10,15 @@ from the Data System module—the project's reference implementation.
 A cryptocurrency scalping bot with:
 
 - **Backtesting Engine** — Local parameter optimisation using Optuna
+- **Core** - Shared services (currently just thread/subprocess job runners)
 - **Data System** — Multi-backend storage (SQLAlchemy/SQLite + Supabase/PostgreSQL)
 - **Exchange Connector** — Kraken API integration
+- **Scripts** — Local testing and manual operations
 - **Strategy Manager** — Trading strategy implementations
 - **Study Analyser** — Optuna study analysis and plotting
-- **Trade Executor** — Live trading execution
+- **Trade Executor** — Live trading execution (deployed to a fly.io machine using Docker)
+- **UI** — NiceGUI dashboard for backtesting (WIP) and live-trading monitoring (future work)
+- **Utils** — Reusable utilities (e.g., timestamp parsing, strategy parameter configs, etc.)
 
 ---
 
