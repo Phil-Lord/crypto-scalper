@@ -11,4 +11,4 @@ def render_chart() -> ui.plotly:
         showlegend=False
     )
     figure = go.Figure(layout=layout)
-    return ui.plotly(figure=figure).classes('w-full h-full gap-4')
+    return ui.plotly(figure=figure).classes('w-full h-full')

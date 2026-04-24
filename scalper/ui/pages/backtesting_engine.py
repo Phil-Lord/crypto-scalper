@@ -3,7 +3,14 @@ from nicegui import ui
 from core import run_in_thread
 from data_system import Job, JobType, SQLAlchemyClient, SQLAlchemyJobRepository
 
-from ui.components import render_chart, render_header, render_sidebar, render_table
+from ui.components import (
+    render_chart,
+    render_header,
+    render_main_content,
+    render_sidebar,
+    render_slot,
+    render_table
+)
 from ui.services import get_trades, plot_backtest_results, plot_trades, run_backtest, update_table
 from ui.theme import primary_button, sidebar_input, sidebar_select
 
@@ -11,6 +18,8 @@ from ui.theme import primary_button, sidebar_input, sidebar_select
 class BacktestingEnginePage:
     def __init__(self):
         ui.dark_mode().enable()
+        ui.query('.nicegui-content').classes('p-0 gap-0')
+
         render_header()
 
         with render_sidebar():
@@ -22,8 +31,12 @@ class BacktestingEnginePage:
             self.load_button = primary_button('Load Trades', on_click=self._load_trades)
             self.backtest_button = primary_button('Run Backtest', on_click=self._run_backtest)
 
-        self.chart = render_chart()
-        self.grid = render_table()
+        with render_main_content():
+            with render_slot(flex=1.5):
+                self.chart = render_chart()
+            with render_slot():
+                self.grid = render_table()
+
         self.job_repo = SQLAlchemyJobRepository(SQLAlchemyClient())
 
     async def _load_trades(self):
