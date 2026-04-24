@@ -67,3 +67,11 @@ def update_table(table: ui.table, results: pd.DataFrame) -> None:
 
     for i in range(len(table.columns)):
         table.columns[i]['sortable'] = True
+
+    # Add conditional colour formatting for signal column
+    with table.add_slot('body-cell-signal'):
+        with table.cell('signal'):
+            ui.badge().props('''
+                :color="props.value == 'buy' ? 'green' : 'red'"
+                :label="props.value"
+            ''')
