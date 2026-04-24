@@ -63,42 +63,7 @@ def update_table(table: ui.table, results: pd.DataFrame) -> None:
     remaining_columns = [c for c in trades.columns if c not in key_columns]
     trades = trades[key_columns + remaining_columns]
 
-    ui.add_css("""
-        .sticky-header-table {
-            /* height or max-height is important */
-            height: 310px;
-            /* this is when the loading indicator appears */
-            /* prevent scrolling behind sticky top row on focus */
-        }
-
-        .sticky-header-table .q-table__top,
-        .sticky-header-table .q-table__bottom,
-        .sticky-header-table thead tr:first-child th {
-            /* bg color is important for th; just specify one */
-            background-color: #1d1d1d;
-        }
-
-        .sticky-header-table thead tr th {
-            position: sticky;
-            z-index: 1;
-        }
-
-        .sticky-header-table thead tr:first-child th {
-            top: 0;
-        }
-
-        .sticky-header-table.q-table--loading thead tr:last-child th {
-            /* height of all previous header rows */
-            top: 48px;
-        }
-
-        .sticky-header-table tbody {
-            /* height of all previous header rows */
-            scroll-margin-top: 48px;
-        }
-    """)
     table.update_from_pandas(trades)
-    table.classes('sticky-header-table')
 
     for i in range(len(table.columns)):
         table.columns[i]['sortable'] = True
