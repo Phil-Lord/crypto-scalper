@@ -55,6 +55,7 @@ class BacktestingEnginePage:
             )
             figure = plot_trades(trades, self.chart.figure)
             self.chart.update_figure(figure)
+            update_table(self.grid, None)
         except Exception as e:
             print(f'Error loading trades: {e}')
         finally:

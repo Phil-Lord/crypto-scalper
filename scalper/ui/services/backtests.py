@@ -51,6 +51,10 @@ def create_scatter(results: pd.DataFrame, colour: str) -> go.Figure:
 
 
 def update_table(table: ui.table, results: pd.DataFrame) -> None:
+    if results is None or results.empty:
+        table.update_from_pandas(pd.DataFrame())
+        return
+
     trades = results[(results['signal'] == 'buy') | (results['signal'] == 'sell')]
 
     # Format timestamp and price
