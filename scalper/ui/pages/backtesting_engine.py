@@ -3,8 +3,8 @@ from nicegui import ui
 from core import run_in_thread
 from data_system import Job, JobType, SQLAlchemyClient, SQLAlchemyJobRepository
 
-from ui.components import render_chart, render_header, render_sidebar, render_table, update_table
-from ui.services import get_trades, plot_backtest_results, plot_trades, run_backtest
+from ui.components import render_chart, render_header, render_sidebar, render_table
+from ui.services import get_trades, plot_backtest_results, plot_trades, run_backtest, update_table
 from ui.theme import primary_button, sidebar_input, sidebar_select
 
 
@@ -63,9 +63,7 @@ class BacktestingEnginePage:
             )
             figure = plot_backtest_results(results, self.chart.figure)
             self.chart.update_figure(figure)
-
-            trades = results[(results['signal'] == 'buy') | (results['signal'] == 'sell')]
-            update_table(self.grid, trades)
+            update_table(self.grid, results)
         except Exception as e:
             self.status_label.set_text(f'Error: {job.message}')
             print(f'Error running backtest: {e}')

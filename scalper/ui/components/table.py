@@ -1,11 +1,6 @@
-import pandas as pd
 from nicegui import ui
+import pandas as pd
 
 
 def render_table() -> ui.table:
-    data = pd.DataFrame()
-    return ui.table.from_pandas(data).classes('max-h-full w-full')
-
-
-def update_table(table: ui.table, data: pd.DataFrame):
-    table.update_from_pandas(data)
+    return ui.table.from_pandas(pd.DataFrame()).classes('max-h-full w-full')

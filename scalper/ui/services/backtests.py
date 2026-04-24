@@ -1,3 +1,4 @@
+from nicegui import ui
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -47,3 +48,19 @@ def create_scatter(results: pd.DataFrame, colour: str) -> go.Figure:
         mode='markers',
         marker=go.scatter.Marker(color=colour, symbol='circle', size=12)
     )
+
+
+def update_table(table: ui.table, results: pd.DataFrame) -> None:
+    trades = results[(results['signal'] == 'buy') | (results['signal'] == 'sell')]
+
+    # Format timestamp and price
+    trades.reset_index(inplace=True)
+    trades['timestamp'] = trades['timestamp'].dt.strftime('%d %b %Y %H:%M')
+    trades['price'] = trades['price'].apply(lambda p: f'£{p:,.2f}')
+
+    # Reorder columns to show timestamp, signal, price first
+    key_columns = ['timestamp', 'signal', 'price']
+    remaining_columns = [c for c in trades.columns if c not in key_columns]
+    trades = trades[key_columns + remaining_columns]
+
+    table.update_from_pandas(trades)
