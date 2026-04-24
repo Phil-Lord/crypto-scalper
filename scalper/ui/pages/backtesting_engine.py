@@ -19,7 +19,6 @@ class BacktestingEnginePage:
             self.end_date = sidebar_input('End date', '2026-04-15')
 
             ui.space()
-            self.status_label = ui.label('').classes('text-neutral-400 text-xs')
             self.load_button = primary_button('Load Trades', on_click=self._load_trades)
             self.backtest_button = primary_button('Run Backtest', on_click=self._run_backtest)
 
@@ -43,7 +42,6 @@ class BacktestingEnginePage:
             figure = plot_trades(trades, self.chart.figure)
             self.chart.update_figure(figure)
         except Exception as e:
-            self.status_label.set_text(f'Error: {job.message}')
             print(f'Error loading trades: {e}')
         finally:
             self._set_loading(False)
@@ -65,7 +63,6 @@ class BacktestingEnginePage:
             self.chart.update_figure(figure)
             update_table(self.grid, results)
         except Exception as e:
-            self.status_label.set_text(f'Error: {job.message}')
             print(f'Error running backtest: {e}')
         finally:
             self._set_loading(False)
