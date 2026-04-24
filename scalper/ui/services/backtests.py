@@ -64,3 +64,6 @@ def update_table(table: ui.table, results: pd.DataFrame) -> None:
     trades = trades[key_columns + remaining_columns]
 
     table.update_from_pandas(trades)
+
+    for i in range(len(table.columns)):
+        table.columns[i]['sortable'] = True
