@@ -19,6 +19,7 @@ class BacktestingEnginePage:
     def __init__(self):
         ui.dark_mode().enable()
         ui.query('.nicegui-content').classes('p-0 gap-0')
+        ui.query('body').style('overflow: hidden')
 
         render_header()
 
