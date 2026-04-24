@@ -18,8 +18,8 @@ from ui.theme import primary_button, sidebar_input, sidebar_select
 class BacktestingEnginePage:
     def __init__(self):
         ui.dark_mode().enable()
-        ui.query('.nicegui-content').classes('p-0 gap-0')
-        ui.query('body').style('overflow: hidden')
+        ui.query('.nicegui-content').classes('p-0 gap-0')  # Remove padding/gap from main content
+        ui.query('body').style('overflow: hidden')  # Prevent page scrolling
 
         render_header()
 
