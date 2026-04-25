@@ -1584,3 +1584,247 @@ class TestTradeExecutor:
 
         mock_bot_order_repo.mark_failed.assert_called_once()
         assert result.status == OrderStatus.FAILED
+
+    # --- execute_interval — fill confirmation through real _confirm_order ---
+    #
+    # These tests exercise the full BUY → submit → QueryOrders confirm path with
+    # `_confirm_order` running for real. The other execute_interval tests mock
+    # `_confirm_order` via `_setup_order_signal` to focus on tick/order persistence;
+    # these complement them by covering the live confirmation flow end-to-end.
+
+    def _setup_live_buy(self, exec_executor, mock_strategy, mock_add_order_connector):
+        ''' Configures a live BUY signal with a real (unmocked) _confirm_order path. '''
+        mock_strategy.last_action = Signal.SELL
+
+        def generate(_ohlc):
+            # Mirror the real Strategy: mutate last_action when emitting a directional signal.
+            mock_strategy.last_action = Signal.BUY
+            return {'signal': Signal.BUY}
+
+        mock_strategy.generate_signal.side_effect = generate
+        mock_add_order_connector.place.return_value = AddOrderResult(
+            txid=['TXID-001'], order_description='buy 0.001 XXBTZGBP @ market',
+        )
+
+    def test_execute_interval_query_fill_retries_three_times(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_query_orders_connector,
+    ):
+        # Given — order placed but Kraken keeps reporting OPEN; confirm should retry 3×
+        self._setup_live_buy(exec_executor, mock_strategy, mock_add_order_connector)
+        mock_query_orders_connector.fetch.return_value = [
+            QueryOrderResult(
+                txid='TXID-001', price=Decimal('0'), volume=Decimal('0'),
+                fee=Decimal('0'), status=QueryOrderStatus.OPEN,
+            ),
+        ]
+
+        with patch('time.sleep') as mock_sleep:
+            exec_executor.execute_interval()
+
+        assert mock_query_orders_connector.fetch.call_count == 3
+        # Two sleeps between three attempts, each one second.
+        assert mock_sleep.call_count == 2
+        for call in mock_sleep.call_args_list:
+            assert call.args[0] == 1
+
+    def test_execute_interval_query_fill_still_open_leaves_placed(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_query_orders_connector, mock_bot_order_repo,
+    ):
+        # Given — Kraken keeps reporting OPEN through all retries
+        self._setup_live_buy(exec_executor, mock_strategy, mock_add_order_connector)
+        mock_query_orders_connector.fetch.return_value = [
+            QueryOrderResult(
+                txid='TXID-001', price=Decimal('0'), volume=Decimal('0'),
+                fee=Decimal('0'), status=QueryOrderStatus.OPEN,
+            ),
+        ]
+
+        with patch('time.sleep'):
+            exec_executor.execute_interval()
+
+        # Order persisted as PLACED, never marked filled or failed; will reconcile next interval.
+        mock_bot_order_repo.add.assert_called_once()
+        added_order = mock_bot_order_repo.add.call_args[0][0]
+        assert added_order.status == OrderStatus.PLACED
+        mock_bot_order_repo.mark_filled.assert_not_called()
+        mock_bot_order_repo.mark_failed.assert_not_called()
+        # last_action stays advanced — order is in DB and may yet fill.
+        assert mock_strategy.last_action == Signal.BUY
+
+    def test_execute_interval_query_fill_cancelled_marks_failed(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_query_orders_connector, mock_bot_order_repo, mock_bot_tick_repo,
+    ):
+        # Given — Kraken reports CANCELED on first poll
+        self._setup_live_buy(exec_executor, mock_strategy, mock_add_order_connector)
+        mock_query_orders_connector.fetch.return_value = [
+            QueryOrderResult(
+                txid='TXID-001', price=Decimal('0'), volume=Decimal('0'),
+                fee=Decimal('0'), status=QueryOrderStatus.CANCELED,
+            ),
+        ]
+        # `mark_failed` returns the FAILED-status order so execute_interval can route to HOLD.
+        mock_bot_order_repo.mark_failed.return_value = self._make_order(
+            exec_executor, side=Side.BUY, status=OrderStatus.FAILED,
+        )
+
+        with patch('time.sleep'):
+            exec_executor.execute_interval()
+
+        mock_bot_order_repo.mark_failed.assert_called_once()
+        # last_action rolled back because the order never executed.
+        assert mock_strategy.last_action == Signal.SELL
+        # Tick records HOLD (no real position change) with an error string.
+        tick = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick.signal == Signal.HOLD
+        assert tick.error is not None
+
+    def test_execute_interval_query_fill_closed_marks_filled(
+            self, exec_executor, mock_strategy, mock_add_order_connector,
+            mock_query_orders_connector, mock_bot_order_repo,
+    ):
+        # Given — Kraken reports CLOSED with fill details on first poll
+        self._setup_live_buy(exec_executor, mock_strategy, mock_add_order_connector)
+        mock_query_orders_connector.fetch.return_value = [
+            QueryOrderResult(
+                txid='TXID-001', price=Decimal('50000.00'), volume=Decimal('0.001'),
+                fee=Decimal('0.50'), status=QueryOrderStatus.CLOSED,
+            ),
+        ]
+        mock_bot_order_repo.mark_filled.return_value = self._make_order(
+            exec_executor, side=Side.BUY, status=OrderStatus.FILLED,
+        )
+
+        exec_executor.execute_interval()
+
+        # Single QueryOrders call — closed on first attempt, no retries needed.
+        assert mock_query_orders_connector.fetch.call_count == 1
+        mock_bot_order_repo.mark_filled.assert_called_once_with(
+            mock_bot_order_repo.add.call_args[0][0].id,
+            Decimal('50000.00'), Decimal('0.001'), Decimal('0.50'),
+        )
+
+    # --- warm_up — must not touch persistence or place orders ---
+
+    def test_warm_up_does_not_persist_ticks(
+            self, executor, mock_strategy, mock_bot_tick_repo,
+    ):
+        candles = [
+            pd.Series({'open': 1.0, 'high': 2.0, 'low': 0.5, 'close': 1.5}),
+            pd.Series({'open': 1.5, 'high': 2.5, 'low': 1.0, 'close': 2.0}),
+        ]
+        mock_strategy.warmup_candles = 2
+        executor._fetch_ohlc_history = Mock(return_value=candles)
+        executor.logger = Mock()
+
+        executor.warm_up()
+
+        mock_bot_tick_repo.add.assert_not_called()
+
+    def test_warm_up_does_not_place_orders(
+            self, executor, mock_strategy, mock_add_order_connector, mock_bot_order_repo,
+    ):
+        candles = [
+            pd.Series({'open': 1.0, 'high': 2.0, 'low': 0.5, 'close': 1.5}),
+            pd.Series({'open': 1.5, 'high': 2.5, 'low': 1.0, 'close': 2.0}),
+        ]
+        mock_strategy.warmup_candles = 2
+        executor._fetch_ohlc_history = Mock(return_value=candles)
+        executor.logger = Mock()
+
+        executor.warm_up()
+
+        mock_add_order_connector.place.assert_not_called()
+        mock_bot_order_repo.add.assert_not_called()
+
+    # --- execute_interval — argument propagation to dependencies ---
+
+    def test_execute_interval_position_sizer_receives_signal_and_pre_order_balances(
+            self, exec_executor, mock_strategy, mock_position_sizer, mock_add_order_connector,
+    ):
+        # Given — pre-order balances differ from post-order (verifies the *pre* set is sized)
+        pre_order = PairBalances(
+            symbol_base='XXBT', symbol_quote='ZGBP',
+            balance_base=Decimal('0'), balance_quote=Decimal('10000.00'),
+        )
+        post_order = PairBalances(
+            symbol_base='XXBT', symbol_quote='ZGBP',
+            balance_base=Decimal('0.2'), balance_quote=Decimal('0'),
+        )
+        exec_executor._fetch_balances = Mock(side_effect=[pre_order, post_order])
+
+        filled = self._make_order(exec_executor, side=Side.BUY, status=OrderStatus.FILLED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        mock_position_sizer.calculate_volume.assert_called_once_with(Signal.BUY, pre_order)
+
+    def test_execute_interval_add_order_called_with_pair_signal_and_volume(
+            self, exec_executor, mock_strategy, mock_position_sizer, mock_add_order_connector,
+    ):
+        mock_position_sizer.calculate_volume.return_value = Decimal('0.005')
+        filled = self._make_order(exec_executor, side=Side.BUY, status=OrderStatus.FILLED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        mock_add_order_connector.place.assert_called_once_with(
+            'XXBTZGBP', Signal.BUY, Decimal('0.005'), validate=False,
+        )
+
+    def test_execute_interval_post_order_balances_persisted_in_tick(
+            self, exec_executor, mock_strategy, mock_add_order_connector, mock_bot_tick_repo,
+    ):
+        # Given — pre-order is all-quote, post-order is all-base (a successful BUY swap)
+        pre_order = PairBalances(
+            symbol_base='XXBT', symbol_quote='ZGBP',
+            balance_base=Decimal('0'), balance_quote=Decimal('10000.00'),
+        )
+        post_order = PairBalances(
+            symbol_base='XXBT', symbol_quote='ZGBP',
+            balance_base=Decimal('0.2'), balance_quote=Decimal('0'),
+        )
+        exec_executor._fetch_balances = Mock(side_effect=[pre_order, post_order])
+
+        filled = self._make_order(exec_executor, side=Side.BUY, status=OrderStatus.FILLED)
+        self._setup_order_signal(
+            exec_executor, mock_strategy, mock_add_order_connector, Signal.BUY, filled,
+        )
+
+        exec_executor.execute_interval()
+
+        tick = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick.balance_base == Decimal('0.2')
+        assert tick.balance_quote == Decimal('0')
+
+    def test_execute_interval_raises_when_live_order_returns_no_txid(
+            self, exec_executor, mock_strategy, mock_add_order_connector, mock_bot_tick_repo,
+    ):
+        # Given — Kraken returns no txid in live mode (should never happen outside validate=True)
+        mock_strategy.generate_signal.return_value = {'signal': Signal.BUY}
+        mock_add_order_connector.place.return_value = AddOrderResult(
+            txid=None, order_description='buy 0.001 XXBTZGBP @ market',
+        )
+
+        exec_executor.execute_interval()
+
+        # The ValueError is caught by the signal/order block; tick is persisted with the error.
+        tick = mock_bot_tick_repo.add.call_args[0][0]
+        assert tick.signal == Signal.HOLD
+        assert tick.error is not None
+        assert 'txid' in tick.error.lower()
+
+    # --- request_shutdown vs shutdown — separation of responsibilities ---
+
+    def test_request_shutdown_does_not_complete_run(
+            self, executor, mock_bot_run_repo,
+    ):
+        executor.request_shutdown()
+        mock_bot_run_repo.complete.assert_not_called()
