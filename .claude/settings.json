@@ -1,0 +1,15 @@
+{
+    "statusLine": {
+        "type": "command",
+        "command": "$CLAUDE_PROJECT_DIR/.claude/statusline.sh"
+    },
+    "enabledPlugins": {
+        "skill-creator@claude-plugins-official": true
+    },
+    "permissions": {
+        "allow": [
+            "Bash(pytest)",
+            "Bash(pytest:*)"
+        ]
+    }
+}

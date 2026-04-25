@@ -1,7 +1,14 @@
 # Copilot Instructions
 
 These instructions guide AI agents working on the `crypto-scalper` project. Standards are derived
-from the Data System module—the project's reference implementation.
+from the Data System module — the project's reference implementation.
+
+> **Note:** Claude Code is now the primary AI agent for this project. The source of truth for
+> agent-facing guidance is `CLAUDE.md` (universal conventions) plus `.claude/rules/*.md`
+> (detailed patterns: testing, architecture, docstrings) and `.claude/skills/*/SKILL.md`
+> (workflows like `code-review`, `add-strategy`, `claudit`, `update-supabase-repo-tests`).
+> This file mirrors that material so Copilot stays useful as a fallback. If the two diverge,
+> CLAUDE.md and `.claude/rules/` win — run the `claudit` skill to bring this file back in sync.
 
 ---
 
@@ -257,17 +264,20 @@ when:
 - Future-you might ask *"why did I do it this way?"*
 - There were trade-offs worth documenting
 
-### Prompt Files
+### Reusable workflows
 
-Reusable prompts live in `.github/prompts/`:
+Reusable agent workflows live as Claude Code skills under `.claude/skills/`:
 
-- **`audit-module.prompt.md`** — Audit a module against project standards
-- **`new-module.prompt.md`** — Scaffold a new module from scratch
-- **`add-strategy.prompt.md`** — Add a new trading strategy
-- **`new-feature.prompt.md`** — Checklist for shipping a complete feature
-- **`review-instructions.prompt.md`** — Sync instructions and prompts with the codebase
+- **`code-review`** — Audit a module or recent changes against project standards (replaces the
+  old `audit-module` and `new-feature` prompts).
+- **`add-strategy`** — Scaffold a new trading strategy in `strategy_manager/`.
+- **`claudit`** — Audit CLAUDE.md, rules, skills, and this file against the actual codebase
+  state. Flags drift.
+- **`update-supabase-repo-tests`** — Update `scalper/scripts/test_supabase_repos.py` after
+  changes to the Supabase repos or models.
 
-When a task becomes repeatable, create a new prompt file for it.
+The historical implementation plan in `.github/prompts/plan-tradeExecutorLiveTrading.prompt.md`
+is preserved as reference material until live trading is fully shipped.
 
 ---
 
@@ -335,21 +345,18 @@ class TestSupabaseBotRepository:
 
 Register all markers in `pytest.ini`.
 
-### Makefile Targets
+### Running tests
 
-Add `make` targets for running module tests:
+`pytest.ini` sets `pythonpath = scalper` and `testpaths = scalper/tests`, so plain `pytest`
+works from the repo root:
 
-```makefile
-# In .PHONY declaration
-.PHONY: test test/utils test/data_system
-
-# Module-level target
-test/utils:
-	pytest -m utils
-
-# Category-level target (for larger modules)
-test/data_system/models:
-	pytest -m "data_system and models"
+```bash
+pytest                                   # everything
+pytest -m strategy_manager               # one module
+pytest -m "strategy_manager and rules"   # one sub-category
+pytest -m integration                    # all integration tests
+pytest scalper/tests/unit/path/to/test_file.py  # one file
+pytest -k crossover                      # by name
 ```
 
 ### Fixtures
@@ -906,4 +913,6 @@ Apply when working with database schemas or models that map to tables.
 
 ---
 
-**Prompts:** Actionable checklists and scaffolding guides live in `.github/prompts/`. See `CLAUDE.md` for orientation and quick-start commands.
+**Reusable workflows:** Live as Claude Code skills under `.claude/skills/` (see "Reusable
+workflows" above). See `CLAUDE.md` for orientation and quick-start commands, and
+`.claude/rules/{testing,architecture,docstrings}.md` for detailed conventions.
