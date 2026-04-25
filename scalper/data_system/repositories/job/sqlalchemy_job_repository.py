@@ -1,12 +1,12 @@
-from datetime import datetime, timezone
 import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import text, Row
+from sqlalchemy import Row, text
 
 from data_system.clients import SQLAlchemyClient
-from data_system.repositories import JobRepository
 from data_system.models import Job, JobStatus, JobType
+from data_system.repositories import JobRepository
 
 logger = logging.getLogger(__name__)
 
