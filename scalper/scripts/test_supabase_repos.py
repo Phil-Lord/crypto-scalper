@@ -533,6 +533,53 @@ def _test_bot_order_repo(
     no_link = order_repo.get_by_tick_id(-1)
     _expect(no_link is None, 'get_by_tick_id(missing)', 'expected None for unknown tick_id')
 
+    update_target = order_repo.add(BotOrder(
+        bot_id=bot_id,
+        run_id=bot_run.id,
+        exchange_order_id=f'{TEST_PREFIX}EX-{uuid4().hex[:6]}',
+        side=Side.BUY,
+    ))
+    update_filled_at = datetime.now(timezone.utc)
+    updated = order_repo.update(BotOrder(
+        bot_id=update_target.bot_id,
+        run_id=update_target.run_id,
+        exchange_order_id=update_target.exchange_order_id,
+        side=update_target.side,
+        status=OrderStatus.FILLED,
+        placed_at=update_target.placed_at,
+        filled_at=update_filled_at,
+        price=PRICE_BUY,
+        volume=VOLUME,
+        fee=FEE,
+        id=update_target.id,
+    ))
+    _expect(updated.status == OrderStatus.FILLED, 'bot_order.update', 'status not updated')
+    _expect(updated.price == PRICE_BUY, 'bot_order.update', 'price Decimal lost')
+    _expect(updated.volume == VOLUME, 'bot_order.update', 'volume Decimal lost')
+    _expect(updated.fee == FEE, 'bot_order.update', 'fee Decimal lost')
+    _expect(
+        updated.filled_at is not None and updated.filled_at == update_filled_at,
+        'bot_order.update', 'filled_at not preserved exactly',
+    )
+    _expect(
+        updated.filled_at is not None and updated.filled_at.tzinfo is not None,
+        'bot_order.update', 'filled_at not timezone-aware',
+    )
+
+    try:
+        order_repo.update(BotOrder(
+            bot_id=bot_id,
+            run_id=bot_run.id,
+            exchange_order_id=f'{TEST_PREFIX}EX-{uuid4().hex[:6]}',
+            side=Side.BUY,
+        ))
+    except ValueError:
+        pass
+    else:
+        ledger.record_failure(
+            'bot_order.update(missing)', 'expected ValueError for non-existent order_id',
+        )
+
     filled = order_repo.mark_filled(added_placed.id, PRICE_BUY, VOLUME, FEE)
     _expect(filled.status == OrderStatus.FILLED, 'mark_filled', 'status not FILLED')
     _expect(filled.price == PRICE_BUY, 'mark_filled', 'price not preserved')
