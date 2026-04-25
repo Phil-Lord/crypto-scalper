@@ -63,11 +63,38 @@ For each finding, note the specific file, the section, and the proposed fix.
 
 ### 6. Skills (`.claude/skills/`)
 - For each `SKILL.md`, check that referenced files, paths, and class/function names still exist.
-  - `add-strategy/SKILL.md` — paths in `strategy_manager/`, indicators/rules listed.
+  - `add-strategy/SKILL.md` — paths in `strategy_manager/`, indicators/rules listed,
+    `checklist.md` and `templates.md` referenced from SKILL.md.
   - `update-supabase-repo-tests/SKILL.md` — repo paths under
     `data_system/repositories/{bot,bot_order,bot_run,bot_tick}/`.
   - `code-review/SKILL.md` — references to rules files.
+- For any skill that references companion files (`checklist.md`, `reference.md`,
+  `templates.md`, `scripts/`), verify those files actually exist and aren't orphaned.
 - Flag any skill referencing dead paths or classes.
+
+### 6b. Skill structure / progressive disclosure
+For each `.claude/skills/*/SKILL.md`, evaluate whether it should be split into
+`SKILL.md` + companion files (`checklist.md`, `reference.md`, `templates.md`, `scripts/`). The
+benefit is that companion files are loaded on demand instead of every time the skill triggers.
+
+Flag a skill as a split candidate when **any** of these is true:
+
+- SKILL.md is over ~250 lines and clearly mixes "what/when/how to use" with bulky procedural or
+  reference content.
+- It contains a long step-by-step workflow with acceptance criteria — that belongs in
+  `checklist.md`.
+- It includes verbatim code blocks intended to be copied into source files — those belong in
+  `templates.md` as labelled fenced code blocks (one markdown file, not separate `.tmpl`
+  files — fenced code blocks are conventional and load in a single Read).
+- It carries reference data that's only needed sometimes (long tables, schema dumps, error
+  catalogues, examples) — that belongs in `reference.md`.
+- It describes a deterministic check that could be a script Claude runs via Bash — that belongs
+  in `scripts/`.
+
+Do **not** flag skills that are short prose-only instruction sets with no bulk reference or
+templates. Splitting those adds filesystem hops with no real win.
+
+For each flagged skill, propose the split shape (which files, what each contains).
 
 ### 7. Supabase repo coverage (`update-supabase-repo-tests` boundary)
 - List the public methods on each of `SupabaseBotRepository`, `SupabaseBotRunRepository`,
