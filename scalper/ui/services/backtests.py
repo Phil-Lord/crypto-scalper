@@ -41,7 +41,7 @@ def plot_backtest_results(results: pd.DataFrame, figure: go.Figure) -> go.Figure
     return figure
 
 
-def create_scatter(results: pd.DataFrame, colour: str) -> go.Figure:
+def create_scatter(results: pd.DataFrame, colour: str) -> go.Scatter:
     return go.Scatter(
         x=results.index,
         y=results['price'],
