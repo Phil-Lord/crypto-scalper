@@ -1,36 +1,7 @@
 # CLAUDE.md — Agent Orientation
 
 Crypto scalping bot. Production code lives entirely under `scalper/`. Legacy code under `legacy/`
-is not maintained — ignore it unless asked.
-
----
-
-## Key Commands
-
-```bash
-# Run all tests
-cd scalper && make test
-
-# Run a specific module's tests
-make test/data_system
-make test/exchange_connector
-make test/strategy_manager
-make test/backtesting_engine
-make test/utils
-
-# Run sub-category tests
-make test/data_system/repositories
-make test/exchange_connector/connectors
-make test/strategy_manager/indicators
-make test/strategy_manager/rules
-make test/strategy_manager/strategies
-
-# Run integration tests only
-make test/integration
-make test/integration/exchange_connector
-make test/integration/strategy_manager
-make test/integration/backtesting_engine
-```
+is unmaintained — ignore it unless explicitly asked.
 
 ---
 
@@ -38,30 +9,82 @@ make test/integration/backtesting_engine
 
 ```
 scalper/
-├── backtesting_engine/     # Local parameter optimisation (Optuna)
-├── data_system/            # Storage: SQLite (local) + Supabase (cloud)
-├── exchange_connector/     # Kraken API (connectors/ is the public interface)
-├── strategy_manager/       # Strategies, indicators, rules
-├── study_analyser/         # Optuna study analysis and plotting
-├── trade_executor/         # Live trading execution loop
-├── utils/                  # Shared utilities (timestamp, env vars, pair config, Optuna utils, data visualisation, strategy configs)
-├── scripts/                # Entry-point scripts (not production code)
+├── backtesting_engine/     # Optuna parameter optimisation, profit calc, generalisation evaluation
+├── core/                   # Job runner (async helpers for thread/subprocess jobs)
+├── data_system/            # Storage layer: SQLAlchemy (SQLite local) + Supabase (cloud)
+│   ├── clients/            # SQLAlchemyClient, SupabaseClient
+│   ├── config/             # LocalSQLiteConfig, SupabaseConfig
+│   ├── models/             # Dataclasses: Bot, BotOrder, BotRun, BotTick, Job, Trade, ...
+│   ├── repositories/       # One folder per aggregate (bot, bot_order, job, trade, ...)
+│   └── schema.sql          # Postgres and local SQLite schema
+├── exchange_connector/     # Kraken integration
+│   ├── api/                # KrakenApiClient + exceptions
+│   ├── connectors/         # Public interface — high-level callable units
+│   ├── services/           # Lower-level service objects used by connectors
+│   ├── kraken_utils/       # Auth/signature helpers
+│   └── models/             # AddOrderResult, OhlcCandle, QueryOrderResult, ...
+├── strategy_manager/       # Strategies, indicators, rules + factory
+│   ├── factory.py          # create_strategy(), STRATEGIES registry
+│   ├── indicators/         # SMA, EMA, RSI, ADX, ATR
+│   ├── rules/              # MA crossover, RSI/ADX/ATR thresholds
+│   └── strategies/         # SmaStrategy, PrecisionTrendStrategy (each with *_config.py)
+├── study_analyser/         # Optuna study analysis + plotting
+├── trade_executor/         # Live trading loop, position sizers, order reconciliation
+├── ui/                     # NiceGUI app (pages, components, services, theme, static)
+├── utils/                  # load_env, LOG_FORMAT, pair_config, timestamps, optuna helpers,
+│                           #   strategy_configs, data_visualisation
+├── scripts/                # CLI entry points (NOT importable production code)
+├── local_storage/          # SQLite DB lives here (scalper.db)
+├── logs/                   # Runtime logs
 └── tests/
-    ├── unit/               # Mirror source structure
+    ├── unit/               # Mirrors source structure
     └── integration/        # Flat files, cross-layer tests
 ```
 
-Tests mirror source: `strategy_manager/foo.py` → `tests/unit/strategy_manager/test_foo.py`
+Test files mirror source paths: `strategy_manager/foo.py` → `tests/unit/strategy_manager/test_foo.py`.
+
+Public APIs are re-exported from each module's `__init__.py` (e.g. `from data_system import SupabaseClient`).
+Cross-module imports should use the package, not deep paths.
 
 ---
 
-## Non-Negotiable Rules
+## Running Tests
 
-- **Never call `logging.basicConfig()`** in library/service code — only in `scripts/` entry points
-- **Call `load_env()` before** importing any module that reads env vars at import time
-- **Never run `scripts/start_scalping.py`** without explicit user instruction — this triggers live trading
-- **Never modify database schema** (`schema.sql` or migrations) without explicit instruction
-- **British English** everywhere — optimise, analyse, serialise, centralise (not -ize/-ize)
+`pytest.ini` sets `pythonpath = scalper` and `testpaths = scalper/tests`, so plain `pytest` works
+from the repo root (or from inside `scalper/`).
+
+```bash
+pytest                                  # everything
+pytest -m strategy_manager              # one module
+pytest -m "strategy_manager and rules"  # one sub-category
+pytest -m integration                   # all integration tests
+pytest scalper/tests/unit/strategy_manager/rules/test_ma_crossover_rule.py  # one file
+pytest -k crossover                     # by name
+```
+
+See `pytest.ini` for the full marker list (one per module, sub-category, class, and often
+per-method).
+
+---
+
+## Things to Be Careful About
+
+These are conventions, not all currently enforced by tooling — break them only with reason.
+
+- **`logging.basicConfig()` belongs in `scripts/` only.** Library/service modules use
+  `logging.getLogger(__name__)` and let the entry point configure handlers. `start_scalping.py`
+  shows the pattern (set root to WARNING, raise app-package loggers via `LOG_LEVEL` env var).
+- **Call `utils.load_env()` at the top of every script** before importing modules that read env
+  vars at import time (Supabase, Kraken). It's a no-op in production where env comes from the
+  platform.
+- **Never run `scripts/start_scalping.py` without explicit user instruction.** This places real
+  orders on Kraken.
+- **Don't modify `data_system/schema.sql`** without explicit instruction — it's the SQLite source
+  of truth and changes need to land in lockstep with repository code and any cloud Supabase
+  changes.
+- **British English in code, comments, docs, and identifiers** — `optimise`, `analyse`,
+  `serialise`, `generalisation`. The codebase is consistent on this; don't introduce `-ize`
+  spellings.
 
 ---
 
@@ -69,35 +92,53 @@ Tests mirror source: `strategy_manager/foo.py` → `tests/unit/strategy_manager/
 
 **Proceed without asking:**
 
-- Adding tests, fixing style, refactoring within a module
+- Adding/updating tests, fixing style, refactoring within a module
 - Reading any file to gather context
-- Adding new indicators, rules, or a strategy (see `.github/prompts/add-strategy.prompt.md`)
+- Adding new indicators, rules, or strategies (follow patterns in
+  `strategy_manager/{indicators,rules,strategies}/`)
+- Local-only changes to UI pages/components
 
 **Ask first:**
 
-- Changing public APIs (method signatures exported by `__init__.py`)
-- Adding new dependencies to `pyproject.toml` (use `uv add <package>`)
-- Changes that touch both `data_system` schema and application code simultaneously
-- Anything that touches live trading paths (`trade_executor/`, `scripts/start_scalping.py`)
-
----
-
-## Adding New Things
-
-Reusable prompts in `.github/prompts/`:
-
-- **`audit-module.prompt.md`** — Audit a module against project standards
-- **`new-module.prompt.md`** — Scaffold a new module from scratch
-- **`add-strategy.prompt.md`** — Add a new trading strategy
-- **`new-feature.prompt.md`** — Checklist for shipping a complete feature
-- **`review-instructions.prompt.md`** — Sync instructions and prompts with the codebase
+- Changing public APIs (anything re-exported from a module's `__init__.py`)
+- Adding new dependencies (`uv add <package>` — don't hand-edit `pyproject.toml`)
+- Changes that touch `data_system/schema.sql` and application code together
+- Anything in `trade_executor/` or `scripts/start_scalping.py` (live trading paths)
+- Modifying `.env`, fly.toml, Dockerfile, or anything deployment-shaped
 
 ---
 
 ## Environment
 
-- Python 3.13.4 (managed by uv, see `.python-version`)
-- Dependencies: `pyproject.toml` + `uv.lock` (use `uv sync` to install)
-- Local DB: SQLite at `scalper/local_storage/scalper.db`
-- Cloud DB: Supabase (requires `SUPABASE_URL` + `SUPABASE_KEY` in `.env`)
-- Exchange: Kraken (requires `KRAKEN_API_KEY` + `KRAKEN_API_SECRET` in `.env`)
+- Python 3.13.4 (`.python-version`); `pyproject.toml` requires ≥3.12. Managed by `uv`.
+- Install deps: `uv sync` (use `uv sync --group docs` for mkdocs deps).
+- Local DB: SQLite at `scalper/local_storage/scalper.db`.
+- Cloud DB: Supabase — needs `SUPABASE_URL` + `SUPABASE_KEY` in `.env`.
+- Exchange: Kraken — needs `KRAKEN_API_KEY` + `KRAKEN_API_SECRET` in `.env`.
+- UI: NiceGUI app started via `scripts/start_ui.py` (port 8080).
+- Docs: `mkdocs serve` (config at repo root `mkdocs.yml`).
+
+---
+
+## Useful Entry Points (`scalper/scripts/`)
+
+**Trading & UI**
+
+- `start_scalping.py` — live trading loop (DO NOT run unprompted)
+- `start_ui.py` — NiceGUI dashboard
+
+**Backtesting & Optuna**
+
+- `run_backtest.py` — single backtest run
+- `find_param_sets.py` — Optuna parameter search
+- `analyse_study.py`, `delete_study.py` — Optuna study management
+
+**Bot & job management**
+
+- `register_bot.py` — register a bot config in Supabase
+- `manage_jobs.py` — inspect/modify the job queue
+- `query_supabase.py` — ad-hoc Supabase queries
+
+**Kraken API helpers**
+
+- `fetch_trades.py`, `get_trades.py`, `get_ticker.py`, `get_balances.py`, `get_asset_pairs.py`, `add_order.py`, `query_orders.py`
