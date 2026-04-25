@@ -67,6 +67,32 @@ per-method).
 
 ---
 
+## Code Conventions
+
+Universal rules — apply to every line of code:
+
+- **Python 3.12+ syntax** — `str | None`, `list[Trade]`, `dict[str, Any]`. Never `Optional`,
+  `Union`, `List`, `Dict` from `typing`.
+- **Single quotes** for all strings, including docstrings.
+- **100-character line limit**, PEP 8 otherwise.
+- **British English** in code, comments, docs, and identifiers — `optimise`, `analyse`,
+  `serialise`, `generalisation`. Don't introduce `-ize` spellings.
+- **Type hints required** on public function and method signatures. Use enums in type hints
+  rather than `str` where a fixed value set exists.
+- **Frozen dataclasses for domain models** — `@dataclass(frozen=True)`. Required fields first,
+  defaulted last. `field(default_factory=...)` for mutable defaults.
+- **String-compatible enums** for serialised values — `class Signal(str, Enum):`.
+- **`Decimal` for live-trading money** (orders, fills, fees, balances). `float` is fine for
+  backtesting stats and Unix timestamps. `datetime` must be timezone-aware UTC.
+- **Imports**: stdlib → third-party → local, separated by blank lines. Tests import from the
+  direct module path (e.g. `data_system.models.bot_tick_model`), not the package re-export, so
+  IDE navigation lands on the definition.
+
+Detailed conventions for testing, architecture, and docstrings live in `.claude/rules/` — load
+the relevant file when working in that area.
+
+---
+
 ## Things to Be Careful About
 
 These are conventions, not all currently enforced by tooling — break them only with reason.
@@ -82,9 +108,6 @@ These are conventions, not all currently enforced by tooling — break them only
 - **Don't modify `data_system/schema.sql`** without explicit instruction — it's the SQLite source
   of truth and changes need to land in lockstep with repository code and any cloud Supabase
   changes.
-- **British English in code, comments, docs, and identifiers** — `optimise`, `analyse`,
-  `serialise`, `generalisation`. The codebase is consistent on this; don't introduce `-ize`
-  spellings.
 
 ---
 
