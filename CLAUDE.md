@@ -161,6 +161,7 @@ These are conventions, not all currently enforced by tooling — break them only
 - `register_bot.py` — register a bot config in Supabase
 - `manage_jobs.py` — inspect/modify the job queue
 - `query_supabase.py` — ad-hoc Supabase queries
+- `test_supabase_repos.py` — manual verification of live-trading Supabase repos against real Supabase
 
 **Kraken API helpers**
 
