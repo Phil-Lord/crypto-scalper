@@ -23,7 +23,7 @@ class Job:
     Dataclass representing a background job/task.
 
     Attributes:
-        job_type (JobType): The job type, e.g., 'get_trades, 'run_backtest', etc.
+        job_type (JobType): The job type, e.g., 'get_trades', 'run_backtest', etc.
         id (UUID): Unique identifier for the job, auto-generated as a UUID.
         status (JobStatus): Current status of the job, default is PENDING.
         message (str): Optional message for status updates or error details.
