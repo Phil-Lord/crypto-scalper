@@ -13,8 +13,8 @@ from .trades import convert_prices_to_ohlc
 def run_backtest(symbol, start_date, end_date) -> pd.DataFrame:
     strategy = create_strategy('PrecisionTrendStrategy', PRECISION_TREND_CONFIG)
     repo = SQLAlchemyTradeRepository(SQLAlchemyClient())
-    start = get_second_timestamp(*parse_datetime(start_date))
-    end = get_second_timestamp(*parse_datetime(end_date))
+    start = get_second_timestamp(*parse_datetime(start_date)) if start_date else None
+    end = get_second_timestamp(*parse_datetime(end_date)) if end_date else None
     engine = BacktestingEngine(symbol, strategy, repo, start, end, interval=1, vectorised=True)
     return engine.run()
 
