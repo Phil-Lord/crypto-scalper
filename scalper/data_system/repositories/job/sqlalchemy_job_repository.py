@@ -17,26 +17,26 @@ class SQLAlchemyJobRepository(JobRepository):
 
     def add(self, job: Job) -> None:
         with self.client.session() as session:
-            query = text("""
+            query = text('''
                 INSERT INTO jobs (id, job_type, status, message, created_at, updated_at)
                 VALUES (:id, :job_type, :status, :message, :created_at, :updated_at)
-            """)
+            ''')
             session.execute(query, self._to_record(job))
 
     def update(self, job: Job) -> None:
         with self.client.session() as session:
-            query = text("""
+            query = text('''
                 UPDATE jobs
                 SET status = :status, message = :message, updated_at = :updated_at
                 WHERE id = :id
-            """)
+            ''')
             session.execute(query, self._to_record(job))
 
     def get_by_id(self, job_id: str) -> Job | None:
         with self.client.session() as session:
             result = session.execute(
-                text("SELECT * FROM jobs WHERE id = :id"),
-                {"id": str(job_id)}
+                text('SELECT * FROM jobs WHERE id = :id'),
+                {'id': str(job_id)},
             )
             record = result.fetchone()
             return self._to_job(record) if record else None
@@ -44,12 +44,12 @@ class SQLAlchemyJobRepository(JobRepository):
     def get_all(self, job_type: JobType | None = None) -> list[Job]:
         with self.client.session() as session:
             result = session.execute(
-                text("""
+                text('''
                     SELECT * FROM jobs
                     WHERE (:job_type IS NULL OR job_type = :job_type)
                     ORDER BY created_at DESC
-                """),
-                {"job_type": job_type.value if job_type else None}
+                '''),
+                {'job_type': job_type.value if job_type else None},
             )
             return [self._to_job(row) for row in result.fetchall()]
 
