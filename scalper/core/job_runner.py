@@ -8,7 +8,7 @@ from data_system import Job, JobRepository, JobStatus
 
 async def run_in_thread(job_repo: JobRepository, job: Job, fn: Callable[..., Any], *args) -> Any:
     '''
-    Run an async blocking function in a separate thread.
+    Run a blocking function in a separate thread.
 
     - Ideal for I/O-bound and short CPU-bound tasks.
     - The task lives and dies with the app process.
