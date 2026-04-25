@@ -70,10 +70,10 @@ class TestSQLAlchemyJobRepository:
     def test_update_calls_session_execute_once(self, mock_client, mock_session, sample_job: Job):
         # Given
         repository = SQLAlchemyJobRepository(mock_client)
-        sample_job.update(status=JobStatus.RUNNING, message='progress')
+        updated_job = sample_job.update(status=JobStatus.RUNNING, message='progress')
 
         # When
-        repository.update(sample_job)
+        repository.update(updated_job)
 
         # Then
         mock_session.execute.assert_called_once()
@@ -81,18 +81,18 @@ class TestSQLAlchemyJobRepository:
     def test_update_passes_correct_record(self, mock_client, mock_session, sample_job: Job):
         # Given
         repository = SQLAlchemyJobRepository(mock_client)
-        sample_job.update(status=JobStatus.DONE, message='finished')
+        updated_job = sample_job.update(status=JobStatus.DONE, message='finished')
 
         # When
-        repository.update(sample_job)
+        repository.update(updated_job)
 
         # Then
         call_args = mock_session.execute.call_args
         record = call_args[0][1]
-        assert record['id'] == str(sample_job.id)
+        assert record['id'] == str(updated_job.id)
         assert record['status'] == 'done'
         assert record['message'] == 'finished'
-        assert record['updated_at'] == sample_job.updated_at.timestamp()
+        assert record['updated_at'] == updated_job.updated_at.timestamp()
 
     def test_get_by_id_returns_none_when_not_found(self, mock_client, mock_session):
         # Given

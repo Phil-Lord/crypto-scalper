@@ -67,80 +67,86 @@ class TestJob:
         assert job.updated_at.tzinfo is not None
         assert before <= job.updated_at <= after
 
-    def test_update_sets_status(self, sample_job: Job):
-        # When
-        sample_job.update(status=JobStatus.RUNNING)
+    def test_job_is_frozen(self, sample_job: Job):
+        with pytest.raises(AttributeError):
+            sample_job.status = JobStatus.RUNNING
 
-        # Then
-        assert sample_job.status == JobStatus.RUNNING
+    def test_update_returns_new_instance(self, sample_job: Job):
+        updated = sample_job.update(status=JobStatus.RUNNING)
+        assert updated is not sample_job
+        assert sample_job.status == JobStatus.PENDING
+
+    def test_update_sets_status(self, sample_job: Job):
+        updated = sample_job.update(status=JobStatus.RUNNING)
+        assert updated.status == JobStatus.RUNNING
 
     def test_update_sets_message(self, sample_job: Job):
-        # When
-        sample_job.update(message='fetching page 3')
-
-        # Then
-        assert sample_job.message == 'fetching page 3'
+        updated = sample_job.update(message='fetching page 3')
+        assert updated.message == 'fetching page 3'
 
     def test_update_sets_status_and_message_together(self, sample_job: Job):
-        # When
-        sample_job.update(status=JobStatus.ERROR, message='boom')
-
-        # Then
-        assert sample_job.status == JobStatus.ERROR
-        assert sample_job.message == 'boom'
+        updated = sample_job.update(status=JobStatus.ERROR, message='boom')
+        assert updated.status == JobStatus.ERROR
+        assert updated.message == 'boom'
 
     def test_update_refreshes_updated_at(self, sample_job: Job):
         # Given
         original_updated_at = sample_job.updated_at
 
         # When
-        sample_job.update(status=JobStatus.RUNNING)
+        updated = sample_job.update(status=JobStatus.RUNNING)
 
         # Then
-        assert sample_job.updated_at >= original_updated_at
-        assert sample_job.updated_at.tzinfo is not None
+        assert updated.updated_at >= original_updated_at
+        assert updated.updated_at.tzinfo is not None
 
     def test_update_refreshes_updated_at_even_with_no_args(self, sample_job: Job):
         # Given
         original_updated_at = sample_job.updated_at
 
         # When
-        sample_job.update()
+        updated = sample_job.update()
 
         # Then
-        assert sample_job.updated_at >= original_updated_at
+        assert updated.updated_at >= original_updated_at
 
     def test_update_does_not_overwrite_status_when_none(self, sample_job: Job):
         # Given
-        sample_job.update(status=JobStatus.RUNNING)
+        running = sample_job.update(status=JobStatus.RUNNING)
 
         # When
-        sample_job.update(message='progress update')
+        updated = running.update(message='progress update')
 
         # Then
-        assert sample_job.status == JobStatus.RUNNING
-        assert sample_job.message == 'progress update'
+        assert updated.status == JobStatus.RUNNING
+        assert updated.message == 'progress update'
 
     def test_update_does_not_overwrite_message_when_none(self, sample_job: Job):
         # Given
-        sample_job.update(message='initial message')
+        with_message = sample_job.update(message='initial message')
 
         # When
-        sample_job.update(status=JobStatus.DONE)
+        updated = with_message.update(status=JobStatus.DONE)
 
         # Then
-        assert sample_job.status == JobStatus.DONE
-        assert sample_job.message == 'initial message'
+        assert updated.status == JobStatus.DONE
+        assert updated.message == 'initial message'
 
     def test_update_allows_empty_string_message(self, sample_job: Job):
         # Given
-        sample_job.update(message='something')
+        with_message = sample_job.update(message='something')
 
         # When
-        sample_job.update(message='')
+        cleared = with_message.update(message='')
 
         # Then
-        assert sample_job.message == ''
+        assert cleared.message == ''
+
+    def test_update_preserves_id_and_created_at(self, sample_job: Job):
+        updated = sample_job.update(status=JobStatus.RUNNING)
+        assert updated.id == sample_job.id
+        assert updated.created_at == sample_job.created_at
+        assert updated.job_type == sample_job.job_type
 
 
 @pytest.mark.data_system

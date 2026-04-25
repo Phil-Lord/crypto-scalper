@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
 from uuid import UUID, uuid4
@@ -17,7 +17,7 @@ class JobStatus(str, Enum):
     ERROR = 'error'
 
 
-@dataclass
+@dataclass(frozen=True)
 class Job:
     '''
     Dataclass representing a background job/task.
@@ -45,10 +45,11 @@ class Job:
     created_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
-    def update(self, status: JobStatus = None, message: str = None) -> None:
-        ''' Update the job's status and message, refreshing the updated_at timestamp. '''
-        if status is not None:
-            self.status = status
-        if message is not None:
-            self.message = message
-        self.updated_at = datetime.now(timezone.utc)
+    def update(self, status: JobStatus | None = None, message: str | None = None) -> 'Job':
+        ''' Return a new Job with updated status/message and a refreshed updated_at timestamp. '''
+        return replace(
+            self,
+            status=status if status is not None else self.status,
+            message=message if message is not None else self.message,
+            updated_at=datetime.now(timezone.utc),
+        )

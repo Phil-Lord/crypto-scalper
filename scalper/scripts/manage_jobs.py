@@ -37,10 +37,16 @@ def update(repository: JobRepository):
         print('Job not found')
         return
 
-    status = questionary.select('Status:', choices=[status.value for status in JobStatus]).ask()
+    status = questionary.select(
+        'Status (optional):',
+        choices=['SKIP'] + [status.value for status in JobStatus]
+    ).ask()
     message = questionary.text('Message (optional):').ask()
 
-    job.update(status=JobStatus(status), message=message)
+    job = job.update(
+        status=JobStatus(status) if status and status != 'SKIP' else None,
+        message=message if message else None
+    )
     repository.update(job)
     print('Updated job:', job)
 

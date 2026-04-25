@@ -54,29 +54,25 @@ class TestRunInThread:
     def test_marks_job_running_then_done_on_success(self, mock_repo, job: Job):
         statuses: list[JobStatus] = []
 
-        def record_add(j: Job) -> None:
+        def record(j: Job) -> None:
             statuses.append(j.status)
 
-        def record_update(j: Job) -> None:
-            statuses.append(j.status)
-
-        mock_repo.add.side_effect = record_add
-        mock_repo.update.side_effect = record_update
+        mock_repo.add.side_effect = record
+        mock_repo.update.side_effect = record
 
         asyncio.run(run_in_thread(mock_repo, job, lambda: 'ok'))
 
         assert statuses == [JobStatus.RUNNING, JobStatus.DONE]
-        assert job.status == JobStatus.DONE
 
     def test_persists_running_status_before_executing_fn(self, mock_repo, job: Job):
-        observed_status: list[JobStatus] = []
+        added_jobs: list[Job] = []
+        mock_repo.add.side_effect = added_jobs.append
 
         def fn() -> None:
-            observed_status.append(job.status)
+            assert added_jobs and added_jobs[0].status == JobStatus.RUNNING
 
         asyncio.run(run_in_thread(mock_repo, job, fn))
 
-        assert observed_status == [JobStatus.RUNNING]
         mock_repo.add.assert_called_once()
 
     def test_marks_job_error_when_fn_raises(self, mock_repo, job: Job):
@@ -86,9 +82,10 @@ class TestRunInThread:
         with pytest.raises(RuntimeError, match='boom'):
             asyncio.run(run_in_thread(mock_repo, job, fn))
 
-        assert job.status == JobStatus.ERROR
-        assert job.message == 'boom'
         mock_repo.update.assert_called_once()
+        persisted = mock_repo.update.call_args.args[0]
+        assert persisted.status == JobStatus.ERROR
+        assert persisted.message == 'boom'
 
     def test_passes_args_through_to_fn(self, mock_repo, job: Job):
         fn = MagicMock(return_value='done')
@@ -120,14 +117,16 @@ class TestRunSubprocess:
 
         asyncio.run(run_subprocess(mock_repo, job, ['echo', 'hi']))
 
-        assert job.status == JobStatus.DONE
+        persisted = mock_repo.update.call_args.args[0]
+        assert persisted.status == JobStatus.DONE
 
     def test_marks_job_error_when_subprocess_exits_non_zero(self, mocker, mock_repo, job: Job):
         self._patch_subprocess(mocker, _MockProc(returncode=1, lines=[]))
 
         asyncio.run(run_subprocess(mock_repo, job, ['false']))
 
-        assert job.status == JobStatus.ERROR
+        persisted = mock_repo.update.call_args.args[0]
+        assert persisted.status == JobStatus.ERROR
 
     def test_persists_running_status_before_streaming(self, mocker, mock_repo, job: Job):
         proc = _MockProc(returncode=0, lines=[])
@@ -138,6 +137,7 @@ class TestRunSubprocess:
         # add is called once up front with RUNNING; update is called at least once
         # with the terminal status after proc exits.
         mock_repo.add.assert_called_once()
+        assert mock_repo.add.call_args.args[0].status == JobStatus.RUNNING
         assert mock_repo.update.call_count >= 1
 
     def test_streams_stdout_lines_into_job_message(self, mocker, mock_repo, job: Job):
@@ -146,7 +146,8 @@ class TestRunSubprocess:
 
         asyncio.run(run_subprocess(mock_repo, job, ['fake']))
 
-        assert job.message == 'line 2'
+        persisted = mock_repo.update.call_args.args[0]
+        assert persisted.message == 'line 2'
 
     def test_invokes_on_progress_callback_for_each_line(self, mocker, mock_repo, job: Job):
         proc = _MockProc(returncode=0, lines=[b'a\n', b'b\n', b'c\n'])
@@ -167,5 +168,6 @@ class TestRunSubprocess:
         with pytest.raises(OSError, match='cannot spawn'):
             asyncio.run(run_subprocess(mock_repo, job, ['fake']))
 
-        assert job.status == JobStatus.ERROR
-        assert job.message == 'cannot spawn'
+        persisted = mock_repo.update.call_args.args[0]
+        assert persisted.status == JobStatus.ERROR
+        assert persisted.message == 'cannot spawn'
