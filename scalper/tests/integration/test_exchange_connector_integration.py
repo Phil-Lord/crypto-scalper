@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 from unittest.mock import Mock, patch
 
@@ -5,7 +7,13 @@ from exchange_connector.api.exceptions import KrakenApiResponseError
 from exchange_connector.connectors.ticker_connector import TickerConnector
 from exchange_connector.connectors.trades_connector import TradesConnector
 from exchange_connector.connectors.asset_pairs_connector import AssetPairsConnector
+from exchange_connector.connectors.query_orders_connector import QueryOrdersConnector
+from exchange_connector.models.query_order_result import QueryOrderResult, QueryOrderStatus
 from data_system.models.trade_model import Trade
+
+
+PATCH_HEADERS = 'exchange_connector.api.kraken_api_client.get_headers'
+MOCK_HEADERS = {'API-Key': 'test', 'API-Sign': 'test'}
 
 
 @pytest.mark.integration
@@ -294,3 +302,151 @@ class TestExchangeConnectorIntegration:
             # Verify error indicates transformation failure
             assert 'Failed to parse' in str(
                 exc_info.value) or 'Trade data incomplete' in str(exc_info.value)
+
+    # ─── QueryOrdersConnector — connector → service → client integration ───
+    #
+    # QueryOrders is a private POST endpoint, so the auth header builder is
+    # patched to bypass the KRAKEN_TRADING_API_KEY/SECRET requirement; the
+    # connector → service → client → signing path otherwise runs unmocked.
+
+    @pytest.fixture
+    def mock_kraken_query_orders_response(self):
+        return {
+            'error': [],
+            'result': {
+                'OABCDE-FGHIJ-KLMNOP': {
+                    'status': 'closed',
+                    'price': '49750.00',
+                    'vol_exec': '0.50251256',
+                    'fee': '6.45',
+                },
+                'OQRSTU-VWXYZ-012345': {
+                    'status': 'open',
+                    'price': '0.00',
+                    'vol_exec': '0.00',
+                    'fee': '0.00',
+                },
+                'OFAILD-ORDER-CANCEL': {
+                    'status': 'canceled',
+                    'price': '0.00',
+                    'vol_exec': '0.00',
+                    'fee': '0.00',
+                },
+            },
+        }
+
+    @pytest.mark.query_orders_connector
+    def test_query_orders_connector_full_stack_integration(
+            self, mock_kraken_query_orders_response,
+    ):
+        # Given
+        connector = QueryOrdersConnector()
+        txids = [
+            'OABCDE-FGHIJ-KLMNOP',
+            'OQRSTU-VWXYZ-012345',
+            'OFAILD-ORDER-CANCEL',
+        ]
+
+        # When
+        with (
+            patch('time.sleep'),
+            patch(PATCH_HEADERS, return_value=MOCK_HEADERS),
+            patch('requests.post') as mock_post,
+        ):
+            mock_response = Mock()
+            mock_response.json.return_value = mock_kraken_query_orders_response
+            mock_response.raise_for_status.return_value = None
+            mock_post.return_value = mock_response
+
+            results = connector.fetch(txids)
+
+        # Then — domain transformation produced QueryOrderResult per txid
+        assert len(results) == 3
+        assert all(isinstance(r, QueryOrderResult) for r in results)
+
+        results_by_txid = {r.txid: r for r in results}
+
+        filled = results_by_txid['OABCDE-FGHIJ-KLMNOP']
+        assert filled.status == QueryOrderStatus.CLOSED
+        assert filled.price == Decimal('49750.00')
+        assert filled.volume == Decimal('0.50251256')
+        assert filled.fee == Decimal('6.45')
+
+        open_order = results_by_txid['OQRSTU-VWXYZ-012345']
+        assert open_order.status == QueryOrderStatus.OPEN
+        assert open_order.price == Decimal('0.00')
+        assert open_order.volume == Decimal('0.00')
+
+        cancelled = results_by_txid['OFAILD-ORDER-CANCEL']
+        assert cancelled.status == QueryOrderStatus.CANCELED
+
+        # Then — single POST to the QueryOrders endpoint with comma-joined txids
+        mock_post.assert_called_once()
+        call_kwargs = mock_post.call_args.kwargs
+        assert mock_post.call_args.args[0].endswith('/0/private/QueryOrders')
+        assert call_kwargs['data']['txid'] == ','.join(txids)
+        assert 'nonce' in call_kwargs['data']
+        assert call_kwargs['headers'] == MOCK_HEADERS
+
+    @pytest.mark.query_orders_connector
+    def test_query_orders_connector_returns_empty_for_no_txids(self):
+        # Given
+        connector = QueryOrdersConnector()
+
+        # When — no HTTP call should be made when there are no txids to query
+        with patch('requests.post') as mock_post:
+            results = connector.fetch([])
+
+        # Then
+        assert results == []
+        mock_post.assert_not_called()
+
+    @pytest.mark.query_orders_connector
+    def test_query_orders_connector_propagates_kraken_api_error(self):
+        # Given
+        connector = QueryOrdersConnector()
+        error_response = {'error': ['EOrder:Unknown order'], 'result': {}}
+
+        # When / Then — error propagates client → service → connector
+        with (
+            patch('time.sleep'),
+            patch(PATCH_HEADERS, return_value=MOCK_HEADERS),
+            patch('requests.post') as mock_post,
+        ):
+            mock_response = Mock()
+            mock_response.json.return_value = error_response
+            mock_response.raise_for_status.return_value = None
+            mock_post.return_value = mock_response
+
+            with pytest.raises(KrakenApiResponseError) as exc_info:
+                connector.fetch(['OUNKNW-ORDER-ID000'])
+            assert 'EOrder:Unknown order' in str(exc_info.value)
+
+    @pytest.mark.query_orders_connector
+    def test_query_orders_connector_raises_on_malformed_response(self):
+        # Given — order entry missing the required 'price' field
+        connector = QueryOrdersConnector()
+        malformed_response = {
+            'error': [],
+            'result': {
+                'OABCDE-FGHIJ-KLMNOP': {
+                    'status': 'closed',
+                    'vol_exec': '0.5',
+                    'fee': '1.0',
+                },
+            },
+        }
+
+        # When / Then
+        with (
+            patch('time.sleep'),
+            patch(PATCH_HEADERS, return_value=MOCK_HEADERS),
+            patch('requests.post') as mock_post,
+        ):
+            mock_response = Mock()
+            mock_response.json.return_value = malformed_response
+            mock_response.raise_for_status.return_value = None
+            mock_post.return_value = mock_response
+
+            with pytest.raises(ValueError, match='Failed to parse order result'):
+                connector.fetch(['OABCDE-FGHIJ-KLMNOP'])
