@@ -10,27 +10,7 @@ where possible; only create new ones if the strategy genuinely needs them.
 
 ---
 
-## Workflow
-
-1. **Clarify requirements** — Confirm strategy name, what indicators/rules it needs, what
-   parameters it takes, what its entry/exit conditions are. Ask before scaffolding.
-2. **Create the config** — Frozen dataclass with `__post_init__` validation.
-3. **Create indicators** — Only if a new one is genuinely needed; otherwise reuse.
-4. **Create rules** — Only if a new one is genuinely needed; otherwise reuse.
-5. **Create the strategy** — Subclass `Strategy`, register indicators and rules in `__init__`.
-6. **Register in factory** — Add to `STRATEGIES` dict in
-   `scalper/strategy_manager/factory.py`.
-7. **Update exports** — Add to `strategies/__init__.py` and `strategy_manager/__init__.py`.
-8. **Add strategy param configs** - Add param dicts to `scalper/utils/strategy_configs.py`.
-9. **Write tests** — Unit tests for config validation, indicator logic, signal generation. Plus
-   a test that runs `_generate_signal` and `_generate_signals` on the same data and asserts
-   identical output.
-10. **Register markers** — Add module/category/class markers to `pytest.ini`.
-11. **Update strategy_manager docs** — `docs/strategy_manager/` should mention the new strategy.
-
----
-
-## File locations
+## What this skill produces
 
 ```
 scalper/strategy_manager/
@@ -46,97 +26,45 @@ scalper/strategy_manager/
 
 scalper/tests/unit/strategy_manager/
 ├── strategies/test_{name}_strategy.py
-├── indicators/test_{name}_indicator.py
-└── rules/test_{name}_rule.py
+├── indicators/test_{name}_indicator.py   # only if new
+└── rules/test_{name}_rule.py             # only if new
 ```
+
+Plus updates to `pytest.ini` (markers), `scalper/utils/strategy_configs.py` (param sets), and
+`docs/strategy_manager/`.
 
 ---
 
-## Strategy pattern — both implementations
+## How to use this skill
 
-Every strategy implements **both** `_generate_signal` (live, called once per OHLC bar) and
-`_generate_signals` (vectorised, called with a full DataFrame for backtesting). Both must
-produce identical signals for identical data.
+1. **Clarify requirements first.** Confirm strategy name, which indicators/rules it needs, what
+   parameters it takes, and its entry/exit conditions. Ask before scaffolding.
+2. **Check what already exists** before creating new indicators or rules:
 
-```python
-class MyStrategy(Strategy):
-    def __init__(self, config: MyStrategyConfig):
-        super().__init__()
-        self.config = config
-        self.register_indicator('my_indicator', MyIndicator(config.window))
-        self.register_rule('my_rule', MyRule('my_indicator'))
+   ```bash
+   ls scalper/strategy_manager/indicators
+   ls scalper/strategy_manager/rules
+   ```
 
-    def _generate_signal(self, rule_results: dict) -> Signal:
-        '''Live: called once per OHLC bar.'''
-        return rule_results['my_rule']
-
-    def _generate_signals(self, results: pd.DataFrame) -> pd.Series:
-        '''Vectorised: called with full historical DataFrame for backtesting.'''
-        return results['my_rule']
-```
-
-## Config pattern
-
-```python
-@dataclass(frozen=True)
-class MyStrategyConfig:
-    '''
-    Configuration for MyStrategy.
-
-    Attributes:
-        window (int): Lookback window size in bars.
-    '''
-    window: int
-
-    def __post_init__(self):
-        if self.window < 2:
-            raise ValueError(f'window must be >= 2, got {self.window}')
-```
-
-## Factory registration
-
-```python
-# scalper/strategy_manager/factory.py
-STRATEGIES = {
-    ...
-    'MyStrategy': (MyStrategy, MyStrategyConfig),
-}
-```
+3. **Walk `checklist.md`** in order. It is the source of truth for the workflow, file paths, and
+   acceptance criteria. Tick each box as you go — don't skip ahead.
+4. **Use `templates.md` as scaffolding.** It contains three labelled code blocks (config,
+   strategy, tests). Copy the relevant block, then replace every `{{placeholder}}` with the new
+   strategy's specifics. The templates encode the patterns (frozen dataclass,
+   `_generate_signal` + `_generate_signals`, marker hierarchy) so you don't have to reconstruct
+   them from prose.
+5. **Stop and ask** before doing anything that requires user judgement: introducing a new
+   dependency, changing a public API in `strategy_manager/__init__.py`, or modifying
+   `data_system/schema.sql`.
 
 ---
 
-## Existing indicators and rules — check before creating
+## Files in this skill
 
-Before adding a new indicator or rule, confirm an existing one doesn't already do the job. Read
-the directories at the time of writing (the list below may drift):
+- `SKILL.md` — this file (overview + how to use).
+- `checklist.md` — the actual workflow, file paths, and acceptance criteria.
+- `templates.md` — copy-paste scaffolds for the strategy class, config, and tests.
 
-```bash
-ls scalper/strategy_manager/indicators
-ls scalper/strategy_manager/rules
-```
-
-At the time the prompt was written, this included:
-
-- **Indicators:** `SmaIndicator`, `EmaIndicator`, `RsiIndicator`, `AtrIndicator`,
-  `AdxIndicator`
-- **Rules:** `MaCrossoverRule`, `RsiThresholdRule`, `AdxThresholdRule`, `AtrThresholdRule`
-
----
-
-## Checklist
-
-- [ ] Config is a frozen dataclass with `__post_init__` validation
-- [ ] Strategy implements **both** `_generate_signal` and `_generate_signals`
-- [ ] Both methods return identical logic on identical data
-- [ ] Indicators with state use `deque(maxlen=window)` for bounded memory
-- [ ] Strategy registered in `STRATEGIES` dict in `factory.py`
-- [ ] Strategy params added to `scalper/utils/strategy_configs.py` for backtesting and optimisation
-- [ ] Exported from `strategies/__init__.py` and `strategy_manager/__init__.py`
-- [ ] Unit tests cover: config validation edge cases, indicator output, signal generation
-- [ ] Test verifies live and vectorised paths produce identical output on sample data
-- [ ] New markers registered in `pytest.ini`
-- [ ] `docs/strategy_manager/` mentions the new strategy
-
-For style/architecture rules referenced above (frozen dataclasses, type hints, British English,
-test naming, marker hierarchy), see `CLAUDE.md`, `.claude/rules/architecture.md`, and
-`.claude/rules/testing.md`.
+For style/architecture rules (frozen dataclasses, type hints, British English, test naming,
+marker hierarchy, dual-implementation pattern), see `CLAUDE.md`,
+`.claude/rules/architecture.md`, and `.claude/rules/testing.md`.
