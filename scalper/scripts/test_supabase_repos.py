@@ -34,6 +34,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import NoReturn
 from uuid import UUID, uuid4
 
 import click
@@ -72,15 +73,18 @@ BALANCE_BASE = Decimal('0.12345678')
 BALANCE_QUOTE = Decimal('1234.56789012')
 
 
+class _ScenarioFailure(Exception):
+    '''Raised when a scenario assertion fails so main() can run cleanup before exiting.'''
+
+
 @dataclass
 class Ledger:
-    '''Records every successful insert so cleanup can target exact rows.'''
+    '''Records every successful bot insert so cleanup can target rows by bot_id.'''
     bot_ids: list[str] = field(default_factory=list)
     failures: list[str] = field(default_factory=list)
 
-    def record_failure(self, scenario: str, message: str) -> None:
-        self.failures.append(f'{scenario}: {message}')
-        logger.error('%s FAILED: %s', scenario, message)
+    def record_failure(self, scenario: str, message: str) -> NoReturn:
+        raise _ScenarioFailure(f'{scenario}: {message}')
 
 
 @click.command()
@@ -104,11 +108,14 @@ def main(yes: bool) -> None:
 
     try:
         _test_bot_repo(bot_repo, primary_bot_id, ledger)
-        bot_run = _test_bot_run_repo(bot_repo, run_repo, primary_bot_id, ledger)
+        bot_run = _test_bot_run_repo(run_repo, primary_bot_id, ledger)
         linked_tick_id = _test_bot_tick_repo(
             bot_repo, run_repo, tick_repo, primary_bot_id, holds_only_bot_id, bot_run, ledger,
         )
         _test_bot_order_repo(order_repo, primary_bot_id, bot_run, linked_tick_id, ledger)
+    except (_ScenarioFailure, AssertionError) as e:
+        ledger.failures.append(str(e))
+        logger.error('Aborting run: %s', e)
     finally:
         _cleanup(client, ledger.bot_ids)
         _residue_sweep(client, ledger.bot_ids)
@@ -259,7 +266,6 @@ def _test_bot_repo(bot_repo: SupabaseBotRepository, bot_id: str, ledger: Ledger)
         ledger.bot_ids.append(bot_id)
     except Exception as e:
         ledger.record_failure('bot_repo.add', f'unexpected exception: {e!r}')
-        return
 
     _expect(added.id == bot.id, 'bot_repo.add', 'returned id mismatch')
     _expect(added.parameters == bot.parameters, 'bot_repo.add', 'parameters JSONB drift')
@@ -291,7 +297,6 @@ def _test_bot_repo(bot_repo: SupabaseBotRepository, bot_id: str, ledger: Ledger)
 # ---------------------------------------------------------------------------------------
 
 def _test_bot_run_repo(
-    bot_repo: SupabaseBotRepository,
     run_repo: SupabaseBotRunRepository,
     bot_id: str,
     ledger: Ledger,
@@ -342,7 +347,7 @@ def _test_bot_run_repo(
     _expect(not_completed is None, 'bot_run_repo.complete(missing)',
             'expected None for non-existent id')
 
-    return added_closed  # the still-open-ish handle for tick/order tests below
+    return added_closed  # downstream tick/order tests only use bot_run.id for FK
 
 
 # ---------------------------------------------------------------------------------------

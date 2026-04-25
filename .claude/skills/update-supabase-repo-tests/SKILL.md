@@ -53,9 +53,11 @@ script must not interfere with them and must guarantee zero residue.
 
 - **Test prefix** — every identifier created uses `claudit-test-` plus the per-run UUID. Names,
   bot IDs, exchange order IDs all carry it.
-- **Ledger** — every successful insert appends `(table, primary_key)` to an in-memory list.
-- **`try`/`finally` cleanup** — the finally block deletes by primary key from the ledger, in
-  reverse FK order, regardless of test outcome.
+- **Ledger** — every successful bot insert appends the `bot_id` to an in-memory list. Related
+  rows (runs, ticks, orders) are reachable for cleanup via that bot_id (FK).
+- **`try`/`finally` cleanup** — the finally block deletes all rows scoped to each ledgered
+  `bot_id` in reverse FK order: `bot_orders` → `bot_ticks` → `bot_runs` → `bots`. Each delete
+  is `.eq('bot_id', ...)`-scoped (or `.eq('id', ...)` for `bots`), regardless of test outcome.
 - **Residue sweep** after cleanup — re-query each table for the prefix; if anything remains,
   retry delete; if still anything remains, exit non-zero with the IDs.
 - **Pre-flight** — query for the prefix before inserting; refuse to start (or prompt to clean
