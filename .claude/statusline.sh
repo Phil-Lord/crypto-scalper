@@ -8,8 +8,8 @@ MODEL=$(echo "$input" | jq -r '.model.display_name // "unknown"')
 
 # The "// 0" provides a fallback if the field is null
 CONTEXT_USED=$(echo "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
-FIVE_HOUR_USAGE=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // 0')
-SEVEN_DAY_USAGE=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // 0')
+FIVE_HOUR_USAGE=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // 0' | cut -d. -f1)
+SEVEN_DAY_USAGE=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // 0' | cut -d. -f1)
 
 # Pick bar color based on context usage
 GREEN='\033[32m'; YELLOW='\033[33m'; RED='\033[31m'; RESET='\033[0m'
