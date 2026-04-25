@@ -1,7 +1,7 @@
 from nicegui import ui
 
 
-def render_main_content():
+def render_main_content() -> ui.column:
     '''
     Renders the main content area of the application.
 
