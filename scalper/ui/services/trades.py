@@ -25,6 +25,9 @@ def get_trades(pair: str, start_date: str, end_date: str) -> pd.DataFrame:
 
 
 def plot_trades(trades: pd.DataFrame, figure: go.Figure) -> go.Figure:
+    if trades.empty:
+        return figure
+
     ohlc = convert_prices_to_ohlc(trades)
     figure.data = []
     figure.add_trace(go.Candlestick(
