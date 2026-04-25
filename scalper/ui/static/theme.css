@@ -1,0 +1,53 @@
+:root,
+body,
+.body--dark,
+#q-app {
+    --q-primary: #03c574 !important;
+}
+
+
+/* ---------- Sticky header for tables ---------- */
+
+/* Prevent scrolling behind header on focus when the loading indicator appears */
+.sticky-header {
+    height: 100%;
+}
+
+.sticky-header .q-table__top,
+.sticky-header .q-table__bottom,
+
+/*
+ * Configure:
+ * 1. thead (table head)
+ * 2. tr (table row)
+ * 3. th (table header cell)
+*/
+.sticky-header thead tr:first-child th {
+    background-color: #1d1d1d;
+    top: 0;
+}
+
+.sticky-header thead tr th {
+    position: sticky;
+    z-index: 1;
+}
+
+/* 
+ * When Quasar shows the loading spinner, it renders a second header row. 
+ * That row needs to be positioned below the first sticky header,
+ * so top is set to the first header's height.
+*/
+.sticky-header.q-table--loading thead tr:last-child th {
+    /* Quasar's fixed header row height */
+    top: 48px;
+}
+
+/* 
+ * When a tbody element is scrolled into focus (e.g. keyboard navigation),
+ * the browser needs to know how much space the sticky header occupies
+ * so it doesn't scroll the focused row behind it.
+*/
+.sticky-header tbody {
+    /* Quasar's fixed header row height */
+    scroll-margin-top: 48px;
+}

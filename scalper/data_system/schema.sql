@@ -119,3 +119,15 @@ CREATE TABLE generalisation_evaluation (
 
     PRIMARY KEY (study_name, trial_number, start_timestamp, end_timestamp)
 );
+
+
+-- Table: jobs
+-- Stores information about background jobs (e.g., get_trades, run_backtest).
+CREATE TABLE jobs (
+    id TEXT PRIMARY KEY,                        -- Matches Job.id (UUID stored as text)
+    job_type TEXT NOT NULL,                     -- Matches Job.job_type (e.g., 'get_trades', 'run_backtest')
+    status TEXT NOT NULL DEFAULT 'pending',     -- Matches Job.status ('pending', 'running', 'done', 'error')
+    message TEXT,                               -- Matches Job.message (optional status/error message)
+    created_at REAL NOT NULL,                   -- Matches Job.created_at (Unix timestamp)
+    updated_at REAL NOT NULL                    -- Matches Job.updated_at (Unix timestamp)
+);
