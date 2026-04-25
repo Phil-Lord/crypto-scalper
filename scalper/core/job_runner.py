@@ -1,10 +1,12 @@
 import asyncio
 import time
+from collections.abc import Callable
+from typing import Any
 
 from data_system import Job, JobRepository, JobStatus
 
 
-async def run_in_thread(job_repo: JobRepository, job: Job, fn: callable, *args):
+async def run_in_thread(job_repo: JobRepository, job: Job, fn: Callable[..., Any], *args) -> Any:
     '''
     Run an async blocking function in a separate thread.
 
@@ -25,7 +27,12 @@ async def run_in_thread(job_repo: JobRepository, job: Job, fn: callable, *args):
         raise
 
 
-async def run_subprocess(job_repo: JobRepository, job: Job, cmd: list[str], on_progress: callable = None):
+async def run_subprocess(
+    job_repo: JobRepository,
+    job: Job,
+    cmd: list[str],
+    on_progress: Callable[[str], None] | None = None,
+) -> None:
     '''
     Spawn a separate OS process which runs independently of the UI.
 
