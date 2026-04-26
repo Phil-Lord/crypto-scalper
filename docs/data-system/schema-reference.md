@@ -103,6 +103,19 @@ Stores out-of-sample evaluation results for Optuna trials.
 | `final_balance`   | FLOAT NOT NULL | Final balance after evaluation |
 | `geo_mean_return` | FLOAT NOT NULL | Geometric mean return          |
 
+### `jobs`
+
+Tracks background jobs (e.g., trade fetching, backtest runs) submitted via `scripts/manage_jobs.py`.
+
+| Column       | Type      | Description                                           |
+| ------------ | --------- | ----------------------------------------------------- |
+| `id`         | TEXT (PK) | Job UUID stored as text                               |
+| `job_type`   | TEXT      | `'get_trades'`, `'fetch_trades'`, or `'run_backtest'` |
+| `status`     | TEXT      | `'pending'`, `'running'`, `'done'`, or `'error'`      |
+| `message`    | TEXT      | Optional status detail or error message (nullable)    |
+| `created_at` | FLOAT     | Unix timestamp of creation                            |
+| `updated_at` | FLOAT     | Unix timestamp of last status change                  |
+
 ---
 
 ## Indexing Strategy
@@ -112,6 +125,7 @@ Critical indexes are defined for common query patterns:
 | Table       | Index                          | Purpose                                    |
 | ----------- | ------------------------------ | ------------------------------------------ |
 | `trades`    | `(pair, timestamp)`            | Fast fetching of trades within time ranges |
+| `trades`    | `(pair)`                       | Pair-only filtering without time bounds    |
 | `bot_runs`  | `(bot_id, started_at DESC)`    | Quick lookup of recent runs per bot        |
 | `bot_ticks` | `(run_id, timestamp ASC)`      | Instant chart loading for a run            |
 | `bot_ticks` | `(id) WHERE error IS NOT NULL` | Fast error debugging                       |

@@ -4,10 +4,10 @@ The system uses two distinct database backends optimised for their respective us
 
 ## Dual Schema Architecture
 
-| Backend              | Engine     | Purpose                     | Tables                                        |
-| -------------------- | ---------- | --------------------------- | --------------------------------------------- |
-| **Local SQLite**     | SQLAlchemy | Backtesting & optimisation  | `trades`, `generalisation_evaluation`         |
-| **Cloud PostgreSQL** | Supabase   | Live trading & audit trails | `bots`, `bot_runs`, `bot_ticks`, `bot_orders` |
+| Backend              | Engine     | Purpose                          | Tables                                        |
+| -------------------- | ---------- | -------------------------------- | --------------------------------------------- |
+| **Local SQLite**     | SQLAlchemy | Backtesting, optimisation & jobs | `trades`, `generalisation_evaluation`, `jobs` |
+| **Cloud PostgreSQL** | Supabase   | Live trading & audit trails      | `bots`, `bot_runs`, `bot_ticks`, `bot_orders` |
 
 **Rationale:**
 

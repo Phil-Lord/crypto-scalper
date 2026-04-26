@@ -4,8 +4,9 @@ This is the storage module for the system, it defines database configurations/mo
 data access services for other modules. It uses a multi-backend architecture as we need to support
 different database tools and management services, namely:
 
-- **SQLAlchemy** for local backtesting tables, e.g. `trades` and `generalisation_evaluation`.
-- **Supabase** for live trading tables, e.g. `bots`, `bot_runs`, and `bot_ticks`.
+- **SQLAlchemy** for local backtesting and job-tracking tables: `trades`,
+  `generalisation_evaluation`, and `jobs`.
+- **Supabase** for live trading tables: `bots`, `bot_runs`, `bot_ticks`, and `bot_orders`.
 
 ## Contents
 
