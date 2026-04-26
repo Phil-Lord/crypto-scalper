@@ -16,6 +16,9 @@ theme:
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
+  features:
+    - content.code.copy
+    - content.code.select
 nav:
   - index.md
   - Data System:
@@ -36,10 +39,18 @@ nav:
       - backtesting-engine/parameter-optimisation.md
       - backtesting-engine/profit-calculation.md
       - backtesting-engine/generalisation-evaluation.md
-  - trade-executor.md
+  - Trade Executor:
+      - trade-executor/index.md
+      - trade-executor/operations.md
   - cloud-architecture.md
   - architecture-decision-log.md
 markdown_extensions:
   - admonition
-  - pymdownx.superfences
   - pymdownx.emoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences

@@ -97,10 +97,9 @@ Safe for running hundreds of strategy instances concurrently.
 ### Backtesting Engine
 
 ```python
-from strategy_manager import StrategyManager
+from strategy_manager import create_strategy
 
-manager = StrategyManager()
-strategy = manager.get_strategy('SmaStrategy', short_window=10, long_window=50)
+strategy = create_strategy('SmaStrategy', {'short_window': 10, 'long_window': 50})
 
 # Vectorised backtesting
 results = strategy.vectorised_compute(ohlc_data)
@@ -109,10 +108,9 @@ results = strategy.vectorised_compute(ohlc_data)
 ### Trade Executor
 
 ```python
-from strategy_manager import StrategyManager
+from strategy_manager import create_strategy
 
-manager = StrategyManager()
-strategy = manager.get_strategy('PrecisionTrendStrategy', ...)
+strategy = create_strategy('PrecisionTrendStrategy', bot.parameters)
 
 # Live trading loop
 for ohlc in tick_stream:

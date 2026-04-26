@@ -23,23 +23,28 @@ The main class for running backtests. Loads trade data, resamples into OHLC inte
 ```python
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
 from backtesting_engine import BacktestingEngine
+from strategy_manager import create_strategy
 
 # Setup
 client = SQLAlchemyClient()
 repository = SQLAlchemyTradeRepository(client)
 
+# Construct the strategy (factory builds the right config dataclass)
+strategy = create_strategy('PrecisionTrendStrategy', {
+    'short_ema': 9,
+    'long_ema': 21,
+    # ... remaining PrecisionTrendStrategyConfig fields
+})
+
 # Create engine
 engine = BacktestingEngine(
     pair='XXBTZGBP',
-    strategy_name='PrecisionTrendStrategy',
+    strategy=strategy,
     repository=repository,
     start=1609459200.0,  # Unix timestamp
     end=1625097600.0,
-    interval=1,  # 1-minute candles
+    interval=1,          # 1-minute candles
     vectorised=True,
-    # Strategy parameters
-    short_ema=9,
-    long_ema=21
 )
 
 # Run backtest
@@ -53,12 +58,12 @@ positions = engine.calculate_position_profits()
 **Parameters:**
 
 - `pair`: Trading pair in Kraken format (`XXBTZGBP`)
-- `strategy_name`: Name of strategy to load via StrategyManager
-- `repository`: TradeRepository instance for loading historical data
+- `strategy`: A `Strategy` instance — typically built with
+  `create_strategy(name, params)` from `strategy_manager`
+- `repository`: `TradeRepository` instance for loading historical data
 - `start`/`end`: Unix timestamps for time range (optional, defaults to all data)
 - `interval`: Resampling interval in minutes (default: 1)
 - `vectorised`: If True, uses fast pandas operations; if False, row-by-row (default: True)
-- `**strategy_params`: Parameters passed to strategy constructor
 
 ---
 
@@ -76,17 +81,19 @@ repository = SQLAlchemyTradeRepository(client)
 
 ### With Strategy Manager
 
-Strategies must implement **dual computation modes**:
+Strategies extend `Strategy` and implement **dual computation modes**. The base
+class supplies `generate_signal()` and `vectorised_compute()`; subclasses provide
+the per-mode reductions:
 
 ```python
-class MyStrategy:
-    def generate_signal(self, ohlc: pd.Series) -> dict:
-        '''Single row processing for live trading and iterative backtesting.'''
-        pass
+class MyStrategy(Strategy):
+    def _generate_signal(self, rule_results: dict) -> Signal:
+        '''Reduce rule results to a single live-mode signal.'''
+        ...
 
-    def vectorised_compute(self, ohlc: pd.DataFrame) -> pd.DataFrame:
-        '''Batch processing for fast backtesting.'''
-        pass
+    def _generate_signals(self, results: pd.DataFrame) -> pd.Series:
+        '''Reduce rule columns to a vectorised signal series.'''
+        ...
 ```
 
 See [Strategy Manager Documentation](../strategy-manager/index.md) for details.

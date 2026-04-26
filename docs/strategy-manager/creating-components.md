@@ -8,13 +8,22 @@ This guide covers how to build custom strategies, indicators, and rules for the 
 
 ### 1. Simple Strategy (Single Rule)
 
+Strategies take a frozen-dataclass config — never raw kwargs — so validation
+lives in one place (`SmaStrategyConfig.__post_init__`) and applies identically
+in live trading and backtesting.
+
 ```python
 class SmaStrategy(Strategy):
-    def __init__(self, short_window: int, long_window: int):
+    def __init__(self, config: SmaStrategyConfig):
         super().__init__()
-        self.register_indicator('short_sma', SmaIndicator(short_window))
-        self.register_indicator('long_sma', SmaIndicator(long_window))
+        self.config = config
+        self.register_indicator('short_sma', SmaIndicator(config.short_window))
+        self.register_indicator('long_sma', SmaIndicator(config.long_window))
         self.register_rule('crossover', MaCrossoverRule('short_sma', 'long_sma'))
+
+    @property
+    def warmup_candles(self) -> int:
+        return self.config.long_window + 1
 
     def _generate_signal(self, rule_results: dict) -> Signal:
         return rule_results['crossover']
@@ -27,20 +36,25 @@ class SmaStrategy(Strategy):
 
 ```python
 class PrecisionTrendStrategy(Strategy):
-    def __init__(self, ..., weight_crossover, weight_rsi, ...):
+    def __init__(self, config: PrecisionTrendStrategyConfig):
         super().__init__()
+        self.config = config
+
         # Register indicators
-        self.register_indicator('short_ema', EmaIndicator(short_ema))
-        self.register_indicator('rsi', RsiIndicator(rsi_window))
+        self.register_indicator('short_ema', EmaIndicator(config.short_ema))
+        self.register_indicator('rsi', RsiIndicator(config.rsi_window))
 
         # Register rules
         self.register_rule('crossover', MaCrossoverRule('short_ema', 'long_ema'))
-        self.register_rule('rsi_threshold', RsiThresholdRule('rsi', oversold, overbought))
+        self.register_rule(
+            'rsi_threshold',
+            RsiThresholdRule('rsi', config.rsi_oversold, config.rsi_overbought),
+        )
 
         # Normalise weights
-        total = weight_crossover + weight_rsi + ...
-        self.weight_crossover = weight_crossover / total
-        self.weight_rsi = weight_rsi / total
+        total = config.weight_crossover + config.weight_rsi + ...
+        self.weight_crossover = config.weight_crossover / total
+        self.weight_rsi = config.weight_rsi / total
 
     def _generate_signal(self, rule_results: dict) -> Signal:
         # Weighted scoring
@@ -50,9 +64,9 @@ class PrecisionTrendStrategy(Strategy):
             self.weight_rsi * signal_map[rule_results['rsi_threshold']]
         )
 
-        if score > self.buy_threshold:
+        if score > self.config.buy_threshold:
             return Signal.BUY
-        elif score < self.sell_threshold:
+        elif score < self.config.sell_threshold:
             return Signal.SELL
         return Signal.HOLD
 ```

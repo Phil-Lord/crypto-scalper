@@ -48,19 +48,24 @@ Records granular interval results - the immutable record of each trading decisio
 
 ### `bot_orders`
 
-Records executed trades.
+Records orders placed by a bot, with explicit lifecycle. See
+[Trade Executor → Order Lifecycle](../trade-executor/index.md#order-lifecycle) for the
+state machine.
 
-| Column        | Type        | Description               |
-| ------------- | ----------- | ------------------------- |
-| `id`          | UUID (PK)   | Auto-generated order ID   |
-| `bot_id`      | TEXT (FK)   | References `bots.id`      |
-| `run_id`      | UUID (FK)   | References `bot_runs.id`  |
-| `tick_id`     | BIGINT (FK) | References `bot_ticks.id` |
-| `side`        | TEXT        | `'buy'` or `'sell'`       |
-| `price`       | DECIMAL     | Execution price           |
-| `volume`      | DECIMAL     | Trade volume              |
-| `fee`         | DECIMAL     | Fee charged               |
-| `executed_at` | TIMESTAMPTZ | Execution timestamp       |
+| Column              | Type                   | Description                                                              |
+| ------------------- | ---------------------- | ------------------------------------------------------------------------ |
+| `id`                | UUID (PK)              | Auto-generated order ID                                                  |
+| `bot_id`            | TEXT (FK)              | References `bots.id`                                                     |
+| `run_id`            | UUID (FK)              | References `bot_runs.id` (cascade delete)                                |
+| `tick_id`           | BIGINT (FK, nullable)  | References `bot_ticks.id`; linked after the tick is persisted            |
+| `exchange_order_id` | TEXT                   | Kraken order ID (`txid`); domain-layer name disambiguates from trade IDs |
+| `side`              | TEXT                   | `'buy'` or `'sell'`                                                      |
+| `status`            | TEXT                   | `'placed'`, `'filled'`, or `'failed'` (default `'placed'`)               |
+| `placed_at`         | TIMESTAMPTZ            | When the order was submitted to the exchange (default `NOW()`)           |
+| `filled_at`         | TIMESTAMPTZ (nullable) | When the order reached a terminal state (FILLED or FAILED)               |
+| `price`             | DECIMAL (nullable)     | Average executed price (set on FILL; may be present on FAILED)           |
+| `volume`            | DECIMAL (nullable)     | Executed volume                                                          |
+| `fee`               | DECIMAL (nullable)     | Fee paid                                                                 |
 
 ---
 
@@ -89,14 +94,27 @@ Historical trade data fetched from Kraken API.
 
 Stores out-of-sample evaluation results for Optuna trials.
 
-| Column            | Type          | Description                    |
-| ----------------- | ------------- | ------------------------------ |
-| `study_name`      | TEXT (CPK)    | Optuna study name              |
-| `trial_number`    | INTEGER (CPK) | Trial number within the study  |
-| `start_timestamp` | FLOAT (CPK)   | Evaluation window start        |
-| `end_timestamp`   | FLOAT (CPK)   | Evaluation window end          |
+| Column            | Type           | Description                    |
+| ----------------- | -------------- | ------------------------------ |
+| `study_name`      | TEXT (CPK)     | Optuna study name              |
+| `trial_number`    | INTEGER (CPK)  | Trial number within the study  |
+| `start_timestamp` | FLOAT (CPK)    | Evaluation window start        |
+| `end_timestamp`   | FLOAT (CPK)    | Evaluation window end          |
 | `final_balance`   | FLOAT NOT NULL | Final balance after evaluation |
 | `geo_mean_return` | FLOAT NOT NULL | Geometric mean return          |
+
+### `jobs`
+
+Tracks background jobs (e.g., trade fetching, backtest runs) submitted via `scripts/manage_jobs.py`.
+
+| Column       | Type      | Description                                           |
+| ------------ | --------- | ----------------------------------------------------- |
+| `id`         | TEXT (PK) | Job UUID stored as text                               |
+| `job_type`   | TEXT      | `'get_trades'`, `'fetch_trades'`, or `'run_backtest'` |
+| `status`     | TEXT      | `'pending'`, `'running'`, `'done'`, or `'error'`      |
+| `message`    | TEXT      | Optional status detail or error message (nullable)    |
+| `created_at` | FLOAT     | Unix timestamp of creation                            |
+| `updated_at` | FLOAT     | Unix timestamp of last status change                  |
 
 ---
 
@@ -107,6 +125,7 @@ Critical indexes are defined for common query patterns:
 | Table       | Index                          | Purpose                                    |
 | ----------- | ------------------------------ | ------------------------------------------ |
 | `trades`    | `(pair, timestamp)`            | Fast fetching of trades within time ranges |
+| `trades`    | `(pair)`                       | Pair-only filtering without time bounds    |
 | `bot_runs`  | `(bot_id, started_at DESC)`    | Quick lookup of recent runs per bot        |
 | `bot_ticks` | `(run_id, timestamp ASC)`      | Instant chart loading for a run            |
 | `bot_ticks` | `(id) WHERE error IS NOT NULL` | Fast error debugging                       |
@@ -116,6 +135,9 @@ Critical indexes are defined for common query patterns:
 ## Data Integrity Constraints
 
 - **Immutable Models:** All dataclasses use `frozen=True` to prevent mutation after creation.
+  Updates to `BotOrder` (e.g. status transitions, filling in `tick_id`) use
+  `dataclasses.replace()`.
 - **CHECK Constraints:** `bot_ticks.signal` restricted to `('buy', 'sell', 'hold')`;
-  `bot_orders.side` restricted to `('buy', 'sell')`.
+  `bot_orders.side` restricted to `('buy', 'sell')`; `bot_orders.status` restricted to
+  `('placed', 'filled', 'failed')`.
 - **Cascade Deletes:** Deleting a `bot_run` cascades to its `bot_ticks` and `bot_orders`.

@@ -7,17 +7,21 @@ responses into domain objects.
 ## Quick Start
 
 ```python
+from decimal import Decimal
+
 from exchange_connector import (
     TradesConnector,
     TickerConnector,
+    OhlcConnector,
     BalanceConnector,
     AddOrderConnector,
+    QueryOrdersConnector,
     KrakenApiError,  # Base exception for error handling
 )
 
 # Fetch historical trades (returns Trade domain objects)
 trades_connector = TradesConnector()
-trades = trades_connector.fetch('XXBTZGBP', since=1704067200000000000, until=1704153600000000000)
+trades = trades_connector.fetch('XXBTZGBP', start=1704067200000000000, end=1704153600000000000)
 
 # Get current price
 ticker_connector = TickerConnector()
@@ -28,10 +32,13 @@ current_price = float(price_data['c'][0])
 balance_connector = BalanceConnector()
 balances = balance_connector.fetch()
 
-# Place a market order with error handling
+# Place a market order, then confirm the fill — both inside the same try
+# so we don't reference `result` if placement raised.
 order_connector = AddOrderConnector()
+query_connector = QueryOrdersConnector()
 try:
-    result = order_connector.place('XXBTZGBP', 'buy', 100.0)  # Buy £100 worth
+    result = order_connector.place('XXBTZGBP', 'buy', Decimal('100.0'))  # Buy £100 worth
+    fills = query_connector.fetch([result.txid[0]])  # list[QueryOrderResult]
 except KrakenApiError as e:
     logger.error(f'API error: {e}')
 ```

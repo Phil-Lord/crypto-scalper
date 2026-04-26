@@ -21,8 +21,9 @@ To achieve backend interchangeability (e.g., swapping SQLAlchemy for Supabase), 
 utilises a strict separation between **Interfaces** and **Implementations**:
 
 1. **Base Repositories _(The Interface)_:** We expose an abstract base class for each table. This
-   acts as a _"contract"_, defining what methods are available (e.g., `get_trade_by_id`) without
-   defining how they work. Consumers of the data system rely solely on these base classes.
+   acts as a _"contract"_, defining what methods are available (e.g.,
+   `TradeRepository.get(pair, start, end)`) without defining how they work. Consumers of the
+   data system rely solely on these base classes.
 
 2. **Specific Repositories _(The Implementation)_:** These classes implement the Base Repository
    using a specific **Client**. For example, a `SQLAlchemyTradeRepository` implements the

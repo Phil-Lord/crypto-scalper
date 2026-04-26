@@ -13,19 +13,21 @@ The BacktestingEngine uses Optuna-based parameter optimisation to find effective
 
 ```python
 from backtesting_engine import BacktestingEngine
-from strategy_manager.strategies import PrecisionTrendStrategyConfig
+from strategy_manager import create_strategy
 
-# Create engine with base configuration
+# Build a seed strategy — Optuna replaces it per trial via create_strategy()
+strategy = create_strategy('PrecisionTrendStrategy', seed_params)
+
 engine = BacktestingEngine(
     pair='XXBTZGBP',
-    strategy_name='PrecisionTrendStrategy',
+    strategy=strategy,
     repository=repository,
     start=1609459200.0,
     end=1625097600.0,
     interval=1
 )
 
-# Define parameter grid
+# Define parameter grid (each entry is a [low, high] range)
 param_grid = {
     'short_ema': [5, 20],
     'long_ema': [15, 50],
@@ -172,10 +174,8 @@ Studies persist in PostgreSQL database for:
 
 **Configuration:**
 
-```python
-# utils/__init__.py
-OPTUNA_DB_URL = os.getenv('OPTUNA_DB_URL', 'postgresql://...')
-```
+`OptunaConfig.DB_URL` (in `utils/`) reads `OPTUNA_DB_URL` lazily via metaclass
+properties so studies pick up the value at access time, not import time.
 
 **Study naming convention:**  
 `{StrategyName}_{Pair}_{StartDate}-{EndDate}`
