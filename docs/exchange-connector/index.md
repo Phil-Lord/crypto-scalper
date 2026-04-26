@@ -10,8 +10,10 @@ responses into domain objects.
 from exchange_connector import (
     TradesConnector,
     TickerConnector,
+    OhlcConnector,
     BalanceConnector,
     AddOrderConnector,
+    QueryOrdersConnector,
     KrakenApiError,  # Base exception for error handling
 )
 
@@ -34,6 +36,10 @@ try:
     result = order_connector.place('XXBTZGBP', 'buy', 100.0)  # Buy £100 worth
 except KrakenApiError as e:
     logger.error(f'API error: {e}')
+
+# Confirm fill details for one or more orders
+query_connector = QueryOrdersConnector()
+fills = query_connector.fetch([result.txid[0]])  # list[QueryOrderResult]
 ```
 
 ## Contents

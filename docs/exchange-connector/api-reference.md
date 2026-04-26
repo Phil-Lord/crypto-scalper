@@ -4,11 +4,15 @@ This page documents the Kraken API endpoints used by the exchange connector.
 
 ## Authentication
 
-Private endpoints require HMAC-SHA512 authentication. The `kraken_auth_utils` module handles:
+Private endpoints require HMAC-SHA512 authentication. The `kraken_auth_utils` module handles
+message signing and header construction; `KrakenApiClient._next_nonce()` generates the nonce.
 
-1. **Nonce generation** — Millisecond timestamp to prevent replay attacks
-2. **Message signing** — HMAC-SHA512 of nonce + POST data + endpoint
-3. **Header construction** — `API-Key` and `API-Sign` headers
+1. **Nonce generation** — Nanosecond timestamp (`time.time_ns()`), monotonically advanced under
+   a lock so two threads issuing requests in the same nanosecond still produce strictly
+   increasing nonces. Required because APScheduler's thread pool can fire concurrent
+   requests across bots.
+2. **Message signing** — HMAC-SHA512 of nonce + POST data + endpoint.
+3. **Header construction** — `API-Key` and `API-Sign` headers.
 
 ### Environment Variables
 
@@ -98,17 +102,54 @@ connector = AddOrderConnector()
 
 # Place an actual order
 result = connector.place('XXBTZGBP', 'buy', 100.0)
-# Returns: OrderResult(txid=['ORDER-ID'], order_description='buy 100.00000000 XXBTZGBP @ market')
+# Returns: AddOrderResult(txid=['ORDER-ID'], order_description='buy 100.00000000 XXBTZGBP @ market')
 
 # Validate order without executing (for testing)
 result = connector.place('XXBTZGBP', 'buy', 100.0, validate=True)
-# Returns: OrderResult(txid=None, order_description='buy 100.00000000 XXBTZGBP @ market')
+# Returns: AddOrderResult(txid=None, order_description='buy 100.00000000 XXBTZGBP @ market')
 ```
 
 **Notes:**
 
-- Buy orders use `viqc` flag (volume in quote currency)
-- When `validate=True`, the order is validated but not executed, and `txid` will be `None`
+- Buy orders use `viqc` flag (volume in quote currency).
+- When `validate=True`, the order is validated but not executed, and `txid` will be `None`.
+  This is what the trade executor's [dry-run mode](../trade-executor/index.md#dry-run-mode)
+  uses to verify the OHLC → signal → order pipeline against production Kraken without
+  placing real orders.
+
+### Query Orders
+
+Fetch execution details for one or more previously placed orders (requires authentication).
+
+- **Endpoint:** `POST /0/private/QueryOrders`
+- **Connector:** `QueryOrdersConnector`
+- **Service:** `QueryOrdersService`
+
+```python
+from exchange_connector import QueryOrdersConnector
+
+connector = QueryOrdersConnector()
+results = connector.fetch(['ORDER-ID-1', 'ORDER-ID-2'])
+# Returns: list[QueryOrderResult]
+```
+
+Multiple txids are sent in a single request — N orders cost one API call, not N. Used by
+the trade executor to confirm fills (3× retry, 1s apart) right after placement and to
+reconcile any leftover PLACED orders at the start of every interval.
+
+`QueryOrderResult` is a frozen dataclass:
+
+| Field    | Type               | Notes                                                  |
+| -------- | ------------------ | ------------------------------------------------------ |
+| `txid`   | `str`              | Kraken transaction ID (the order ID).                  |
+| `price`  | `Decimal`          | Average executed price (`price` from Kraken response). |
+| `volume` | `Decimal`          | Executed volume (`vol_exec` from Kraken response).     |
+| `fee`    | `Decimal`          | Fee charged in quote currency.                         |
+| `status` | `QueryOrderStatus` | `pending`, `open`, `closed`, `canceled`, or `expired`. |
+
+`QueryOrderStatus` values map to the trade executor's order lifecycle:
+`closed → FILLED`, `canceled` / `expired → FAILED`, `pending` / `open` → leave as PLACED
+and reconcile next interval.
 
 ## Rate Limiting
 
