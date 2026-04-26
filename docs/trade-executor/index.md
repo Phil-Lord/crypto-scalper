@@ -64,11 +64,11 @@ into an existing position.
 
 Two further safeguards:
 
-| Condition                                   | Action                                                          |
-| ------------------------------------------- | --------------------------------------------------------------- |
-| No previous tick                            | Default `last_action = SELL` — first run                        |
-| Latest directional tick's order is FAILED   | Reverse the action (the position change never actually happened)|
-| Latest directional tick's order is FILLED / no order  | Use the tick's signal as-is                           |
+| Condition                                            | Action                                                           |
+| ---------------------------------------------------- | ---------------------------------------------------------------- |
+| No previous tick                                     | Default `last_action = SELL` — first run                         |
+| Latest directional tick's order is FAILED            | Reverse the action (the position change never actually happened) |
+| Latest directional tick's order is FILLED / no order | Use the tick's signal as-is                                      |
 
 ## Interval Flow
 
@@ -76,7 +76,7 @@ Each `execute_interval()` is one decision cycle:
 
 1. Early-return if `_shutting_down` is set.
 2. **Reconcile** outstanding PLACED orders (see below).
-3. **Fetch OHLC** — the latest *closed* candle. If this fails, log and return; no tick is
+3. **Fetch OHLC** — the latest _closed_ candle. If this fails, log and return; no tick is
    persisted (`bot_ticks.price` is non-nullable).
 4. Save `previous_action = strategy.last_action`, then call
    `strategy.generate_signal(ohlc)`.
@@ -106,14 +106,14 @@ PLACED  ────┼── reconciled at next execute_interval ──┼─�
             └─────────────────────────────────────────┴──►  FAILED  (Kraken: cancelled / expired)
 ```
 
-| Field               | Set on placement           | Set on settle             |
-| ------------------- | -------------------------- | ------------------------- |
-| `exchange_order_id` | extracted from `txid[0]`   | —                         |
-| `status`            | `PLACED`                   | `FILLED` or `FAILED`      |
-| `placed_at`         | `datetime.now(utc)`        | —                         |
-| `filled_at`         | `None`                     | `datetime.now(utc)`       |
-| `price` `volume` `fee` | `None`                  | from `QueryOrderResult`   |
-| `tick_id`           | `None`                     | linked after tick persist |
+| Field                  | Set on placement         | Set on settle             |
+| ---------------------- | ------------------------ | ------------------------- |
+| `exchange_order_id`    | extracted from `txid[0]` | —                         |
+| `status`               | `PLACED`                 | `FILLED` or `FAILED`      |
+| `placed_at`            | `datetime.now(utc)`      | —                         |
+| `filled_at`            | `None`                   | `datetime.now(utc)`       |
+| `price` `volume` `fee` | `None`                   | from `QueryOrderResult`   |
+| `tick_id`              | `None`                   | linked after tick persist |
 
 - `BotOrder` is a frozen dataclass; updates use `dataclasses.replace()` and the
   `bot_order_repo.update()` method.
@@ -159,14 +159,14 @@ scheduler.add_job(
 )
 ```
 
-| Setting                | Why                                                                                                               |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `BlockingScheduler`    | Single-purpose script; blocks the main thread; integrates cleanly with signal handlers via `shutdown(wait=True)`. |
-| `CronTrigger`          | Wall-clock alignment (fires at `:00`, `:05`, …) — `IntervalTrigger` would drift relative to candle close.         |
-| `second='5'` offset    | Kraken's most recent candle takes a second or two to propagate; firing at `:05` avoids racing it.                 |
-| `jitter=3`             | Prevents N bots from hitting Kraken at exactly the same instant.                                                  |
+| Setting                | Why                                                                                                                                                                                     |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BlockingScheduler`    | Single-purpose script; blocks the main thread; integrates cleanly with signal handlers via `shutdown(wait=True)`.                                                                       |
+| `CronTrigger`          | Wall-clock alignment (fires at `:00`, `:05`, …) — `IntervalTrigger` would drift relative to candle close.                                                                               |
+| `second='5'` offset    | Kraken's most recent candle takes a second or two to propagate; firing at `:05` avoids racing it.                                                                                       |
+| `jitter=3`             | Prevents N bots from hitting Kraken at exactly the same instant.                                                                                                                        |
 | `misfire_grace_time=1` | If an interval runs long, **skip** the next one rather than queue it. Critical for trading safety. APScheduler 3.x treats `0` as infinite — `1` is the correct "discard if late" value. |
-| `max_instances=1`      | Belt-and-braces: one `execute_interval` per bot at a time.                                                        |
+| `max_instances=1`      | Belt-and-braces: one `execute_interval` per bot at a time.                                                                                                                              |
 
 ## Shutdown
 
@@ -211,11 +211,11 @@ reconcile" message.
 
 ## Reading the Code
 
-| Topic                 | File                                                |
-| --------------------- | --------------------------------------------------- |
-| Executor              | `scalper/trade_executor/trade_executor.py`          |
-| Position sizing       | `scalper/trade_executor/position_sizer.py`          |
-| Scheduler / signals   | `scalper/scripts/start_scalping.py`                 |
-| Bot registration      | `scalper/scripts/register_bot.py`                   |
-| `BotOrder` model      | `scalper/data_system/models/bot_order_model.py`     |
-| Schema                | `scalper/data_system/schema.sql`                    |
+| Topic               | File                                            |
+| ------------------- | ----------------------------------------------- |
+| Executor            | `scalper/trade_executor/trade_executor.py`      |
+| Position sizing     | `scalper/trade_executor/position_sizer.py`      |
+| Scheduler / signals | `scalper/scripts/start_scalping.py`             |
+| Bot registration    | `scalper/scripts/register_bot.py`               |
+| `BotOrder` model    | `scalper/data_system/models/bot_order_model.py` |
+| Schema              | `scalper/data_system/schema.sql`                |
