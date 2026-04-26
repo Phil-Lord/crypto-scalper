@@ -6,8 +6,10 @@ architecture; [Operations](operations.md) covers deploying, adding bots, and mon
 
 ## Lifecycle
 
-For each bot in `BOT_IDS`, the entry-point script (`start_scalping.py`) walks the
-following sequence once at boot, then hands control to the scheduler:
+For each `--bot-id` (the production entrypoint translates the comma-separated
+`BOT_IDS` env var into one `--bot-id` flag per id), the entry-point script
+(`start_scalping.py`) walks the following sequence once at boot, then hands
+control to the scheduler:
 
 ```
 construct  →  warm_up()  →  recover_state()  →  schedule execute_interval()
