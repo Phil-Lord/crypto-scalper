@@ -26,6 +26,11 @@ find_params(
 - `num_sets`: Number of top parameter sets to evaluate (default: 10)
 - `start`/`end`: Unix timestamps for the evaluation period (must be different from training period)
 
+> **Current limitation:** `find_params()` constructs the engine with strategy
+> `PrecisionTrendStrategy` and pair `XXBTZGBP` hard-coded. Generalising other
+> studies requires either patching the call site or extending the function to
+> accept those values.
+
 ---
 
 ## Metrics Stored
