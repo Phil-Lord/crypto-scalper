@@ -1,76 +1,119 @@
 # Cloud Architecture
 
-This section documents key design decisions made during the development of the cloud architecture
-for the scalper. It captures the reasoning, trade-offs, and examples for future reference.
+How the live-trading scalper runs in production. Operational workflows
+(`fly deploy`, adding bots, monitoring) live in
+[Trade Executor → Operations](trade-executor/operations.md).
 
 ## Execution Model
 
-As opposed to a constant loop running in a VM or something, the scalper runs one self-contained
-trading cycle per execution. This has several advantages:
+The scalper runs as an **always-on** Python process, one Fly.io Machine for the whole fleet.
+APScheduler fires a `TradeExecutor.execute_interval()` per bot on each candle close, with
+indicator state held warm in memory between intervals.
 
-- Each decision is computed independently based on market data and persisted state.
-- High fault tolerance - a failure in one interval does not affect the next.
-- Each run is isolated, reducing long-running state or memory issues.
-- Simple scaling/parallelisation, logging, and retry logic.
-- More cost efficient - No paying for idle loops.
+```
+Fly Machine
+└── entrypoint.sh
+    └── start_scalping.py
+        └── BlockingScheduler (APScheduler, CronTrigger)
+            ├── TradeExecutor.execute_interval()  ← bot 1 (e.g. 1m, BTCGBP)
+            ├── TradeExecutor.execute_interval()  ← bot 2 (e.g. 5m, ETHGBP)
+            └── …
+```
 
-## Compute Service
+Always-on (rather than stateless per-interval invocations) is the deliberate choice — see
+[Architecture Decision Log](architecture-decision-log.md). In short: EMAs are infinite
+impulse response filters and never fully converge from a cold start. Warming up once on
+boot and keeping state in memory eliminates per-interval seed bias and halves Kraken API
+calls.
 
-AWS Lambda is used as the compute environment, triggered every interval by Amazon EventBridge
-Scheduler. This provides simple, managed cron-style scheduling without wasting compute resources or
-necessitating manual uptime management. Here's the flow:
+## Compute — Fly.io
 
-EventBridge → Lambda → [TradeExecutor](trade-executor.md) → runs 1 interval + maybe executes trade.
+| Resource          | Value                  |
+| ----------------- | ---------------------- |
+| Region            | `lhr` (London)         |
+| Machine size      | `shared-cpu-1x`, 512MB |
+| Restart policy    | `on-failure`           |
+| `kill_timeout`    | 60s (graceful drain)   |
+| `auto_stop`       | disabled               |
 
-## Database
+`auto_stop_machines` is explicitly disabled in `fly.toml` — without inbound HTTP traffic,
+Fly would otherwise pause the machine. `kill_timeout = 60` gives the signal handler time to
+finish any in-flight `execute_interval()` before SIGKILL.
 
-Supabase (PostgreSQL) stores all live trading data, integrating seamlessly with AWS Lambda. The
-free tier (500 MB database, 500 MB RAM, shared CPU) is sufficient for current usage.
+Cost target: ~$2/month for 2-5 bots in one process. Migrating to one Machine per bot
+(Fly.io Machines API) is straightforward later — only the entry-point changes.
 
-### Data Model
+## Container Deployment
 
-The live trading database follows a clear hierarchy:
+The image is built from a single multi-stage `Dockerfile` at the repo root. Key points:
+
+- **Base:** `python:3.13-slim`.
+- **Dependencies:** `uv sync --locked --no-group dev --no-group docs` — test and docs
+  tooling stay out of the image.
+- **Source layout:** only the production packages are copied (`data_system`,
+  `exchange_connector`, `strategy_manager`, `trade_executor`, `utils`, plus the single
+  `start_scalping.py` script).
+- **Entrypoint:** `entrypoint.sh` parses comma-separated `BOT_IDS` and `DRY_RUN`
+  environment variables into the right CLI flags for `start_scalping.py`.
+
+`fly deploy` is the only deployment command — it builds, pushes, and rolls the machine.
+
+## Database — Supabase
+
+Supabase (PostgreSQL) stores all live-trading data. The free tier is sufficient at current
+volume.
+
+The data model:
 
 ```
 bots (1) ──► bot_runs (many) ──► bot_ticks (many)
                               └─► bot_orders (many)
 ```
 
-| Table        | Purpose                                                   |
-| ------------ | --------------------------------------------------------- |
-| `bots`       | Configuration identity (pair, strategy, version, params)  |
-| `bot_runs`   | Execution sessions (when a bot is "turned on")            |
-| `bot_ticks`  | Granular interval results (the immutable decision record) |
-| `bot_orders` | Executed trades linked to their triggering tick           |
+| Table        | Purpose                                                                          |
+| ------------ | -------------------------------------------------------------------------------- |
+| `bots`       | Configuration identity (pair, strategy, version, params)                         |
+| `bot_runs`   | Execution sessions; `completed_at IS NULL` indicates a crashed run               |
+| `bot_ticks`  | Per-interval decisions (the immutable record); also drives health monitoring     |
+| `bot_orders` | Orders with explicit `placed → filled / failed` lifecycle and `exchange_order_id`|
 
-This separation provides:
+`bot_id` (`btc_1m_v1`) is the configuration-level identity; `run_id` is the execution
+identity, allowing reuse across restarts. Bot configuration is read from the `bots` table
+at process start — adding a bot is a database insert, not an infrastructure change.
 
-- **Relational Integrity:** Query exactly which configuration produced which result.
-- **Performance:** Indexed `run_id` lookups remain fast even with millions of ticks.
-- **Data Deduplication:** Strategy name and pair stored once in `bots`, not every tick.
+> Full schema, indexes, and constraints: [Schema Reference](data-system/schema-reference.md).
 
-The `bot_id` format (`btc_1m_v1`) acts as **configuration-level identity**, while `run_id` provides
-**execution session identity** - enabling bot reuse across restarts and long-term performance
-tracking per configuration.
+## Configuration & Secrets
 
-> For detailed schema definitions, indexes, and constraints, see the
-> [Schema Reference](data-system/schema-reference.md) documentation.
+All credentials are stored as Fly.io secrets and surface as environment variables in the
+container:
 
-## Container-based Deployment
+```sh
+fly secrets set \
+  KRAKEN_TRADING_API_KEY=… \
+  KRAKEN_TRADING_API_SECRET=… \
+  SUPABASE_URL=… \
+  SUPABASE_KEY=… \
+  BOT_IDS=btc_1m_001,eth_5m_v2
+```
 
-The Lambda function is deployed as a Docker container hosted in Amazon Elastic Container Registry
-(ECR). Using container-based deployment ensures compatibility with the project's structure as
-there's no need to flatten dependencies or zip modules. This also enables consistent runtime
-environments between local development and production. Finally, containers provide portability for
-switching to other cloud platforms if necessary in the future.
+`BOT_IDS` is the only non-secret env var — it controls which bots the entrypoint launches.
+`DRY_RUN=true` switches every bot into Kraken's `validate=True` mode and disables tick
+persistence.
+
+`SupabaseConfig` reads env vars lazily via metaclass properties, so import order in scripts
+does not depend on `load_env()` running first.
 
 ## Logging
 
-- Structured logging in JSON to integrate with CloudWatch.
-- External logging sink (e.g., Supabase, S3, or Datadog) for long-term trade audit trails.
-- Include Lambda’s request_id or interval timestamp in every log line for traceability.
+Plain text logging via `LOG_FORMAT` to stderr — `fly logs` captures and exposes them. Each
+log line is prefixed with the bot id via a `LoggerAdapter`, which is critical for tracing
+multi-bot processes.
 
-## Infrastructure as Code
+The application log level is configured via the `LOG_LEVEL` env var
+(`fly secrets set LOG_LEVEL=DEBUG` + `fly apps restart` to surface routine HOLD intervals
+and reconciliation no-ops). The root logger stays at WARNING to suppress noise from
+`httpcore`, `hpack`, etc.
 
-Terraform is used to manage all cloud resources. This makes it easy to manage environment changes,
-redeployments, and infrastructure version control.
+JSON structured logging is deferred until a log aggregation sink (Datadog, Loki) is added —
+a one-line change in the entry-point formatter.
