@@ -12,8 +12,8 @@ The system uses two distinct database backends optimised for their respective us
 **Rationale:**
 
 - **SQLite** is lightweight and requires no infrastructure - ideal for rapid local experimentation.
-- **PostgreSQL/Supabase** provides cloud-native durability, real-time access, and integrates with
-  AWS Lambda for live trading.
+- **PostgreSQL/Supabase** provides cloud-native durability, real-time access, and integrates
+  with the live-trading process running on Fly.io.
 
 ## Client Patterns
 
