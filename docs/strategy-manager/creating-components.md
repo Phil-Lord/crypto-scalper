@@ -8,13 +8,22 @@ This guide covers how to build custom strategies, indicators, and rules for the 
 
 ### 1. Simple Strategy (Single Rule)
 
+Strategies take a frozen-dataclass config — never raw kwargs — so validation
+lives in one place (`SmaStrategyConfig.__post_init__`) and applies identically
+in live trading and backtesting.
+
 ```python
 class SmaStrategy(Strategy):
-    def __init__(self, short_window: int, long_window: int):
+    def __init__(self, config: SmaStrategyConfig):
         super().__init__()
-        self.register_indicator('short_sma', SmaIndicator(short_window))
-        self.register_indicator('long_sma', SmaIndicator(long_window))
+        self.config = config
+        self.register_indicator('short_sma', SmaIndicator(config.short_window))
+        self.register_indicator('long_sma', SmaIndicator(config.long_window))
         self.register_rule('crossover', MaCrossoverRule('short_sma', 'long_sma'))
+
+    @property
+    def warmup_candles(self) -> int:
+        return self.config.long_window + 1
 
     def _generate_signal(self, rule_results: dict) -> Signal:
         return rule_results['crossover']

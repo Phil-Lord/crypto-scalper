@@ -94,7 +94,9 @@ The Strategy Manager implements each algorithm **twice** to optimise for differe
 **Example:**
 
 ```python
-strategy = SmaStrategy(short_window=10, long_window=50)
+from strategy_manager import SmaStrategy, SmaStrategyConfig
+
+strategy = SmaStrategy(SmaStrategyConfig(short_window=10, long_window=50))
 
 # Process new tick
 signal_data = strategy.generate_signal(ohlc_series)
@@ -115,7 +117,7 @@ signal_data = strategy.generate_signal(ohlc_series)
 **Example:**
 
 ```python
-strategy = SmaStrategy(short_window=10, long_window=50)
+strategy = SmaStrategy(SmaStrategyConfig(short_window=10, long_window=50))
 
 # Process historical data
 results = strategy.vectorised_compute(ohlc_dataframe)
