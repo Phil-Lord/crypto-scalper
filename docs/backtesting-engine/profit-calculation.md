@@ -35,7 +35,7 @@ positions = engine.calculate_position_profits(initial_quote_balance=1000)
 - `exit_time`: Timestamp of sell signal
 - `profit`: Net profit after fees (can be negative)
 
-**Fees:** 0.04% on both buy and sell sides (Kraken taker fees)
+**Fees:** 0.4% on both buy and sell sides (Kraken taker fees)
 
 ---
 
