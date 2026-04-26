@@ -5,7 +5,7 @@ def calculate_position_profits(results: pd.DataFrame, initial_quote_balance: flo
     '''
     Calculate profit for each completed position (buy → sell cycle).
 
-    Applies 0.04% trading fee on both buy and sell sides.
+    Applies 0.4% trading fee on both buy and sell sides.
 
     :param results: DataFrame with 'signal' and 'price' columns, indexed by timestamp.
     :param initial_quote_balance: Starting balance in quote currency (default: 1000).
@@ -16,7 +16,7 @@ def calculate_position_profits(results: pd.DataFrame, initial_quote_balance: flo
     base_balance = 0.0
     entry_price = None
     entry_time = None
-    fee = 0.0004
+    fee = 0.004
 
     for row in results.itertuples():
         signal, price, index = row.signal, row.price, row.Index
@@ -42,7 +42,7 @@ def get_final_quote_balance(results: pd.DataFrame, initial_quote_balance: float 
     Calculate final quote balance after executing all signals.
 
     If still holding a position at the end, values it at the final market price.
-    Applies 0.04% trading fee on both buy and sell sides.
+    Applies 0.4% trading fee on both buy and sell sides.
 
     :param results: DataFrame with 'signal' and 'price' columns, indexed by timestamp.
     :param initial_quote_balance: Starting balance in quote currency (default: 1000).
@@ -50,7 +50,7 @@ def get_final_quote_balance(results: pd.DataFrame, initial_quote_balance: float 
     '''
     quote_balance = initial_quote_balance
     base_balance = 0.0
-    fee = 0.0004
+    fee = 0.004
 
     for row in results.itertuples():
         if row.signal == 'buy' and quote_balance > 0:
