@@ -10,17 +10,17 @@ Calculate profit for each completed buy → sell cycle:
 
 ```python
 from backtesting_engine import BacktestingEngine
+from strategy_manager import create_strategy
 
-# Create and run backtest
+strategy = create_strategy('PrecisionTrendStrategy', {'short_ema': 9, 'long_ema': 21, ...})
+
 engine = BacktestingEngine(
     pair='XXBTZGBP',
-    strategy_name='PrecisionTrendStrategy',
+    strategy=strategy,
     repository=repository,
     start=1609459200.0,
     end=1625097600.0,
     interval=1,
-    short_ema=9,
-    long_ema=21
 )
 
 results = engine.run()
