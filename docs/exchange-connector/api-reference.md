@@ -7,10 +7,12 @@ This page documents the Kraken API endpoints used by the exchange connector.
 Private endpoints require HMAC-SHA512 authentication. The `kraken_auth_utils` module handles
 message signing and header construction; `KrakenApiClient._next_nonce()` generates the nonce.
 
-1. **Nonce generation** — Nanosecond timestamp (`time.time_ns()`), monotonically advanced under
-   a lock so two threads issuing requests in the same nanosecond still produce strictly
-   increasing nonces. Required because APScheduler's thread pool can fire concurrent
-   requests across bots.
+1. **Nonce generation** — Nanosecond timestamp (`time.time_ns()`), monotonically advanced via
+   a class-level lock that serialises **the entire private request** (nonce assignment plus
+   dispatch) so two threads sharing one API key cannot interleave. Required because
+   APScheduler's thread pool can fire concurrent private requests across bots; without
+   serialised dispatch Kraken returns `EAPI:Invalid nonce` even with strictly increasing
+   nonce values.
 2. **Message signing** — HMAC-SHA512 of nonce + POST data + endpoint.
 3. **Header construction** — `API-Key` and `API-Sign` headers.
 
@@ -61,7 +63,7 @@ Get historical trade data with pagination.
 
 ```python
 connector = TradesConnector()
-trades = connector.fetch('XXBTZGBP', since=1704067200000000000, until=1704153600000000000)
+trades = connector.fetch('XXBTZGBP', start=1704067200000000000, end=1704153600000000000)
 # Returns: list[Trade]  (domain objects)
 ```
 
@@ -98,14 +100,16 @@ Place a market order (requires authentication).
 - **Service:** `AddOrderService`
 
 ```python
+from decimal import Decimal
+
 connector = AddOrderConnector()
 
 # Place an actual order
-result = connector.place('XXBTZGBP', 'buy', 100.0)
+result = connector.place('XXBTZGBP', 'buy', Decimal('100.0'))
 # Returns: AddOrderResult(txid=['ORDER-ID'], order_description='buy 100.00000000 XXBTZGBP @ market')
 
 # Validate order without executing (for testing)
-result = connector.place('XXBTZGBP', 'buy', 100.0, validate=True)
+result = connector.place('XXBTZGBP', 'buy', Decimal('100.0'), validate=True)
 # Returns: AddOrderResult(txid=None, order_description='buy 100.00000000 XXBTZGBP @ market')
 ```
 

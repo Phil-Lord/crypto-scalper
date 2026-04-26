@@ -7,6 +7,8 @@ responses into domain objects.
 ## Quick Start
 
 ```python
+from decimal import Decimal
+
 from exchange_connector import (
     TradesConnector,
     TickerConnector,
@@ -19,7 +21,7 @@ from exchange_connector import (
 
 # Fetch historical trades (returns Trade domain objects)
 trades_connector = TradesConnector()
-trades = trades_connector.fetch('XXBTZGBP', since=1704067200000000000, until=1704153600000000000)
+trades = trades_connector.fetch('XXBTZGBP', start=1704067200000000000, end=1704153600000000000)
 
 # Get current price
 ticker_connector = TickerConnector()
@@ -33,7 +35,7 @@ balances = balance_connector.fetch()
 # Place a market order with error handling
 order_connector = AddOrderConnector()
 try:
-    result = order_connector.place('XXBTZGBP', 'buy', 100.0)  # Buy £100 worth
+    result = order_connector.place('XXBTZGBP', 'buy', Decimal('100.0'))  # Buy £100 worth
 except KrakenApiError as e:
     logger.error(f'API error: {e}')
 
