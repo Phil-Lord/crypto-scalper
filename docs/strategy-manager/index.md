@@ -62,7 +62,12 @@ class Rule(ABC):
 **3. Strategies** — Combine indicators and rules to generate final signals
 
 ```python
-class Strategy:
+class Strategy(ABC):
+    @property
+    @abstractmethod
+    def warmup_candles(self) -> int:
+        '''Candles required for indicator convergence — read by TradeExecutor.warm_up().'''
+
     def register_indicator(self, name: str, indicator: Indicator)
     def register_rule(self, name: str, rule: Rule)
     def generate_signal(self, ohlc: pd.Series) -> dict
