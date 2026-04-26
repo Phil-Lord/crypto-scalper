@@ -37,4 +37,5 @@ docs = [
     "mkdocs-monorepo-plugin>=1.0",
     "mkdocs-redirects>=1.2",
     "plantuml-markdown>=3.9",
+    "pymdown-extensions>=10.21.2",
 ]
