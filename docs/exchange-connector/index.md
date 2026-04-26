@@ -32,16 +32,15 @@ current_price = float(price_data['c'][0])
 balance_connector = BalanceConnector()
 balances = balance_connector.fetch()
 
-# Place a market order with error handling
+# Place a market order, then confirm the fill — both inside the same try
+# so we don't reference `result` if placement raised.
 order_connector = AddOrderConnector()
+query_connector = QueryOrdersConnector()
 try:
     result = order_connector.place('XXBTZGBP', 'buy', Decimal('100.0'))  # Buy £100 worth
+    fills = query_connector.fetch([result.txid[0]])  # list[QueryOrderResult]
 except KrakenApiError as e:
     logger.error(f'API error: {e}')
-
-# Confirm fill details for one or more orders
-query_connector = QueryOrdersConnector()
-fills = query_connector.fetch([result.txid[0]])  # list[QueryOrderResult]
 ```
 
 ## Contents

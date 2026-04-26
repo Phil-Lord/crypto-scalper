@@ -51,7 +51,10 @@ at `docker run` time.
 ## Adding a New Bot
 
 ```sh
-python -m scripts.register_bot \
+# Run from the repo root. PYTHONPATH=scalper makes the top-level packages
+# (data_system, utils, ...) resolvable — the Dockerfile sets the same var
+# in production.
+PYTHONPATH=scalper uv run python -m scripts.register_bot \
   --id eth_5m_v2 \
   --pair XETHZGBP \
   --strategy-name PrecisionTrendStrategy \

@@ -103,7 +103,7 @@ limbo:
             ┌── _confirm_order (3× retry, 1s apart) ──┐
 PLACED  ────┼── reconciled at next execute_interval ──┼──►  FILLED  (Kraken: closed)
             │                                         │
-            └─────────────────────────────────────────┴──►  FAILED  (Kraken: cancelled / expired)
+            └─────────────────────────────────────────┴──►  FAILED  (Kraken: canceled / expired)
 ```
 
 | Field                  | Set on placement         | Set on settle             |
