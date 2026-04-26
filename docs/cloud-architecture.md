@@ -34,11 +34,11 @@ calls.
 | Machine size      | `shared-cpu-1x`, 512MB |
 | Restart policy    | `on-failure`           |
 | `kill_timeout`    | 60s (graceful drain)   |
-| `auto_stop`       | disabled               |
 
-`auto_stop_machines` is explicitly disabled in `fly.toml` — without inbound HTTP traffic,
-Fly would otherwise pause the machine. `kill_timeout = 60` gives the signal handler time to
-finish any in-flight `execute_interval()` before SIGKILL.
+`fly.toml` declares no `[http_service]` block, so Fly.io's auto-stop behaviour (which only
+applies to HTTP-fronted machines) never triggers — the machine stays running continuously.
+`kill_timeout = 60` gives the signal handler time to finish any in-flight
+`execute_interval()` before SIGKILL.
 
 Cost target: ~$2/month for 2-5 bots in one process. Migrating to one Machine per bot
 (Fly.io Machines API) is straightforward later — only the entry-point changes.
