@@ -42,6 +42,10 @@ def fetch_trades(pair: str, start_date: str, end_date: str) -> tuple[pd.DataFram
     existing_trade_ids = {t.trade_id for t in existing_trades}
 
     fetched = connector.fetch(pair, start_nanos, end_nanos)
+
+    # Kraken returns trades slightly past the requested end timestamp; drop them so
+    # the plotted window matches the user's selection.
+    fetched = [t for t in fetched if t.timestamp <= end_seconds]
     repository.add(fetched)
 
     new_trades = [t for t in fetched if t.trade_id not in existing_trade_ids]
@@ -60,7 +64,7 @@ def plot_trades(
     figure.data = []
 
     if not trades.empty:
-        existing_dim = new_trades is not None and not new_trades.empty
+        existing_dim = new_trades is not None
         figure.add_trace(_candlestick_trace(
             trades,
             name='Existing' if existing_dim else 'Trades',
