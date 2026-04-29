@@ -4,6 +4,7 @@ from core import run_in_thread
 from data_system import Job, JobType, SQLAlchemyClient, SQLAlchemyJobRepository
 
 from ui.components import (
+    confirm_dialog,
     render_chart,
     render_header,
     render_main_content,
@@ -63,7 +64,7 @@ class BacktestingEnginePage:
             self._set_loading(False)
 
     async def _fetch_trades(self):
-        if not await self._confirm_fetch():
+        if not await self.get_confirmation():
             return
 
         job = Job(job_type=JobType.FETCH_TRADES)
@@ -107,18 +108,16 @@ class BacktestingEnginePage:
         finally:
             self._set_loading(False)
 
-    async def _confirm_fetch(self) -> bool:
-        with ui.dialog() as dialog, ui.card():
-            ui.label('Fetch trades from Kraken?').classes('text-lg font-semibold')
-            ui.label(
+    async def get_confirmation(self) -> bool:
+        return await confirm_dialog(
+            title='Fetch trades from Kraken?',
+            message=(
                 f'This will hit the live exchange for {self.symbol.value} between '
                 f'{self.start_date.value} and {self.end_date.value}, and write any new '
                 f'trades to the local DB.'
-            )
-            with ui.row().classes('w-full justify-end'):
-                ui.button('Cancel', on_click=lambda: dialog.submit(False)).props('flat')
-                ui.button('Fetch', on_click=lambda: dialog.submit(True))
-        return await dialog
+            ),
+            confirm_text='Fetch'
+        )
 
     def _set_loading(self, is_loading: bool, button_clicked: ui.button = None) -> None:
         for button in [self.load_button, self.fetch_button, self.backtest_button]:
