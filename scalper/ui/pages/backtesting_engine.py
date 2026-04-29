@@ -63,6 +63,9 @@ class BacktestingEnginePage:
             self._set_loading(False)
 
     async def _fetch_trades(self):
+        if not await self._confirm_fetch():
+            return
+
         job = Job(job_type=JobType.FETCH_TRADES)
         self._set_loading(True, self.fetch_button)
 
@@ -103,6 +106,19 @@ class BacktestingEnginePage:
             print(f'Error running backtest: {e}')
         finally:
             self._set_loading(False)
+
+    async def _confirm_fetch(self) -> bool:
+        with ui.dialog() as dialog, ui.card():
+            ui.label('Fetch trades from Kraken?').classes('text-lg font-semibold')
+            ui.label(
+                f'This will hit the live exchange for {self.symbol.value} between '
+                f'{self.start_date.value} and {self.end_date.value}, and write any new '
+                f'trades to the local DB.'
+            )
+            with ui.row().classes('w-full justify-end'):
+                ui.button('Cancel', on_click=lambda: dialog.submit(False)).props('flat')
+                ui.button('Fetch', on_click=lambda: dialog.submit(True))
+        return await dialog
 
     def _set_loading(self, is_loading: bool, button_clicked: ui.button = None) -> None:
         for button in [self.load_button, self.fetch_button, self.backtest_button]:
