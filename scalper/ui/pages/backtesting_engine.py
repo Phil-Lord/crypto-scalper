@@ -4,6 +4,7 @@ from core import run_in_thread
 from data_system import Job, JobType, SQLAlchemyClient, SQLAlchemyJobRepository
 
 from ui.components import (
+    confirm_dialog,
     render_chart,
     render_header,
     render_main_content,
@@ -11,7 +12,7 @@ from ui.components import (
     render_slot,
     render_table
 )
-from ui.services import get_trades, plot_backtest_results, plot_trades, run_backtest, update_table
+from ui.services import fetch_trades, get_trades, plot_backtest_results, plot_trades, run_backtest, update_table
 from ui.theme import primary_button, sidebar_input, sidebar_select
 
 
@@ -30,6 +31,7 @@ class BacktestingEnginePage:
 
             ui.space()
             self.load_button = primary_button('Load Trades', on_click=self._load_trades)
+            self.fetch_button = primary_button('Fetch Trades', on_click=self._fetch_trades)
             self.backtest_button = primary_button('Run Backtest', on_click=self._run_backtest)
 
         with render_main_content():
@@ -61,6 +63,30 @@ class BacktestingEnginePage:
         finally:
             self._set_loading(False)
 
+    async def _fetch_trades(self):
+        if not await self.get_confirmation():
+            return
+
+        job = Job(job_type=JobType.FETCH_TRADES)
+        self._set_loading(True, self.fetch_button)
+
+        try:
+            existing_trades, new_trades = await run_in_thread(
+                self.job_repo,
+                job,
+                fetch_trades,
+                self.symbol.value,
+                self.start_date.value,
+                self.end_date.value
+            )
+            figure = plot_trades(existing_trades, self.chart.figure, new_trades)
+            self.chart.update_figure(figure)
+            update_table(self.grid, None)
+        except Exception as e:
+            print(f'Error fetching trades: {e}')
+        finally:
+            self._set_loading(False)
+
     async def _run_backtest(self):
         job = Job(job_type=JobType.RUN_BACKTEST)
         self._set_loading(True, self.backtest_button)
@@ -82,8 +108,19 @@ class BacktestingEnginePage:
         finally:
             self._set_loading(False)
 
+    async def get_confirmation(self) -> bool:
+        return await confirm_dialog(
+            title='Fetch trades from Kraken?',
+            message=(
+                f'This will hit the live exchange for {self.symbol.value} between '
+                f'{self.start_date.value} and {self.end_date.value}, and write any new '
+                f'trades to the local DB.'
+            ),
+            confirm_text='Fetch'
+        )
+
     def _set_loading(self, is_loading: bool, button_clicked: ui.button = None) -> None:
-        for button in [self.load_button, self.backtest_button]:
+        for button in [self.load_button, self.fetch_button, self.backtest_button]:
             if not is_loading:
                 button.props(remove='loading')
                 button.enable()
