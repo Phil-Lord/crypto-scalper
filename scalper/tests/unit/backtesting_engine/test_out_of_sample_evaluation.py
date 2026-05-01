@@ -4,8 +4,12 @@ import pytest
 
 from backtesting_engine.out_of_sample_evaluation import (
     INITIAL_BALANCE,
+    chunk_param_sets,
+    evaluate_out_of_sample,
+    evaluate_param_set,
     get_top_param_sets,
     run_evaluation,
+    run_evaluation_parallel,
     save_results,
 )
 from data_system.models.out_of_sample_evaluation_model import OutOfSampleEvaluation
@@ -317,3 +321,229 @@ class TestSaveResults:
             assert ev.study_name == study_name
             assert ev.start_timestamp == start
             assert ev.end_timestamp == end
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.out_of_sample_evaluation
+class TestChunkParamSets:
+    def test_splits_evenly_when_divisible(self):
+        param_sets = [{'trial_number': i} for i in range(6)]
+
+        chunks = chunk_param_sets(param_sets, n_chunks=3)
+
+        assert [len(c) for c in chunks] == [2, 2, 2]
+
+    def test_distributes_remainder_to_earlier_chunks(self):
+        param_sets = [{'trial_number': i} for i in range(7)]
+
+        chunks = chunk_param_sets(param_sets, n_chunks=3)
+
+        assert [len(c) for c in chunks] == [3, 2, 2]
+
+    def test_caps_chunk_count_at_param_set_count(self):
+        param_sets = [{'trial_number': 0}, {'trial_number': 1}]
+
+        chunks = chunk_param_sets(param_sets, n_chunks=10)
+
+        assert len(chunks) == 2
+        assert all(len(c) == 1 for c in chunks)
+
+    def test_preserves_order_across_chunks(self):
+        param_sets = [{'trial_number': i} for i in range(5)]
+
+        chunks = chunk_param_sets(param_sets, n_chunks=2)
+
+        flattened = [ps['trial_number'] for chunk in chunks for ps in chunk]
+        assert flattened == [0, 1, 2, 3, 4]
+
+    def test_treats_zero_or_negative_as_single_chunk(self):
+        param_sets = [{'trial_number': 0}, {'trial_number': 1}]
+
+        chunks = chunk_param_sets(param_sets, n_chunks=0)
+
+        assert len(chunks) == 1
+        assert chunks[0] == param_sets
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.out_of_sample_evaluation
+class TestRunEvaluationParallel:
+    @pytest.fixture
+    def windows(self):
+        return [(pd.Timestamp('2021-01-01'), pd.Timestamp('2021-04-01'))]
+
+    @pytest.fixture
+    def param_sets(self):
+        return [
+            {'trial_number': 0, 'value': 1.5, 'params': {'sma_period': 10}},
+            {'trial_number': 1, 'value': 1.3, 'params': {'sma_period': 20}},
+            {'trial_number': 2, 'value': 1.1, 'params': {'sma_period': 30}},
+        ]
+
+    def test_dispatches_one_task_per_chunk(self, mocker, param_sets, windows):
+        # Given
+        executor = mocker.MagicMock()
+        executor.__enter__.return_value = executor
+        future = mocker.Mock()
+        future.result.return_value = []
+        executor.submit.return_value = future
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.ProcessPoolExecutor',
+            return_value=executor,
+        )
+
+        # When
+        run_evaluation_parallel(
+            'XXBTZGBP', 'PrecisionTrendStrategy', param_sets, windows,
+            start=1609459200.0, end=1617235200.0, n_workers=3,
+        )
+
+        # Then
+        assert executor.submit.call_count == 3
+
+    def test_aggregates_worker_results_in_order(self, mocker, param_sets, windows):
+        # Given
+        executor = mocker.MagicMock()
+        executor.__enter__.return_value = executor
+        worker_outputs = [
+            [{'trial_number': 0, 'geo_mean_return': 1.05}],
+            [{'trial_number': 1, 'geo_mean_return': 0.97}],
+            [{'trial_number': 2, 'geo_mean_return': 1.10}],
+        ]
+        futures = []
+        for output in worker_outputs:
+            f = mocker.Mock()
+            f.result.return_value = output
+            futures.append(f)
+        executor.submit.side_effect = futures
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.ProcessPoolExecutor',
+            return_value=executor,
+        )
+
+        # When
+        results = run_evaluation_parallel(
+            'XXBTZGBP', 'PrecisionTrendStrategy', param_sets, windows,
+            start=1609459200.0, end=1617235200.0, n_workers=3,
+        )
+
+        # Then
+        assert [r['trial_number'] for r in results] == [0, 1, 2]
+
+    def test_caps_executor_workers_at_chunk_count(self, mocker, param_sets, windows):
+        # Given
+        process_pool = mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.ProcessPoolExecutor',
+        )
+        executor = process_pool.return_value
+        executor.__enter__.return_value = executor
+        future = mocker.Mock()
+        future.result.return_value = []
+        executor.submit.return_value = future
+
+        # When
+        # 3 param sets, 10 workers requested → only 3 chunks possible.
+        run_evaluation_parallel(
+            'XXBTZGBP', 'PrecisionTrendStrategy', param_sets, windows,
+            start=1609459200.0, end=1617235200.0, n_workers=10,
+        )
+
+        # Then
+        process_pool.assert_called_once_with(max_workers=3)
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.out_of_sample_evaluation
+class TestEvaluateOutOfSample:
+    @pytest.fixture
+    def patches(self, mocker):
+        mocker.patch('backtesting_engine.out_of_sample_evaluation.load_study')
+
+        eval_repo = mocker.Mock()
+        eval_repo.get_evaluated_trial_numbers.return_value = set()
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.SQLAlchemyOutOfSampleEvaluationRepository',
+            return_value=eval_repo,
+        )
+        mocker.patch('backtesting_engine.out_of_sample_evaluation.SQLAlchemyClient')
+
+        top_param_sets = [
+            {'trial_number': 0, 'value': 1.5, 'params': {'sma_period': 10}},
+            {'trial_number': 1, 'value': 1.3, 'params': {'sma_period': 20}},
+        ]
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
+            return_value=top_param_sets,
+        )
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.create_windows',
+            return_value=[(pd.Timestamp('2021-01-01'), pd.Timestamp('2021-04-01'))],
+        )
+
+        run_serial = mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.run_evaluation',
+            return_value=[],
+        )
+        run_parallel = mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.run_evaluation_parallel',
+            return_value=[],
+        )
+        build_engine = mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.build_engine',
+        )
+        mocker.patch('backtesting_engine.out_of_sample_evaluation.save_results')
+
+        return {
+            'run_serial': run_serial,
+            'run_parallel': run_parallel,
+            'build_engine': build_engine,
+            'top_param_sets': top_param_sets,
+        }
+
+    def test_uses_serial_path_by_default(self, patches):
+        # When
+        evaluate_out_of_sample('study', num_sets=2, start=1.0, end=2.0)
+
+        # Then
+        patches['run_serial'].assert_called_once()
+        patches['run_parallel'].assert_not_called()
+
+    def test_uses_serial_path_when_n_workers_is_one(self, patches):
+        # When
+        evaluate_out_of_sample('study', num_sets=2, start=1.0, end=2.0, n_workers=1)
+
+        # Then
+        patches['run_serial'].assert_called_once()
+        patches['run_parallel'].assert_not_called()
+
+    def test_uses_parallel_path_when_n_workers_above_one(self, patches):
+        # When
+        evaluate_out_of_sample('study', num_sets=2, start=1.0, end=2.0, n_workers=4)
+
+        # Then
+        patches['run_parallel'].assert_called_once()
+        patches['run_serial'].assert_not_called()
+        # Engine is built per-worker by run_evaluation_parallel, not in the main process.
+        patches['build_engine'].assert_not_called()
+
+    def test_passes_n_workers_through_to_parallel_runner(self, patches):
+        # When
+        evaluate_out_of_sample('study', num_sets=2, start=1.0, end=2.0, n_workers=4)
+
+        # Then
+        kwargs = patches['run_parallel'].call_args
+        assert 4 in kwargs.args or kwargs.kwargs.get('n_workers') == 4
+
+    def test_no_evaluation_when_no_param_sets(self, mocker, patches):
+        # Given
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
+            return_value=[],
+        )
+
+        # When
+        evaluate_out_of_sample('study', num_sets=2, start=1.0, end=2.0, n_workers=4)
+
+        # Then
+        patches['run_serial'].assert_not_called()
+        patches['run_parallel'].assert_not_called()
