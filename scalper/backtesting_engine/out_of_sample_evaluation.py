@@ -95,14 +95,9 @@ def run_evaluation(engine: BacktestingEngine, top_param_sets: list[dict], window
     results = []
     with tqdm(total=len(top_param_sets), desc=f'Evaluating', dynamic_ncols=True, bar_format='{l_bar}{bar}') as pbar:
         for param_set in top_param_sets:
-            # Run on full period first
             strategy_name = type(engine.strategy).__name__
             engine.strategy = create_strategy(strategy_name, param_set['params'])
-            engine.set_ohlc_window()
-            engine.run()
-            final_quote_balance = engine.get_final_quote_balance(INITIAL_BALANCE)
 
-            # Run on each window (same params, only reset state)
             window_balances = []
             for window_start, window_end in windows:
                 engine.strategy.reset()
@@ -111,14 +106,11 @@ def run_evaluation(engine: BacktestingEngine, top_param_sets: list[dict], window
                 final_balance = engine.get_final_quote_balance(INITIAL_BALANCE)
                 window_balances.append(final_balance)
 
-            # Calculate mean return across windows
             geometric_mean = pd.Series(window_balances).prod() ** (1 / len(window_balances))
             geometric_mean_ratio = float(geometric_mean / INITIAL_BALANCE)
 
-            # Store results
             results.append({
                 'trial_number': param_set['trial_number'],
-                'final_balance': float(final_quote_balance),
                 'geo_mean_return': geometric_mean_ratio
             })
             pbar.update(1)
@@ -138,7 +130,6 @@ def save_results(
             trial_number=result['trial_number'],
             start_timestamp=start,
             end_timestamp=end,
-            final_balance=result['final_balance'],
             geo_mean_return=result['geo_mean_return']
         )
         for result in results

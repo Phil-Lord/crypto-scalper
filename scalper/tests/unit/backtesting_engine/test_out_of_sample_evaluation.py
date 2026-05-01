@@ -175,26 +175,13 @@ class TestRunEvaluation:
 
         # Then
         assert len(results) == 1
-        assert set(results[0].keys()) == {'trial_number', 'final_balance', 'geo_mean_return'}
+        assert set(results[0].keys()) == {'trial_number', 'geo_mean_return'}
         assert results[0]['trial_number'] == 0
-
-    def test_final_balance_is_from_full_period(self, mocker, mock_engine, sample_param_sets, sample_windows):
-        # Given
-        mocker.patch('backtesting_engine.out_of_sample_evaluation.create_strategy')
-        # First call = full period, second call = window
-        mock_engine.get_final_quote_balance.side_effect = [1500.0, 1100.0]
-
-        # When
-        results = run_evaluation(mock_engine, sample_param_sets, sample_windows)
-
-        # Then
-        assert results[0]['final_balance'] == pytest.approx(1500.0)
 
     def test_calculates_geometric_mean_correctly(self, mocker, mock_engine, sample_param_sets):
         # Given
         mocker.patch('backtesting_engine.out_of_sample_evaluation.create_strategy')
-        # First call = full period, next two calls = windows
-        mock_engine.get_final_quote_balance.side_effect = [1100.0, 1200.0, 1050.0]
+        mock_engine.get_final_quote_balance.side_effect = [1200.0, 1050.0]
         windows = [
             (pd.Timestamp('2021-01-01'), pd.Timestamp('2021-04-01')),
             (pd.Timestamp('2021-02-01'), pd.Timestamp('2021-05-01')),
@@ -226,7 +213,7 @@ class TestRunEvaluation:
         # Then
         assert mock_strategy.reset.call_count == len(windows)
 
-    def test_sets_ohlc_window_for_full_period_then_each_window(self, mocker, mock_engine, sample_param_sets):
+    def test_sets_ohlc_window_once_per_window(self, mocker, mock_engine, sample_param_sets):
         # Given
         mocker.patch('backtesting_engine.out_of_sample_evaluation.create_strategy')
         windows = [
@@ -238,9 +225,9 @@ class TestRunEvaluation:
         run_evaluation(mock_engine, sample_param_sets, windows)
 
         # Then
-        # Once with no args (full period) + once per window
-        assert mock_engine.set_ohlc_window.call_count == 1 + len(windows)
-        mock_engine.set_ohlc_window.assert_any_call()
+        assert mock_engine.set_ohlc_window.call_count == len(windows)
+        for window_start, window_end in windows:
+            mock_engine.set_ohlc_window.assert_any_call(window_start, window_end)
 
     def test_creates_new_strategy_for_each_param_set(self, mocker, mock_engine, sample_windows):
         # Given
@@ -266,7 +253,7 @@ class TestSaveResults:
     def test_calls_repository_add_once(self, mocker):
         # Given
         repository = mocker.Mock()
-        results = [{'trial_number': 0, 'final_balance': 1100.0, 'geo_mean_return': 1.05}]
+        results = [{'trial_number': 0, 'geo_mean_return': 1.05}]
 
         # When
         save_results(repository, results, 'TestStudy', 1609459200.0, 1617235200.0)
@@ -278,8 +265,8 @@ class TestSaveResults:
         # Given
         repository = mocker.Mock()
         results = [
-            {'trial_number': 0, 'final_balance': 1100.0, 'geo_mean_return': 1.05},
-            {'trial_number': 1, 'final_balance': 950.0, 'geo_mean_return': 0.97},
+            {'trial_number': 0, 'geo_mean_return': 1.05},
+            {'trial_number': 1, 'geo_mean_return': 0.97},
         ]
 
         # When
@@ -292,7 +279,7 @@ class TestSaveResults:
     def test_evaluation_fields_are_correct(self, mocker):
         # Given
         repository = mocker.Mock()
-        results = [{'trial_number': 7, 'final_balance': 1200.0, 'geo_mean_return': 1.1}]
+        results = [{'trial_number': 7, 'geo_mean_return': 1.1}]
         study_name = 'TestStudy_XXBTZGBP_20210101-20210401'
         start = 1609459200.0
         end = 1617235200.0
@@ -308,15 +295,14 @@ class TestSaveResults:
         assert ev.trial_number == 7
         assert ev.start_timestamp == start
         assert ev.end_timestamp == end
-        assert ev.final_balance == pytest.approx(1200.0)
         assert ev.geo_mean_return == pytest.approx(1.1)
 
     def test_all_evaluations_share_study_name_and_period(self, mocker):
         # Given
         repository = mocker.Mock()
         results = [
-            {'trial_number': 0, 'final_balance': 1100.0, 'geo_mean_return': 1.05},
-            {'trial_number': 1, 'final_balance': 950.0, 'geo_mean_return': 0.97},
+            {'trial_number': 0, 'geo_mean_return': 1.05},
+            {'trial_number': 1, 'geo_mean_return': 0.97},
         ]
         study_name = 'SharedStudy'
         start = 1609459200.0
