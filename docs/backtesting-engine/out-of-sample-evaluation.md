@@ -1,4 +1,4 @@
-# Generalisation Evaluation
+# Out-of-Sample Evaluation
 
 After parameter optimisation, it's critical to test how well the optimised parameters perform on unseen data. This helps identify which parameter sets truly generalise vs those that merely overfit the training period.
 
@@ -6,13 +6,13 @@ After parameter optimisation, it's critical to test how well the optimised param
 
 ## Workflow
 
-The BacktestingEngine module provides the `find_params()` function to evaluate top-performing parameter sets on a new time period:
+The BacktestingEngine module provides the `evaluate_out_of_sample()` function to evaluate top-performing parameter sets on a new time period:
 
 ```python
-from backtesting_engine import find_params
+from backtesting_engine import evaluate_out_of_sample
 
 # Evaluate top 10 parameter sets on a new time period
-find_params(
+evaluate_out_of_sample(
     study_name='PrecisionTrendStrategy_XXBTZGBP_20210101-20211231',
     num_sets=10,
     start=1640995200.0,  # 2022-01-01
@@ -26,8 +26,8 @@ find_params(
 - `num_sets`: Number of top parameter sets to evaluate (default: 10)
 - `start`/`end`: Unix timestamps for the evaluation period (must be different from training period)
 
-> **Current limitation:** `find_params()` constructs the engine with strategy
-> `PrecisionTrendStrategy` and pair `XXBTZGBP` hard-coded. Generalising other
+> **Current limitation:** `evaluate_out_of_sample()` constructs the engine with strategy
+> `PrecisionTrendStrategy` and pair `XXBTZGBP` hard-coded. Evaluating other
 > studies requires either patching the call site or extending the function to
 > accept those values.
 
@@ -35,13 +35,13 @@ find_params(
 
 ## Metrics Stored
 
-Results are saved to the `generalisation_evaluation` table with the following metrics:
+Results are saved to the `out_of_sample_evaluation` table with the following metrics:
 
 - `final_balance`: Total balance on full evaluation period
 - `geo_mean_return`: Geometric mean across same rolling windows used in optimisation
 - `trial_number`: Link back to original optimisation trial
 
-These metrics allow direct comparison between training performance (from the Optuna study) and evaluation performance (from generalisation testing).
+These metrics allow direct comparison between training performance (from the Optuna study) and evaluation performance (from out-of-sample testing).
 
 ---
 
@@ -49,8 +49,8 @@ These metrics allow direct comparison between training performance (from the Opt
 
 The backtesting workflow follows a clear two-phase pattern:
 
-1. **Optimisation phase** — Find promising parameter sets on historical data
-2. **Generalisation phase** — Validate those parameters on a different time period
+1. **Optimisation phase** — Find promising parameter sets on historical data (in-sample)
+2. **Out-of-sample phase** — Validate those parameters on a different time period
 
 **Why separate phases?**
 
@@ -60,15 +60,15 @@ The backtesting workflow follows a clear two-phase pattern:
 
 **Example timeline:**
 
-- Training: 2021-01-01 → 2021-12-31 (run optimisation)
-- Evaluation: 2022-01-01 → 2022-12-31 (test generalisation)
+- Training (in-sample): 2021-01-01 → 2021-12-31 (run optimisation)
+- Out-of-sample: 2022-01-01 → 2022-12-31 (test generalisation)
 - Live trading: 2023+ (deploy only parameters that generalised well)
 
 ---
 
 ## Integration with BacktestingEngine
 
-The `find_params()` function internally creates a new BacktestingEngine instance for each parameter set being evaluated. It:
+The `evaluate_out_of_sample()` function internally creates a new BacktestingEngine instance for each parameter set being evaluated. It:
 
 1. Retrieves the top N parameter sets from the Optuna study
 2. For each set, creates a BacktestingEngine with those parameters
