@@ -6,6 +6,8 @@ import numpy as np
 
 from strategy_manager import create_strategy
 
+from .window_evaluation import run_strategy_on_window
+
 INITIAL_BALANCE = 1000
 
 
@@ -17,10 +19,15 @@ def get_objective(
     def objective(trial: optuna.Trial) -> float:
         ''' Optimisation Objective: Maximise geometric mean of per-window return ratios. '''
         params = suggest_parameters(trial, param_grid)
-        adjusted_window_returns = []
+        try:
+            strategy_name = type(engine.strategy).__name__
+            engine.strategy = create_strategy(strategy_name, params)
+        except ValueError:
+            raise optuna.TrialPruned()
 
+        adjusted_window_returns = []
         for window_start, window_end in windows:
-            run_strategy_on_window(engine, params, window_start, window_end)
+            run_strategy_on_window(engine, window_start, window_end)
 
             # Calculate penalty.
             trade_count = engine.results['signal'].ne('hold').sum()
@@ -46,19 +53,6 @@ def suggest_parameters(trial: optuna.Trial, param_grid: dict[str, list[Any]]) ->
         else:
             raise ValueError(f'Unsupported parameter type for {name}')
     return params
-
-
-def run_strategy_on_window(engine, params: dict[str, Any], start: pd.Timestamp, end: pd.Timestamp) -> None:
-    ''' Configure and run the strategy on an OHLC window. '''
-    strategy_name = type(engine.strategy).__name__
-
-    try:
-        engine.strategy = create_strategy(strategy_name, params)
-    except ValueError:
-        raise optuna.TrialPruned()
-
-    engine.set_ohlc_window(start, end)
-    engine.run()
 
 
 def calculate_penalty(trade_count: int, start: pd.Timestamp, end: pd.Timestamp) -> float:
