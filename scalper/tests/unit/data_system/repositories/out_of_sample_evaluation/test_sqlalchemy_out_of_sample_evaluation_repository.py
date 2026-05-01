@@ -36,7 +36,6 @@ class TestSQLAlchemyOutOfSampleEvaluationRepository:
             trial_number=1,
             start_timestamp=1704067200.0,
             end_timestamp=1704153600.0,
-            final_balance=1050.50,
             geo_mean_return=1.0025
         )
 
@@ -83,8 +82,7 @@ class TestSQLAlchemyOutOfSampleEvaluationRepository:
                 trial_number=i,
                 start_timestamp=1704067200.0,
                 end_timestamp=1704153600.0,
-                final_balance=1050.50 + i,
-                geo_mean_return=1.0025
+                geo_mean_return=1.0025 + i * 0.001
             )
             for i in range(3)
         ]

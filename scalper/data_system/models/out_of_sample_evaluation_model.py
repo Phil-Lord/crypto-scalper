@@ -15,7 +15,6 @@ class OutOfSampleEvaluation:
         trial_number (int): Trial number within the study.
         start_timestamp (float): Start of the evaluation period (Unix seconds).
         end_timestamp (float): End of the evaluation period (Unix seconds).
-        final_balance (float): Final balance when running on the full period.
         geo_mean_return (float): Geometric mean of returns across time windows.
 
     Database Mapping:
@@ -23,7 +22,6 @@ class OutOfSampleEvaluation:
         - trial_number: INTEGER
         - start_timestamp: REAL
         - end_timestamp: REAL
-        - final_balance: REAL NOT NULL
         - geo_mean_return: REAL NOT NULL
 
     Note:
@@ -34,5 +32,4 @@ class OutOfSampleEvaluation:
     trial_number: int
     start_timestamp: float
     end_timestamp: float
-    final_balance: float
     geo_mean_return: float

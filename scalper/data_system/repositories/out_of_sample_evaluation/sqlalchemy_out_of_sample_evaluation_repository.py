@@ -20,8 +20,8 @@ class SQLAlchemyOutOfSampleEvaluationRepository(OutOfSampleEvaluationRepository)
 
             stmt = text("""
                 INSERT OR REPLACE INTO out_of_sample_evaluation
-                (study_name, trial_number, start_timestamp, end_timestamp, final_balance, geo_mean_return)
-                VALUES (:study_name, :trial_number, :start_timestamp, :end_timestamp, :final_balance, :geo_mean_return)
+                (study_name, trial_number, start_timestamp, end_timestamp, geo_mean_return)
+                VALUES (:study_name, :trial_number, :start_timestamp, :end_timestamp, :geo_mean_return)
             """)
 
             session.execute(stmt, records)
