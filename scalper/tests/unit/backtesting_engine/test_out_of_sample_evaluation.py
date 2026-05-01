@@ -2,13 +2,13 @@ import optuna
 import pandas as pd
 import pytest
 
-from backtesting_engine.generalisation_evaluation import (
+from backtesting_engine.out_of_sample_evaluation import (
     INITIAL_BALANCE,
     get_top_param_sets,
     run_evaluation,
     save_results,
 )
-from data_system.models.generalisation_evaluation_model import GeneralisationEvaluation
+from data_system.models.out_of_sample_evaluation_model import OutOfSampleEvaluation
 
 
 def _make_trial(mocker, number: int, value: float, params: dict = None, complete: bool = True):
@@ -28,7 +28,7 @@ def _make_study(mocker, trials: list, direction: optuna.study.StudyDirection = o
 
 
 @pytest.mark.backtesting_engine
-@pytest.mark.generalisation_evaluation
+@pytest.mark.out_of_sample_evaluation
 class TestGetTopParamSets:
     def test_returns_top_n_trials_for_maximise_direction(self, mocker):
         # Given
@@ -134,7 +134,7 @@ class TestGetTopParamSets:
 
 
 @pytest.mark.backtesting_engine
-@pytest.mark.generalisation_evaluation
+@pytest.mark.out_of_sample_evaluation
 class TestRunEvaluation:
     @pytest.fixture
     def mock_engine(self, mocker):
@@ -154,7 +154,7 @@ class TestRunEvaluation:
 
     def test_returns_result_for_each_param_set(self, mocker, mock_engine, sample_windows):
         # Given
-        mocker.patch('backtesting_engine.generalisation_evaluation.create_strategy')
+        mocker.patch('backtesting_engine.out_of_sample_evaluation.create_strategy')
         param_sets = [
             {'trial_number': 0, 'value': 1.5, 'params': {'sma_period': 10}},
             {'trial_number': 1, 'value': 1.3, 'params': {'sma_period': 20}},
@@ -168,7 +168,7 @@ class TestRunEvaluation:
 
     def test_result_has_correct_structure(self, mocker, mock_engine, sample_param_sets, sample_windows):
         # Given
-        mocker.patch('backtesting_engine.generalisation_evaluation.create_strategy')
+        mocker.patch('backtesting_engine.out_of_sample_evaluation.create_strategy')
 
         # When
         results = run_evaluation(mock_engine, sample_param_sets, sample_windows)
@@ -180,7 +180,7 @@ class TestRunEvaluation:
 
     def test_final_balance_is_from_full_period(self, mocker, mock_engine, sample_param_sets, sample_windows):
         # Given
-        mocker.patch('backtesting_engine.generalisation_evaluation.create_strategy')
+        mocker.patch('backtesting_engine.out_of_sample_evaluation.create_strategy')
         # First call = full period, second call = window
         mock_engine.get_final_quote_balance.side_effect = [1500.0, 1100.0]
 
@@ -192,7 +192,7 @@ class TestRunEvaluation:
 
     def test_calculates_geometric_mean_correctly(self, mocker, mock_engine, sample_param_sets):
         # Given
-        mocker.patch('backtesting_engine.generalisation_evaluation.create_strategy')
+        mocker.patch('backtesting_engine.out_of_sample_evaluation.create_strategy')
         # First call = full period, next two calls = windows
         mock_engine.get_final_quote_balance.side_effect = [1100.0, 1200.0, 1050.0]
         windows = [
@@ -212,7 +212,7 @@ class TestRunEvaluation:
         # Given
         mock_strategy = mocker.Mock()
         mocker.patch(
-            'backtesting_engine.generalisation_evaluation.create_strategy',
+            'backtesting_engine.out_of_sample_evaluation.create_strategy',
             return_value=mock_strategy,
         )
         windows = [
@@ -228,7 +228,7 @@ class TestRunEvaluation:
 
     def test_sets_ohlc_window_for_full_period_then_each_window(self, mocker, mock_engine, sample_param_sets):
         # Given
-        mocker.patch('backtesting_engine.generalisation_evaluation.create_strategy')
+        mocker.patch('backtesting_engine.out_of_sample_evaluation.create_strategy')
         windows = [
             (pd.Timestamp('2021-01-01'), pd.Timestamp('2021-04-01')),
             (pd.Timestamp('2021-02-01'), pd.Timestamp('2021-05-01')),
@@ -245,7 +245,7 @@ class TestRunEvaluation:
     def test_creates_new_strategy_for_each_param_set(self, mocker, mock_engine, sample_windows):
         # Given
         mock_create_strategy = mocker.patch(
-            'backtesting_engine.generalisation_evaluation.create_strategy',
+            'backtesting_engine.out_of_sample_evaluation.create_strategy',
         )
         param_sets = [
             {'trial_number': 0, 'value': 1.5, 'params': {'sma_period': 10}},
@@ -260,7 +260,7 @@ class TestRunEvaluation:
 
 
 @pytest.mark.backtesting_engine
-@pytest.mark.generalisation_evaluation
+@pytest.mark.out_of_sample_evaluation
 class TestSaveResults:
 
     def test_calls_repository_add_once(self, mocker):
@@ -303,7 +303,7 @@ class TestSaveResults:
         # Then
         evaluations = repository.add.call_args[0][0]
         ev = evaluations[0]
-        assert isinstance(ev, GeneralisationEvaluation)
+        assert isinstance(ev, OutOfSampleEvaluation)
         assert ev.study_name == study_name
         assert ev.trial_number == 7
         assert ev.start_timestamp == start

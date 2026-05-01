@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import Mock, MagicMock, patch
 
 from backtesting_engine import BacktestingEngine
-from backtesting_engine.generalisation_evaluation import (
+from backtesting_engine.out_of_sample_evaluation import (
     get_top_param_sets,
     run_evaluation,
     save_results
@@ -14,7 +14,7 @@ from data_system import (
     Trade,
     SQLAlchemyClient,
     SQLAlchemyTradeRepository,
-    SQLAlchemyGeneralisationEvaluationRepository
+    SQLAlchemyOutOfSampleEvaluationRepository
 )
 from data_system.models import Signal
 from strategy_manager import SmaStrategy, SmaStrategyConfig
@@ -31,7 +31,7 @@ class TestBacktestingEngineIntegration:
     - BacktestingEngine loading data and running strategies
     - Profit calculation on real strategy results
     - Parameter optimisation objective function
-    - Generalisation evaluation flow
+    - Out-of-sample evaluation flow
     - Integration with Data System (TradeRepository)
     '''
 
@@ -432,7 +432,7 @@ class TestBacktestingEngineIntegration:
 
     def test_run_evaluation_calculates_metrics(self, mock_trade_repository: Mock, sma_strategy: SmaStrategy):
         '''
-        Test generalisation evaluation calculation.
+        Test out-of-sample evaluation calculation.
         Verifies evaluation metrics computation on new data.
         '''
         # Given
@@ -475,7 +475,7 @@ class TestBacktestingEngineIntegration:
     def test_save_results_transforms_to_domain_objects(self):
         '''
         Test saving evaluation results to repository.
-        Verifies transformation to GeneralisationEvaluation domain objects.
+        Verifies transformation to OutOfSampleEvaluation domain objects.
         '''
         # Given
         mock_session = MagicMock()
@@ -490,7 +490,7 @@ class TestBacktestingEngineIntegration:
                 mock_sessionmaker.return_value = mock_session_class
 
                 client = SQLAlchemyClient()
-                repository = SQLAlchemyGeneralisationEvaluationRepository(client)
+                repository = SQLAlchemyOutOfSampleEvaluationRepository(client)
 
                 results = [
                     {
@@ -516,7 +516,7 @@ class TestBacktestingEngineIntegration:
         # Verify SQL statement
         sql_stmt = str(call_args[0][0])
         assert 'INSERT' in sql_stmt
-        assert 'generalisation_evaluation' in sql_stmt
+        assert 'out_of_sample_evaluation' in sql_stmt
 
         # Verify domain data transformation
         records = call_args[0][1]

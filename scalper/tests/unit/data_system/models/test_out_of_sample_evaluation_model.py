@@ -1,12 +1,12 @@
 import pytest
 
-from data_system.models.generalisation_evaluation_model import GeneralisationEvaluation
+from data_system.models.out_of_sample_evaluation_model import OutOfSampleEvaluation
 
 
 @pytest.mark.data_system
 @pytest.mark.models
-@pytest.mark.generalisation_evaluation_model
-class TestGeneralisationEvaluation:
+@pytest.mark.out_of_sample_evaluation_model
+class TestOutOfSampleEvaluation:
     @pytest.fixture
     def sample_evaluation_data(self):
         return {
@@ -20,7 +20,7 @@ class TestGeneralisationEvaluation:
 
     def test_creates_evaluation_with_all_fields(self, sample_evaluation_data):
         # When
-        evaluation = GeneralisationEvaluation(**sample_evaluation_data)
+        evaluation = OutOfSampleEvaluation(**sample_evaluation_data)
 
         # Then
         assert evaluation.study_name == sample_evaluation_data['study_name']
@@ -33,7 +33,7 @@ class TestGeneralisationEvaluation:
     def test_requires_final_balance(self):
         # When / Then
         with pytest.raises(TypeError):
-            GeneralisationEvaluation(
+            OutOfSampleEvaluation(
                 study_name='test_study',
                 trial_number=1,
                 start_timestamp=1704067200.0,
@@ -44,7 +44,7 @@ class TestGeneralisationEvaluation:
     def test_requires_geo_mean_return(self):
         # When / Then
         with pytest.raises(TypeError):
-            GeneralisationEvaluation(
+            OutOfSampleEvaluation(
                 study_name='test_study',
                 trial_number=1,
                 start_timestamp=1704067200.0,
@@ -52,9 +52,9 @@ class TestGeneralisationEvaluation:
                 final_balance=1050.50
             )
 
-    def test_generalisation_evaluation_is_frozen(self, sample_evaluation_data):
+    def test_out_of_sample_evaluation_is_frozen(self, sample_evaluation_data):
         # Given
-        evaluation = GeneralisationEvaluation(**sample_evaluation_data)
+        evaluation = OutOfSampleEvaluation(**sample_evaluation_data)
 
         # When / Then
         with pytest.raises(AttributeError):
