@@ -134,6 +134,7 @@ backtesting_engine/
 ├── objective.py                     # Optuna objective function logic
 ├── parameter_optimisation.py        # Window creation, study management
 ├── profit_calculation.py            # Position profits and final balance
+├── window_evaluation.py             # Shared per-window run mechanics (IS + OOS)
 └── out_of_sample_evaluation.py      # Post-optimisation evaluation
 ```
 

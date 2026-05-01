@@ -16,15 +16,22 @@ evaluate_out_of_sample(
     study_name='PrecisionTrendStrategy_XXBTZGBP_20210101-20211231',
     num_sets=10,
     start=1640995200.0,  # 2022-01-01
-    end=1672531200.0     # 2023-01-01
+    end=1672531200.0,    # 2023-01-01
+    n_workers=4,         # process-pool fan-out (default 1 = serial in-process)
 )
 ```
 
 **Parameters:**
 
 - `study_name`: Name of the completed Optuna study
-- `num_sets`: Number of top parameter sets to evaluate (default: 10)
+- `num_sets`: Number of top parameter sets to evaluate
 - `start`/`end`: Unix timestamps for the evaluation period (must be different from training period)
+- `n_workers`: Number of process-pool workers. `1` (default) runs serially in the calling
+  process. Values >1 distribute the top parameter sets across `ProcessPoolExecutor` workers,
+  each constructing its own `BacktestingEngine` (and loading OHLC data) once.
+- `progress_callback`: Optional `() -> None` callback invoked once per parameter set evaluated.
+  When `None`, the library installs a default tqdm-backed progress bar to preserve existing
+  CLI behaviour.
 
 > **Current limitation:** `evaluate_out_of_sample()` constructs the engine with strategy
 > `PrecisionTrendStrategy` and pair `XXBTZGBP` hard-coded. Evaluating other
@@ -37,11 +44,17 @@ evaluate_out_of_sample(
 
 Results are saved to the `out_of_sample_evaluation` table with the following metrics:
 
-- `final_balance`: Total balance on full evaluation period
-- `geo_mean_return`: Geometric mean across same rolling windows used in optimisation
-- `trial_number`: Link back to original optimisation trial
+- `trial_number`: Link back to the original optimisation trial
+- `geo_mean_return`: Geometric mean of per-window return ratios across the same rolling windows
+  used during optimisation
 
-These metrics allow direct comparison between training performance (from the Optuna study) and evaluation performance (from out-of-sample testing).
+The geometric mean return uses the identical window construction (rolling 3-month / 1-month
+step) as in-sample optimisation, so OOS scores are directly comparable to study trial values.
+
+> **No whole-period balance column.** Earlier versions also stored a `final_balance` from a
+> redundant full-period run. It was dropped — see the
+> [Architecture Decision Log](../architecture-decision-log.md#backtesting-engine) for the
+> rationale.
 
 ---
 
@@ -68,15 +81,23 @@ The backtesting workflow follows a clear two-phase pattern:
 
 ## Integration with BacktestingEngine
 
-The `evaluate_out_of_sample()` function internally creates a new BacktestingEngine instance for each parameter set being evaluated. It:
+`evaluate_out_of_sample()` constructs one `BacktestingEngine` (loading OHLC once) and reuses it
+across all evaluated parameter sets. It:
 
 1. Retrieves the top N parameter sets from the Optuna study
-2. For each set, creates a BacktestingEngine with those parameters
-3. Runs the backtest on the evaluation period
-4. Calculates both final balance and geometric mean return
+2. Builds rolling 3-month windows over the evaluation period
+3. For each parameter set, evaluates it across every window via the shared
+   `evaluate_param_set_over_windows()` helper — which resets the strategy, slices the OHLC
+   window, runs the backtest, and captures the final quote balance
+4. Computes the geometric mean return ratio across windows
 5. Stores results for later analysis
 
-This reuses the same backtesting logic from the optimisation phase, ensuring consistency in evaluation methodology.
+The shared `evaluate_param_set_over_windows()` helper is also used by the in-sample objective,
+keeping per-window run mechanics in one place and preventing IS/OOS drift.
+
+When `n_workers > 1`, each `ProcessPoolExecutor` worker builds its own `BacktestingEngine`
+once and evaluates its assigned chunk of parameter sets — amortising OHLC load across the
+chunk.
 
 ---
 
