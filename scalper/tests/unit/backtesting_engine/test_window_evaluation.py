@@ -1,10 +1,15 @@
+import numpy as np
 import pandas as pd
 import pytest
 
+from backtesting_engine.backtesting_engine import BacktestingEngine
 from backtesting_engine.window_evaluation import (
     evaluate_param_set_over_windows,
     run_strategy_on_window,
 )
+from data_system.models.trade_model import Trade
+from strategy_manager.strategies.sma_strategy import SmaStrategy
+from strategy_manager.strategies.sma_strategy_config import SmaStrategyConfig
 
 
 @pytest.mark.backtesting_engine
@@ -136,3 +141,97 @@ class TestEvaluateParamSetOverWindows:
         # When / Then — caller is responsible for translating ValueError.
         with pytest.raises(ValueError):
             evaluate_param_set_over_windows(mock_engine, {}, windows)
+
+
+class _StubTradeRepository:
+    '''
+    Minimal repository stub returning a fixed list of trades — covers the
+    surface of TradeRepository.get exercised by BacktestingEngine.
+    '''
+
+    def __init__(self, trades: list[Trade]) -> None:
+        self._trades = trades
+
+    def get(self, pair: str, start: float, end: float) -> list[Trade]:
+        return self._trades
+
+
+def _make_trades(pair: str, start_ts: float, count: int, seed: int) -> list[Trade]:
+    '''
+    Build deterministic minute-spaced trades with a price walk that crosses
+    short/long SMAs, so MA crossover produces a non-trivial signal series.
+    '''
+    rng = np.random.default_rng(seed)
+    prices = 100.0 + np.cumsum(rng.normal(0, 0.5, size=count))
+    return [
+        Trade(
+            trade_id=i,
+            pair=pair,
+            price=float(price),
+            volume=1.0,
+            timestamp=start_ts + i * 60,
+            side='b',
+            order_type='m',
+        )
+        for i, price in enumerate(prices)
+    ]
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.window_evaluation
+class TestWindowParity:
+    '''
+    Real-engine parity test: running the engine on window A and then resetting
+    + running on window B must produce identical output to running a freshly
+    constructed engine on window B alone. Guards the per-window helper against
+    state leakage across windows for both vectorised and live paths.
+    '''
+
+    PAIR = 'XXBTZGBP'
+
+    @pytest.fixture
+    def trades(self) -> list[Trade]:
+        return _make_trades(pair=self.PAIR, start_ts=1609459200.0, count=120, seed=42)
+
+    @pytest.fixture
+    def windows(self) -> tuple[tuple[pd.Timestamp, pd.Timestamp], tuple[pd.Timestamp, pd.Timestamp]]:
+        base = pd.Timestamp(1609459200, unit='s')
+        window_a = (base, base + pd.Timedelta(minutes=29))
+        window_b = (base + pd.Timedelta(minutes=60), base + pd.Timedelta(minutes=119))
+        return window_a, window_b
+
+    def _build_engine(self, trades: list[Trade], vectorised: bool) -> BacktestingEngine:
+        config = SmaStrategyConfig(short_window=3, long_window=5)
+        strategy = SmaStrategy(config)
+        return BacktestingEngine(
+            pair=self.PAIR,
+            strategy=strategy,
+            repository=_StubTradeRepository(trades),
+            start=trades[0].timestamp,
+            end=trades[-1].timestamp + 1,
+            interval=1,
+            vectorised=vectorised,
+        )
+
+    @pytest.mark.parametrize('vectorised', [True, False])
+    def test_use_reset_run_b_matches_fresh_run_b(
+        self, trades: list[Trade], windows, vectorised: bool,
+    ) -> None:
+        # Given
+        window_a, window_b = windows
+
+        # When — reuse engine: run window A, reset, run window B.
+        reused = self._build_engine(trades, vectorised=vectorised)
+        reused.set_ohlc_window(*window_a)
+        reused.run()
+        reused.strategy.reset()
+        reused.set_ohlc_window(*window_b)
+        reused_results = reused.run()
+
+        # And — fresh engine: run window B only.
+        fresh = self._build_engine(trades, vectorised=vectorised)
+        fresh.set_ohlc_window(*window_b)
+        fresh_results = fresh.run()
+
+        # Then
+        pd.testing.assert_frame_equal(reused_results, fresh_results)
