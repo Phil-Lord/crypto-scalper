@@ -5,10 +5,10 @@ import pandas as pd
 from tqdm import tqdm
 
 from data_system import (
-    GeneralisationEvaluation,
-    GeneralisationEvaluationRepository,
+    OutOfSampleEvaluation,
+    OutOfSampleEvaluationRepository,
     SQLAlchemyClient,
-    SQLAlchemyGeneralisationEvaluationRepository,
+    SQLAlchemyOutOfSampleEvaluationRepository,
     SQLAlchemyTradeRepository
 )
 from strategy_manager import create_strategy
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 INITIAL_BALANCE = 1000
 
 
-def find_params(study_name: str, num_sets: int, start: float, end: float) -> None:
+def evaluate_out_of_sample(study_name: str, num_sets: int, start: float, end: float) -> None:
     '''
     Evaluate top parameter sets from an optimisation study on a new time period.
 
@@ -33,7 +33,7 @@ def find_params(study_name: str, num_sets: int, start: float, end: float) -> Non
     study = load_study(study_name)
 
     client = SQLAlchemyClient()
-    eval_repo = SQLAlchemyGeneralisationEvaluationRepository(client)
+    eval_repo = SQLAlchemyOutOfSampleEvaluationRepository(client)
     trade_repo = SQLAlchemyTradeRepository(client)
 
     evaluated_trials = eval_repo.get_evaluated_trial_numbers(study_name, start, end)
@@ -64,7 +64,7 @@ def load_study(study_name: str) -> optuna.Study:
         engine_kwargs={
             'pool_pre_ping': True,
             'connect_args': {
-                'application_name': 'generalisation_evaluation',
+                'application_name': 'out_of_sample_evaluation',
                 'keepalives_idle': 30
             }
         }
@@ -126,14 +126,14 @@ def run_evaluation(engine: BacktestingEngine, top_param_sets: list[dict], window
 
 
 def save_results(
-    repository: GeneralisationEvaluationRepository,
+    repository: OutOfSampleEvaluationRepository,
     results: list[dict],
     study_name: str,
     start: float,
     end: float
 ) -> None:
     evaluations = [
-        GeneralisationEvaluation(
+        OutOfSampleEvaluation(
             study_name=study_name,
             trial_number=result['trial_number'],
             start_timestamp=start,

@@ -1,2 +1,2 @@
 from .backtesting_engine import BacktestingEngine
-from .generalisation_evaluation import find_params
+from .out_of_sample_evaluation import evaluate_out_of_sample
