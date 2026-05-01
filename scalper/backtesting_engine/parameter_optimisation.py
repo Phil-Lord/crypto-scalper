@@ -1,5 +1,5 @@
 import os
-from typing import Any
+from typing import Any, Callable
 import warnings
 
 import optuna
@@ -11,14 +11,34 @@ from .objective import get_objective
 from utils import OptunaConfig
 
 
-def optimise_parameters(engine, param_grid: dict[str, list[Any]], n_trials: int = 100) -> None:
+OptunaCallback = Callable[[optuna.study.Study, optuna.trial.FrozenTrial], None]
+
+
+def optimise_parameters(
+    engine,
+    param_grid: dict[str, list[Any]],
+    n_trials: int = 100,
+    n_jobs: int = -1,
+    progress_callback: OptunaCallback | None = None,
+) -> None:
+    '''
+    Run an Optuna parameter optimisation on the engine's strategy.
+
+    :param engine: BacktestingEngine pre-loaded with OHLC data.
+    :param param_grid: Search space, ``{name: [low, high]}``.
+    :param n_trials: Number of Optuna trials.
+    :param n_jobs: Optuna concurrency. ``-1`` uses all available cores.
+    :param progress_callback: Optional Optuna callback ``(study, trial) -> None``
+        invoked after each trial. When ``None``, the library installs a default
+        tqdm-backed progress bar to preserve existing CLI behaviour.
+    '''
     warnings.filterwarnings('ignore', category=ExperimentalWarning)
     windows = create_windows(engine.start, engine.end)
     study_name = create_study_name(engine)
     storage = create_storage()
     study = create_study(storage, study_name, n_trials)
     validate_search_space(study, param_grid)
-    optimise(n_trials, study, engine, windows, param_grid)
+    optimise(n_trials, study, engine, windows, param_grid, n_jobs, progress_callback)
 
 
 def create_study_name(engine) -> str:
@@ -129,19 +149,24 @@ def optimise(
     study: optuna.study.Study,
     engine,
     windows: list[tuple[pd.Timestamp, pd.Timestamp]],
-    param_grid: dict[str, list[Any]]
+    param_grid: dict[str, list[Any]],
+    n_jobs: int = -1,
+    progress_callback: OptunaCallback | None = None,
 ) -> None:
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    progress_callback = TqdmProgressCallback(n_trials)
+    using_default_pbar = progress_callback is None
+    if using_default_pbar:
+        progress_callback = TqdmProgressCallback(n_trials)
     try:
         study.optimize(
             get_objective(engine, param_grid, windows),
             n_trials=n_trials,
-            n_jobs=-1,
+            n_jobs=n_jobs,
             callbacks=[progress_callback]
         )
     finally:
-        progress_callback.close()
+        if using_default_pbar:
+            progress_callback.close()
 
 
 class TqdmProgressCallback:

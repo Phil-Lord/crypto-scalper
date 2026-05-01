@@ -1,5 +1,7 @@
 import logging
 from concurrent.futures import ProcessPoolExecutor
+from contextlib import contextmanager
+from typing import Callable, Generator
 
 import optuna
 import pandas as pd
@@ -34,6 +36,7 @@ def evaluate_out_of_sample(
     start: float,
     end: float,
     n_workers: int = 1,
+    progress_callback: Callable[[], None] | None = None,
 ) -> None:
     '''
     Evaluate top parameter sets from an optimisation study on a new time period.
@@ -49,6 +52,9 @@ def evaluate_out_of_sample(
         ``1`` runs serially in-process. Values >1 distribute ``top_param_sets``
         across ``ProcessPoolExecutor`` workers, each constructing its own
         ``BacktestingEngine`` (and loading OHLC data) once.
+    :param progress_callback: Optional ``() -> None`` callback invoked once per
+        parameter set evaluated. When ``None``, the library installs a default
+        tqdm-backed progress bar to preserve existing CLI behaviour.
     '''
     study = load_study(study_name)
 
@@ -64,10 +70,10 @@ def evaluate_out_of_sample(
 
     if n_workers <= 1:
         engine = build_engine(PAIR, STRATEGY_NAME, top_param_sets[0]['params'], start, end)
-        results = run_evaluation(engine, top_param_sets, windows)
+        results = run_evaluation(engine, top_param_sets, windows, progress_callback)
     else:
         results = run_evaluation_parallel(
-            PAIR, STRATEGY_NAME, top_param_sets, windows, start, end, n_workers
+            PAIR, STRATEGY_NAME, top_param_sets, windows, start, end, n_workers, progress_callback
         )
 
     save_results(eval_repo, results, study_name, start, end)
@@ -126,12 +132,13 @@ def run_evaluation(
     engine: BacktestingEngine,
     top_param_sets: list[dict],
     windows: list[tuple[pd.Timestamp, pd.Timestamp]],
+    progress_callback: Callable[[], None] | None = None,
 ) -> list[dict]:
     results = []
-    with tqdm(total=len(top_param_sets), desc='Evaluating', dynamic_ncols=True, bar_format='{l_bar}{bar}') as pbar:
+    with _resolve_progress_callback(progress_callback, len(top_param_sets)) as on_tick:
         for param_set in top_param_sets:
             results.append(evaluate_param_set(engine, param_set, windows))
-            pbar.update(1)
+            on_tick()
     return results
 
 
@@ -159,20 +166,45 @@ def run_evaluation_parallel(
     start: float,
     end: float,
     n_workers: int,
+    progress_callback: Callable[[], None] | None = None
 ) -> list[dict]:
     chunks = chunk_param_sets(top_param_sets, n_workers)
 
     results = []
-    with ProcessPoolExecutor(max_workers=len(chunks)) as executor:
-        futures = [
-            executor.submit(
-                _evaluate_chunk_worker, pair, strategy_name, chunk, windows, start, end
-            )
-            for chunk in chunks
-        ]
-        for future in futures:
-            results.extend(future.result())
+    with _resolve_progress_callback(progress_callback, len(top_param_sets)) as on_tick:
+        with ProcessPoolExecutor(max_workers=len(chunks)) as executor:
+            futures = [
+                executor.submit(
+                    _evaluate_chunk_worker, pair, strategy_name, chunk, windows, start, end
+                )
+                for chunk in chunks
+            ]
+            for future in futures:
+                chunk_results = future.result()
+                results.extend(chunk_results)
+                for _ in chunk_results:
+                    on_tick()
     return results
+
+
+@contextmanager
+def _resolve_progress_callback(
+    progress_callback: Callable[[], None] | None,
+    total: int,
+) -> Generator[Callable[[], None], None, None]:
+    '''
+    Yield a ``() -> None`` tick callback. When ``progress_callback`` is ``None``,
+    install a default tqdm bar that closes on exit so existing CLI behaviour
+    (a single 'Evaluating' progress bar) is preserved.
+    '''
+    if progress_callback is not None:
+        yield progress_callback
+        return
+    pbar = tqdm(total=total, desc='Evaluating', dynamic_ncols=True, bar_format='{l_bar}{bar}')
+    try:
+        yield lambda: pbar.update(1)
+    finally:
+        pbar.close()
 
 
 def chunk_param_sets(param_sets: list[dict], n_chunks: int) -> list[list[dict]]:

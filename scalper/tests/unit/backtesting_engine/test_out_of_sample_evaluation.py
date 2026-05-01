@@ -547,3 +547,105 @@ class TestEvaluateOutOfSample:
         # Then
         patches['run_serial'].assert_not_called()
         patches['run_parallel'].assert_not_called()
+
+    def test_forwards_progress_callback_to_serial_runner(self, mocker, patches):
+        # Given
+        cb = mocker.Mock()
+
+        # When
+        evaluate_out_of_sample(
+            'study', num_sets=2, start=1.0, end=2.0, progress_callback=cb,
+        )
+
+        # Then
+        passed = patches['run_serial'].call_args.args[3] \
+            if len(patches['run_serial'].call_args.args) > 3 \
+            else patches['run_serial'].call_args.kwargs.get('progress_callback')
+        assert passed is cb
+
+    def test_forwards_progress_callback_to_parallel_runner(self, mocker, patches):
+        # Given
+        cb = mocker.Mock()
+
+        # When
+        evaluate_out_of_sample(
+            'study', num_sets=2, start=1.0, end=2.0, n_workers=4, progress_callback=cb,
+        )
+
+        # Then
+        call = patches['run_parallel'].call_args
+        passed = call.args[7] if len(call.args) > 7 else call.kwargs.get('progress_callback')
+        assert passed is cb
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.out_of_sample_evaluation
+class TestProgressCallbackInvocation:
+    @pytest.fixture
+    def windows(self):
+        return [(pd.Timestamp('2021-01-01'), pd.Timestamp('2021-04-01'))]
+
+    def test_serial_calls_user_callback_once_per_param_set(self, mocker, windows):
+        # Given
+        mocker.patch('backtesting_engine.window_evaluation.create_strategy')
+        engine = mocker.Mock()
+        engine.get_final_quote_balance.return_value = 1100.0
+        param_sets = [
+            {'trial_number': 0, 'value': 1.5, 'params': {}},
+            {'trial_number': 1, 'value': 1.3, 'params': {}},
+            {'trial_number': 2, 'value': 1.1, 'params': {}},
+        ]
+        cb = mocker.Mock()
+
+        # When
+        run_evaluation(engine, param_sets, windows, progress_callback=cb)
+
+        # Then
+        assert cb.call_count == 3
+
+    def test_serial_uses_default_tqdm_when_callback_none(self, mocker, windows):
+        # Given
+        mocker.patch('backtesting_engine.window_evaluation.create_strategy')
+        tqdm_mock = mocker.patch('backtesting_engine.out_of_sample_evaluation.tqdm')
+        engine = mocker.Mock()
+        engine.get_final_quote_balance.return_value = 1100.0
+        param_sets = [{'trial_number': 0, 'value': 1.5, 'params': {}}]
+
+        # When
+        run_evaluation(engine, param_sets, windows)
+
+        # Then
+        tqdm_mock.assert_called_once()
+        tqdm_mock.return_value.update.assert_called_once_with(1)
+        tqdm_mock.return_value.close.assert_called_once()
+
+    def test_parallel_calls_user_callback_once_per_param_set(self, mocker, windows):
+        # Given
+        executor = mocker.MagicMock()
+        executor.__enter__.return_value = executor
+        worker_outputs = [
+            [{'trial_number': 0, 'geo_mean_return': 1.05},
+             {'trial_number': 1, 'geo_mean_return': 0.95}],
+            [{'trial_number': 2, 'geo_mean_return': 1.10}],
+        ]
+        futures = []
+        for output in worker_outputs:
+            f = mocker.Mock()
+            f.result.return_value = output
+            futures.append(f)
+        executor.submit.side_effect = futures
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.ProcessPoolExecutor',
+            return_value=executor,
+        )
+        cb = mocker.Mock()
+        param_sets = [{'trial_number': i, 'value': 1.0, 'params': {}} for i in range(3)]
+
+        # When
+        run_evaluation_parallel(
+            'XXBTZGBP', 'PrecisionTrendStrategy', param_sets, windows,
+            start=1.0, end=2.0, n_workers=2, progress_callback=cb,
+        )
+
+        # Then
+        assert cb.call_count == 3
