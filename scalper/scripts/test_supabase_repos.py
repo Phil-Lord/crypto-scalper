@@ -144,7 +144,7 @@ def _confirm_target(skip_prompt: bool) -> None:
         'This script will INSERT, UPDATE, and DELETE rows on the bots, bot_runs, bot_ticks, '
         f'and bot_orders tables, scoped to bot_id starting with {TEST_PREFIX!r}.'
     )
-    click.echo('Other tables (trades, generalisation_evaluation, jobs, ...) are not touched.\n')
+    click.echo('Other tables (trades, out_of_sample_evaluation, jobs, ...) are not touched.\n')
 
     if skip_prompt:
         return
