@@ -391,7 +391,7 @@ class TestBacktestingEngineIntegration:
         mock_trial.suggest_int.assert_called()
         mock_trial.set_user_attr.assert_called()
 
-    # ==================== Generalisation Evaluation Integration Tests ====================
+    # ==================== Out-of-Sample Evaluation Integration Tests ====================
 
     def test_get_top_param_sets_extracts_completed_trials(self):
         '''

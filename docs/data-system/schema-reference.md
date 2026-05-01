@@ -90,7 +90,7 @@ Historical trade data fetched from Kraken API.
 > **Note:** Primary key is composite `(trade_id, pair)` since Kraken trade IDs are only unique
 > within a trading pair.
 
-### `generalisation_evaluation`
+### `out_of_sample_evaluation`
 
 Stores out-of-sample evaluation results for Optuna trials.
 

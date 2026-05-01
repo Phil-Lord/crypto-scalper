@@ -9,7 +9,7 @@ is unmaintained — ignore it unless explicitly asked.
 
 ```
 scalper/
-├── backtesting_engine/     # Optuna parameter optimisation, profit calc, generalisation evaluation
+├── backtesting_engine/     # Optuna parameter optimisation, profit calc, out-of-sample evaluation
 ├── core/                   # Job runner (async helpers for thread/subprocess jobs)
 ├── data_system/            # Storage layer: SQLAlchemy (SQLite local) + Supabase (cloud)
 │   ├── clients/            # SQLAlchemyClient, SupabaseClient
@@ -76,7 +76,7 @@ Universal rules — apply to every line of code:
 - **Single quotes** for all strings, including docstrings.
 - **100-character line limit**, PEP 8 otherwise.
 - **British English** in code, comments, docs, and identifiers — `optimise`, `analyse`,
-  `serialise`, `generalisation`. Don't introduce `-ize` spellings.
+  `serialise`, `summarise`. Don't introduce `-ize` spellings.
 - **Type hints required** on public function and method signatures. Use enums in type hints
   rather than `str` where a fixed value set exists.
 - **Frozen dataclasses for domain models** — `@dataclass(frozen=True)`. Required fields first,

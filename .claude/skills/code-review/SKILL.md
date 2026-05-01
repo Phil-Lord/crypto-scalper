@@ -55,7 +55,7 @@ If neither is meaningful, ask the user what scope they want.
 - [ ] Python 3.12+ syntax (`str | None`, `list[T]`) — no `Optional`/`Union`/`List`/`Dict`
 - [ ] Single quotes throughout, including docstrings
 - [ ] 100-character line limit
-- [ ] British English (optimise, analyse, serialise, generalisation)
+- [ ] British English (optimise, analyse, serialise, summarise)
 - [ ] Type hints on all public function/method signatures
 - [ ] Imports ordered: stdlib → third-party → local, separated by blank lines, no unused imports
 - [ ] No `logging.basicConfig()` outside `scripts/`

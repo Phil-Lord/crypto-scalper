@@ -6,7 +6,7 @@ The system uses two distinct database backends optimised for their respective us
 
 | Backend              | Engine     | Purpose                          | Tables                                        |
 | -------------------- | ---------- | -------------------------------- | --------------------------------------------- |
-| **Local SQLite**     | SQLAlchemy | Backtesting, optimisation & jobs | `trades`, `generalisation_evaluation`, `jobs` |
+| **Local SQLite**     | SQLAlchemy | Backtesting, optimisation & jobs | `trades`, `out_of_sample_evaluation`, `jobs`  |
 | **Cloud PostgreSQL** | Supabase   | Live trading & audit trails      | `bots`, `bot_runs`, `bot_ticks`, `bot_orders` |
 
 **Rationale:**

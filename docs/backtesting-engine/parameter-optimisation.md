@@ -187,5 +187,5 @@ Example: `PrecisionTrendStrategy_XXBTZGBP_20210101-20211231`
 ## See Also
 
 - [BacktestingEngine Overview](index.md) — Core concepts and main class reference
-- [Generalisation Evaluation](generalisation-evaluation.md) — Testing optimised parameters on unseen data
+- [Out-of-Sample Evaluation](out-of-sample-evaluation.md) — Testing optimised parameters on unseen data
 - [Architecture Decision Log](../architecture-decision-log.md) — Rationale for optimisation decisions

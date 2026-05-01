@@ -10,7 +10,7 @@ The Backtesting Engine evaluates trading strategies on historical data with Optu
 - **Parameter Optimisation** — Multi-window Optuna optimisation with activity penalties
 - **Dual Computation Modes** — Vectorised (fast) and iterative (live-compatible) execution
 - **Performance Metrics** — Position profits, final balance, trade counts, and returns
-- **Generalisation Testing** — Evaluate optimised parameters on unseen time periods
+- **Out-of-Sample Evaluation** — Evaluate optimised parameters on unseen time periods
 
 ---
 
@@ -129,12 +129,12 @@ Live trading runs strategies in iterative mode (row-by-row with stateful indicat
 
 ```
 backtesting_engine/
-├── __init__.py                      # Exports BacktestingEngine, find_params
+├── __init__.py                      # Exports BacktestingEngine, evaluate_out_of_sample
 ├── backtesting_engine.py            # Main BacktestingEngine class
 ├── objective.py                     # Optuna objective function logic
 ├── parameter_optimisation.py        # Window creation, study management
 ├── profit_calculation.py            # Position profits and final balance
-└── generalisation_evaluation.py     # Post-optimisation evaluation
+└── out_of_sample_evaluation.py      # Post-optimisation evaluation
 ```
 
 ---
@@ -143,7 +143,7 @@ backtesting_engine/
 
 - [Parameter Optimisation](parameter-optimisation.md) — Optuna-based parameter search with rolling windows
 - [Profit Calculation](profit-calculation.md) — Calculating position profits and final balances
-- [Generalisation Evaluation](generalisation-evaluation.md) — Testing optimised parameters on unseen data
+- [Out-of-Sample Evaluation](out-of-sample-evaluation.md) — Testing optimised parameters on unseen data
 - [Strategy Manager](../strategy-manager/index.md) — Creating backtest-compatible strategies
 - [Data System](../data-system/index.md) — Trade data storage and retrieval
 - [Architecture Decision Log](../architecture-decision-log.md#backtesting-engine) — Rationale for backtesting design choices
