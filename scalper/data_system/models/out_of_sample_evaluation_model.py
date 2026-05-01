@@ -2,12 +2,13 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class GeneralisationEvaluation:
+class OutOfSampleEvaluation:
     '''
-    Dataclass representing a generalisation evaluation result for a parameter set.
+    Dataclass representing an out-of-sample evaluation result for a parameter set.
 
     This model stores the results of evaluating an Optuna trial's parameters
-    across multiple time windows to assess generalisation (robustness to overfitting).
+    across multiple time windows on data the optimisation never saw, to assess
+    how well the parameters generalise (robustness to overfitting).
 
     Attributes:
         study_name (str): Name of the Optuna study being evaluated.

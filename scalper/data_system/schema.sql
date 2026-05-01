@@ -107,15 +107,15 @@ CREATE INDEX ix_trades_pair_timestamp ON trades (pair, timestamp);
 CREATE INDEX ix_trades_pair ON trades (pair);
 
 
--- Table: generalisation_evaluation
+-- Table: out_of_sample_evaluation
 -- Stores results of evaluating Optuna trial parameters across time windows.
-CREATE TABLE generalisation_evaluation (
-    study_name TEXT NOT NULL,           -- Matches GeneralisationEvaluation.study_name
-    trial_number INTEGER NOT NULL,      -- Matches GeneralisationEvaluation.trial_number
-    start_timestamp REAL NOT NULL,      -- Matches GeneralisationEvaluation.start_timestamp
-    end_timestamp REAL NOT NULL,        -- Matches GeneralisationEvaluation.end_timestamp
-    final_balance REAL NOT NULL,        -- Matches GeneralisationEvaluation.final_balance
-    geo_mean_return REAL NOT NULL,      -- Matches GeneralisationEvaluation.geo_mean_return
+CREATE TABLE out_of_sample_evaluation (
+    study_name TEXT NOT NULL,           -- Matches OutOfSampleEvaluation.study_name
+    trial_number INTEGER NOT NULL,      -- Matches OutOfSampleEvaluation.trial_number
+    start_timestamp REAL NOT NULL,      -- Matches OutOfSampleEvaluation.start_timestamp
+    end_timestamp REAL NOT NULL,        -- Matches OutOfSampleEvaluation.end_timestamp
+    final_balance REAL NOT NULL,        -- Matches OutOfSampleEvaluation.final_balance
+    geo_mean_return REAL NOT NULL,      -- Matches OutOfSampleEvaluation.geo_mean_return
 
     PRIMARY KEY (study_name, trial_number, start_timestamp, end_timestamp)
 );

@@ -3,15 +3,15 @@ from dataclasses import asdict
 from sqlalchemy import text
 
 from data_system.clients import SQLAlchemyClient
-from data_system.models import GeneralisationEvaluation
-from .generalisation_evaluation_repository import GeneralisationEvaluationRepository
+from data_system.models import OutOfSampleEvaluation
+from .out_of_sample_evaluation_repository import OutOfSampleEvaluationRepository
 
 
-class SQLAlchemyGeneralisationEvaluationRepository(GeneralisationEvaluationRepository):
+class SQLAlchemyOutOfSampleEvaluationRepository(OutOfSampleEvaluationRepository):
     def __init__(self, client: SQLAlchemyClient) -> None:
         self.client = client
 
-    def add(self, evaluations: list[GeneralisationEvaluation]) -> None:
+    def add(self, evaluations: list[OutOfSampleEvaluation]) -> None:
         if not evaluations:
             return
 
@@ -19,7 +19,7 @@ class SQLAlchemyGeneralisationEvaluationRepository(GeneralisationEvaluationRepos
             records = [asdict(e) for e in evaluations]
 
             stmt = text("""
-                INSERT OR REPLACE INTO generalisation_evaluation
+                INSERT OR REPLACE INTO out_of_sample_evaluation
                 (study_name, trial_number, start_timestamp, end_timestamp, final_balance, geo_mean_return)
                 VALUES (:study_name, :trial_number, :start_timestamp, :end_timestamp, :final_balance, :geo_mean_return)
             """)
@@ -29,7 +29,7 @@ class SQLAlchemyGeneralisationEvaluationRepository(GeneralisationEvaluationRepos
     def get_evaluated_trial_numbers(self, study_name: str, start: float, end: float) -> set[int]:
         with self.client.session() as session:
             query = text("""
-                SELECT trial_number FROM generalisation_evaluation
+                SELECT trial_number FROM out_of_sample_evaluation
                 WHERE study_name = :study_name
                   AND start_timestamp = :start
                   AND end_timestamp = :end

@@ -1,18 +1,18 @@
 from abc import ABC, abstractmethod
 
-from data_system.models import GeneralisationEvaluation
+from data_system.models import OutOfSampleEvaluation
 
 
-class GeneralisationEvaluationRepository(ABC):
+class OutOfSampleEvaluationRepository(ABC):
     @abstractmethod
-    def add(self, evaluations: list[GeneralisationEvaluation]) -> None:
+    def add(self, evaluations: list[OutOfSampleEvaluation]) -> None:
         '''
-        Inserts or replaces a list of generalisation evaluation results.
+        Inserts or replaces a list of out-of-sample evaluation results.
 
-        :param evaluations: List of GeneralisationEvaluation domain objects to persist.
+        :param evaluations: List of OutOfSampleEvaluation domain objects to persist.
         '''
         pass
-
+        
     @abstractmethod
     def get_evaluated_trial_numbers(self, study_name: str, start: float, end: float) -> set[int]:
         '''
