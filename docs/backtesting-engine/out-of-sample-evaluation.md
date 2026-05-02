@@ -92,8 +92,10 @@ across all evaluated parameter sets. It:
 4. Computes the geometric mean return ratio across windows
 5. Stores results for later analysis
 
-The shared `evaluate_param_set_over_windows()` helper is also used by the in-sample objective,
-keeping per-window run mechanics in one place and preventing IS/OOS drift.
+The lower-level `run_strategy_on_window()` helper (which `evaluate_param_set_over_windows()`
+calls internally) is also used directly by the in-sample objective, which needs to inspect
+`engine.results` between windows for the activity penalty and so cannot use the wrapper
+end-to-end. Sharing the per-window run mechanics in one place prevents IS/OOS drift.
 
 When `n_workers > 1`, each `ProcessPoolExecutor` worker builds its own `BacktestingEngine`
 once and evaluates its assigned chunk of parameter sets — amortising OHLC load across the
