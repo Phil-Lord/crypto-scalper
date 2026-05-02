@@ -380,6 +380,16 @@ class TestRunEvaluationParallel:
             {'trial_number': 2, 'value': 1.1, 'params': {'sma_period': 30}},
         ]
 
+    @pytest.fixture(autouse=True)
+    def passthrough_as_completed(self, mocker):
+        # The real as_completed expects concurrent.futures.Future internals; with
+        # mocked futures we substitute a passthrough that yields them in submission
+        # order so the test can drive future.result() deterministically.
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.as_completed',
+            side_effect=lambda fs: iter(list(fs)),
+        )
+
     def test_dispatches_one_task_per_chunk(self, mocker, param_sets, windows):
         # Given
         executor = mocker.MagicMock()
@@ -401,7 +411,7 @@ class TestRunEvaluationParallel:
         # Then
         assert executor.submit.call_count == 3
 
-    def test_aggregates_worker_results_in_order(self, mocker, param_sets, windows):
+    def test_aggregates_worker_results(self, mocker, param_sets, windows):
         # Given
         executor = mocker.MagicMock()
         executor.__enter__.return_value = executor
@@ -428,7 +438,9 @@ class TestRunEvaluationParallel:
         )
 
         # Then
-        assert [r['trial_number'] for r in results] == [0, 1, 2]
+        # Order is not guaranteed (workers complete in arbitrary order under
+        # as_completed), so compare as a set.
+        assert {r['trial_number'] for r in results} == {0, 1, 2}
 
     def test_caps_executor_workers_at_chunk_count(self, mocker, param_sets, windows):
         # Given
@@ -637,6 +649,10 @@ class TestProgressCallbackInvocation:
         mocker.patch(
             'backtesting_engine.out_of_sample_evaluation.ProcessPoolExecutor',
             return_value=executor,
+        )
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.as_completed',
+            side_effect=lambda fs: iter(list(fs)),
         )
         cb = mocker.Mock()
         param_sets = [{'trial_number': i, 'value': 1.0, 'params': {}} for i in range(3)]

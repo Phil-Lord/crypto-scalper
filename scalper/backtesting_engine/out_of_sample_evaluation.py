@@ -1,5 +1,5 @@
 import logging
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from contextlib import contextmanager
 from typing import Callable, Generator
 
@@ -179,7 +179,7 @@ def run_evaluation_parallel(
                 )
                 for chunk in chunks
             ]
-            for future in futures:
+            for future in as_completed(futures):
                 chunk_results = future.result()
                 results.extend(chunk_results)
                 for _ in chunk_results:
