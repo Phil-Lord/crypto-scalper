@@ -6,7 +6,6 @@ from backtesting_engine.out_of_sample_evaluation import (
     INITIAL_BALANCE,
     chunk_param_sets,
     evaluate_out_of_sample,
-    evaluate_param_set,
     get_top_param_sets,
     run_evaluation,
     run_evaluation_parallel,
