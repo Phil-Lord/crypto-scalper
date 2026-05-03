@@ -30,21 +30,6 @@ class TestRunStrategyOnWindow:
         engine.set_ohlc_window.assert_called_once_with(start, end)
         engine.run.assert_called_once_with()
 
-    def test_does_not_create_strategy(self, mocker):
-        # Given — helper is purely the per-window mechanic; strategy creation
-        # is the caller's responsibility (so callers who run many windows can
-        # do it once outside the loop).
-        engine = mocker.Mock()
-        engine.strategy = mocker.Mock()
-
-        # When
-        run_strategy_on_window(engine, pd.Timestamp('2021-01-01'), pd.Timestamp('2021-04-01'))
-
-        # Then
-        original_strategy = engine.strategy
-        # Strategy reference is unchanged (no new instance assigned).
-        assert engine.strategy is original_strategy
-
 
 @pytest.mark.backtesting_engine
 @pytest.mark.window_evaluation

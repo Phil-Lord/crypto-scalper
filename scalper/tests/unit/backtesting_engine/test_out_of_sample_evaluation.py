@@ -542,8 +542,8 @@ class TestEvaluateOutOfSample:
         evaluate_out_of_sample('study', num_sets=2, start=1.0, end=2.0, n_workers=4)
 
         # Then
-        kwargs = patches['run_parallel'].call_args
-        assert 4 in kwargs.args or kwargs.kwargs.get('n_workers') == 4
+        call = patches['run_parallel'].call_args
+        assert 4 in call.args or call.kwargs.get('n_workers') == 4
 
     def test_no_evaluation_when_no_param_sets(self, mocker, patches):
         # Given
