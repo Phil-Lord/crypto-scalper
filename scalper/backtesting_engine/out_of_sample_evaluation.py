@@ -69,6 +69,8 @@ def evaluate_out_of_sample(
     windows = create_windows(start, end)
 
     if n_workers <= 1:
+        # Seed params are a placeholder; engine.strategy is replaced per param set
+        # inside evaluate_param_set_over_windows.
         engine = build_engine(PAIR, STRATEGY_NAME, top_param_sets[0]['params'], start, end)
         results = run_evaluation(engine, top_param_sets, windows, progress_callback)
     else:
@@ -240,6 +242,8 @@ def _evaluate_chunk_worker(
     Process-pool worker. Builds one engine per worker process (loading OHLC
     once) and evaluates every assigned parameter set against it.
     '''
+    # Seed params are a placeholder; engine.strategy is replaced per param set
+    # inside evaluate_param_set_over_windows.
     engine = build_engine(pair, strategy_name, param_sets_chunk[0]['params'], start, end)
     return [evaluate_param_set(engine, ps, windows) for ps in param_sets_chunk]
 
