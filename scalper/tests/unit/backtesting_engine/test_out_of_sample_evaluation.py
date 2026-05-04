@@ -4,6 +4,7 @@ import pytest
 
 from backtesting_engine.out_of_sample_evaluation import (
     INITIAL_BALANCE,
+    _evaluate_chunk_worker,
     chunk_param_sets,
     evaluate_out_of_sample,
     get_top_param_sets,
@@ -664,3 +665,40 @@ class TestProgressCallbackInvocation:
 
         # Then
         assert cb.call_count == 3
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.out_of_sample_evaluation
+class TestSerialParallelParity:
+    def test_worker_produces_same_geo_mean_as_serial(self, mocker):
+        # Given — fixed balances so both paths see deterministic, identical input.
+        # Four calls total: serial processes two param_sets, then the worker processes
+        # the same two param_sets again.
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.evaluate_param_set_over_windows',
+            side_effect=[[1200.0], [800.0], [1200.0], [800.0]],
+        )
+        mock_engine = mocker.Mock()
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.build_engine',
+            return_value=mock_engine,
+        )
+
+        param_sets = [
+            {'trial_number': 0, 'value': 1.5, 'params': {'sma_period': 10}},
+            {'trial_number': 1, 'value': 1.3, 'params': {'sma_period': 20}},
+        ]
+        windows = [(pd.Timestamp('2021-01-01'), pd.Timestamp('2021-04-01'))]
+
+        # When
+        serial_results = run_evaluation(mock_engine, param_sets,
+                                        windows, progress_callback=lambda: None)
+        worker_results = _evaluate_chunk_worker(
+            'XXBTZGBP', 'PrecisionTrendStrategy', param_sets, windows,
+            start=1609459200.0, end=1617235200.0,
+        )
+
+        # Then
+        serial_by_trial = {r['trial_number']: r['geo_mean_return'] for r in serial_results}
+        worker_by_trial = {r['trial_number']: r['geo_mean_return'] for r in worker_results}
+        assert serial_by_trial == worker_by_trial
