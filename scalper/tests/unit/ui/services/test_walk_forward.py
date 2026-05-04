@@ -1,62 +1,8 @@
 import asyncio
-import sys
-from unittest.mock import MagicMock
 
 import pytest
 
 from ui.services import walk_forward as svc
-
-
-@pytest.mark.ui
-@pytest.mark.ui_services
-@pytest.mark.walk_forward
-class TestBuildInSampleCommand:
-    def test_includes_all_required_flags(self):
-        cmd = svc.build_in_sample_command(
-            'BTCGBP', 'PrecisionTrendStrategy', '2025-1-1-0-0-0', '2025-4-1-0-0-0',
-            n_trials=50,
-        )
-
-        assert cmd[0] == sys.executable
-        assert cmd[1:3] == ['-m', 'scripts.optimise_in_sample']
-        assert '-p' in cmd and cmd[cmd.index('-p') + 1] == 'BTCGBP'
-        assert '-sn' in cmd and cmd[cmd.index('-sn') + 1] == 'PrecisionTrendStrategy'
-        assert '-s' in cmd and cmd[cmd.index('-s') + 1] == '2025-1-1-0-0-0'
-        assert '-e' in cmd and cmd[cmd.index('-e') + 1] == '2025-4-1-0-0-0'
-        assert '-n' in cmd and cmd[cmd.index('-n') + 1] == '50'
-        assert '-j' in cmd and cmd[cmd.index('-j') + 1] == '1'
-
-    def test_overrides_n_jobs(self):
-        cmd = svc.build_in_sample_command(
-            'BTCGBP', 'SmaStrategy', 's', 'e', n_trials=10, n_jobs=4
-        )
-        assert cmd[cmd.index('-j') + 1] == '4'
-
-
-@pytest.mark.ui
-@pytest.mark.ui_services
-@pytest.mark.walk_forward
-class TestBuildOutOfSampleCommand:
-    def test_includes_all_required_flags(self):
-        cmd = svc.build_out_of_sample_command(
-            'PrecisionTrendStrategy_XXBTZGBP_20250101-20250401',
-            num_sets=10,
-            start='2025-4-1-0-0-0',
-            end='2025-7-1-0-0-0',
-            n_workers=2,
-        )
-
-        assert cmd[0] == sys.executable
-        assert cmd[1:3] == ['-m', 'scripts.evaluate_out_of_sample']
-        assert cmd[cmd.index('-sn') + 1] == 'PrecisionTrendStrategy_XXBTZGBP_20250101-20250401'
-        assert cmd[cmd.index('-n') + 1] == '10'
-        assert cmd[cmd.index('-s') + 1] == '2025-4-1-0-0-0'
-        assert cmd[cmd.index('-e') + 1] == '2025-7-1-0-0-0'
-        assert cmd[cmd.index('-w') + 1] == '2'
-
-    def test_defaults_workers_to_one(self):
-        cmd = svc.build_out_of_sample_command('s', 1, 's', 'e')
-        assert cmd[cmd.index('-w') + 1] == '1'
 
 
 @pytest.mark.ui

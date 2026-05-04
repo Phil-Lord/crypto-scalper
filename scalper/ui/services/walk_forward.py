@@ -1,16 +1,16 @@
 '''
 Walk-forward UI service.
 
-Builds CLI commands, parses the shared ``PROGRESS`` / ``DONE`` JSON contract
-emitted by ``scripts/optimise_in_sample.py`` and ``scripts/evaluate_out_of_sample.py``,
-and orchestrates subprocess execution via :func:`core.run_subprocess`.
+Parses the shared ``PROGRESS`` / ``DONE`` JSON contract emitted by
+``scripts/optimise_in_sample.py`` and ``scripts/evaluate_out_of_sample.py`` and
+orchestrates subprocess execution via :func:`core.run_subprocess`. Each script
+exposes its own ``build_command`` colocated with the click options.
 
 The two phases share a single module because they share both the JSON contract
 and the surrounding lifecycle (``Job`` rows, cancellation, progress streaming).
 '''
 import asyncio
 import json
-import sys
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
@@ -24,7 +24,8 @@ from data_system import (
     SQLAlchemyClient,
     SQLAlchemyOutOfSampleEvaluationRepository,
 )
-from utils import OptunaConfig
+from scripts.evaluate_out_of_sample import build_command as build_out_of_sample_command
+from scripts.optimise_in_sample import build_command as build_in_sample_command
 
 
 SCALPER_DIR = Path(__file__).resolve().parents[2]
@@ -34,51 +35,6 @@ ProgressEvent = dict
 '''
 Parsed progress line: ``{'event': 'PROGRESS' | 'DONE', 'payload': dict}``.
 '''
-
-
-def build_in_sample_command(
-    pair: str,
-    strategy_name: str,
-    start: str,
-    end: str,
-    n_trials: int,
-    n_jobs: int = 1,
-) -> list[str]:
-    '''
-    Build the argv for ``scripts.optimise_in_sample``.
-
-    The script is invoked via ``-m scripts.optimise_in_sample`` so it can be run
-    from the ``scalper/`` directory without requiring ``PYTHONPATH`` to be set.
-    '''
-    return [
-        sys.executable, '-m', 'scripts.optimise_in_sample',
-        '-p', pair,
-        '-sn', strategy_name,
-        '-s', start,
-        '-e', end,
-        '-n', str(n_trials),
-        '-j', str(n_jobs),
-    ]
-
-
-def build_out_of_sample_command(
-    study_name: str,
-    num_sets: int,
-    start: str,
-    end: str,
-    n_workers: int = 1,
-) -> list[str]:
-    '''
-    Build the argv for ``scripts.evaluate_out_of_sample``.
-    '''
-    return [
-        sys.executable, '-m', 'scripts.evaluate_out_of_sample',
-        '-sn', study_name,
-        '-n', str(num_sets),
-        '-s', start,
-        '-e', end,
-        '-w', str(n_workers),
-    ]
 
 
 def parse_progress(line: str) -> ProgressEvent | None:
