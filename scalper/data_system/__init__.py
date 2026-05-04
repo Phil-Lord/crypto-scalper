@@ -13,8 +13,8 @@ from .models import (
     Job,
     JobStatus,
     JobType,
+    OutOfSampleEvaluation,
     Signal,
-    GeneralisationEvaluation,
     Trade
 )
 
@@ -28,9 +28,9 @@ from .repositories import (
     BotOrderRepository,
     SupabaseBotOrderRepository,
     JobRepository,
-    GeneralisationEvaluationRepository,
-    SQLAlchemyGeneralisationEvaluationRepository,
     SQLAlchemyJobRepository,
-    SQLAlchemyTradeRepository,
-    TradeRepository
+    OutOfSampleEvaluationRepository,
+    SQLAlchemyOutOfSampleEvaluationRepository,
+    TradeRepository,
+    SQLAlchemyTradeRepository
 )

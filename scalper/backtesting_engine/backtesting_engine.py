@@ -6,7 +6,7 @@ from strategy_manager import Strategy
 from data_system import TradeRepository
 
 from .profit_calculation import calculate_position_profits, get_final_quote_balance
-from .parameter_optimisation import optimise_parameters
+from .parameter_optimisation import optimise_parameters, OptunaCallback
 
 
 class BacktestingEngine:
@@ -47,8 +47,14 @@ class BacktestingEngine:
 
         return self.results
 
-    def optimise_parameters(self, param_grid: dict[str, list[Any]], n_trials: int = 100) -> None:
-        optimise_parameters(self, param_grid, n_trials)
+    def optimise_parameters(
+        self,
+        param_grid: dict[str, list[Any]],
+        n_trials: int = 100,
+        n_jobs: int = -1,
+        progress_callback: OptunaCallback | None = None
+    ) -> None:
+        optimise_parameters(self, param_grid, n_trials, n_jobs, progress_callback)
 
     def calculate_position_profits(self, initial_quote_balance: float = 1000) -> pd.DataFrame:
         if self.results is None:

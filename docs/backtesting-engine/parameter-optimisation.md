@@ -39,6 +39,13 @@ param_grid = {
 engine.optimise_parameters(param_grid, n_trials=100)
 ```
 
+**Optional parameters:**
+
+- `n_jobs`: Optuna concurrency. Defaults to `-1` (use all available cores).
+- `progress_callback`: Optuna-style `(study, trial) -> None` callback invoked after each trial.
+  When `None`, the library installs a default tqdm-backed progress bar to preserve existing
+  CLI behaviour.
+
 ---
 
 ## Parameter Validation
@@ -187,5 +194,5 @@ Example: `PrecisionTrendStrategy_XXBTZGBP_20210101-20211231`
 ## See Also
 
 - [BacktestingEngine Overview](index.md) — Core concepts and main class reference
-- [Generalisation Evaluation](generalisation-evaluation.md) — Testing optimised parameters on unseen data
+- [Out-of-Sample Evaluation](out-of-sample-evaluation.md) — Testing optimised parameters on unseen data
 - [Architecture Decision Log](../architecture-decision-log.md) — Rationale for optimisation decisions

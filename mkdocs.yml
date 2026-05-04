@@ -38,7 +38,7 @@ nav:
       - backtesting-engine/index.md
       - backtesting-engine/parameter-optimisation.md
       - backtesting-engine/profit-calculation.md
-      - backtesting-engine/generalisation-evaluation.md
+      - backtesting-engine/out-of-sample-evaluation.md
   - Trade Executor:
       - trade-executor/index.md
       - trade-executor/operations.md

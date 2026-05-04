@@ -4,16 +4,16 @@ from unittest.mock import MagicMock
 import pytest
 
 from data_system.clients.sqlalchemy_client import SQLAlchemyClient
-from data_system.models.generalisation_evaluation_model import GeneralisationEvaluation
-from data_system.repositories.generalisation_evaluation.sqlalchemy_generalisation_evaluation_repository import (
-    SQLAlchemyGeneralisationEvaluationRepository,
+from data_system.models.out_of_sample_evaluation_model import OutOfSampleEvaluation
+from data_system.repositories.out_of_sample_evaluation.sqlalchemy_out_of_sample_evaluation_repository import (
+    SQLAlchemyOutOfSampleEvaluationRepository,
 )
 
 
 @pytest.mark.data_system
 @pytest.mark.repositories
-@pytest.mark.sqlalchemy_generalisation_evaluation_repository
-class TestSQLAlchemyGeneralisationEvaluationRepository:
+@pytest.mark.sqlalchemy_out_of_sample_evaluation_repository
+class TestSQLAlchemyOutOfSampleEvaluationRepository:
     @pytest.fixture
     def mock_session(self, mocker):
         return mocker.MagicMock()
@@ -30,20 +30,19 @@ class TestSQLAlchemyGeneralisationEvaluationRepository:
         return client
 
     @pytest.fixture
-    def sample_evaluation(self) -> GeneralisationEvaluation:
-        return GeneralisationEvaluation(
+    def sample_evaluation(self) -> OutOfSampleEvaluation:
+        return OutOfSampleEvaluation(
             study_name='test_study',
             trial_number=1,
             start_timestamp=1704067200.0,
             end_timestamp=1704153600.0,
-            final_balance=1050.50,
             geo_mean_return=1.0025
         )
 
     def test_add_with_empty_list_does_nothing(self, mocker):
         # Given
         mock_client = mocker.MagicMock(spec=SQLAlchemyClient)
-        repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
+        repository = SQLAlchemyOutOfSampleEvaluationRepository(mock_client)
 
         # When
         repository.add([])
@@ -51,9 +50,9 @@ class TestSQLAlchemyGeneralisationEvaluationRepository:
         # Then
         mock_client.session.assert_not_called()
 
-    def test_add_inserts_evaluations(self, mock_client, mock_session, sample_evaluation: GeneralisationEvaluation):
+    def test_add_inserts_evaluations(self, mock_client, mock_session, sample_evaluation: OutOfSampleEvaluation):
         # Given
-        repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
+        repository = SQLAlchemyOutOfSampleEvaluationRepository(mock_client)
 
         # When
         repository.add([sample_evaluation])
@@ -61,9 +60,9 @@ class TestSQLAlchemyGeneralisationEvaluationRepository:
         # Then
         mock_session.execute.assert_called_once()
 
-    def test_add_passes_correct_records_to_execute(self, mock_client, mock_session, sample_evaluation: GeneralisationEvaluation):
+    def test_add_passes_correct_records_to_execute(self, mock_client, mock_session, sample_evaluation: OutOfSampleEvaluation):
         # Given
-        repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
+        repository = SQLAlchemyOutOfSampleEvaluationRepository(mock_client)
 
         # When
         repository.add([sample_evaluation])
@@ -78,17 +77,16 @@ class TestSQLAlchemyGeneralisationEvaluationRepository:
     def test_add_handles_multiple_evaluations(self, mock_client, mock_session):
         # Given
         evaluations = [
-            GeneralisationEvaluation(
+            OutOfSampleEvaluation(
                 study_name='test_study',
                 trial_number=i,
                 start_timestamp=1704067200.0,
                 end_timestamp=1704153600.0,
-                final_balance=1050.50 + i,
-                geo_mean_return=1.0025
+                geo_mean_return=1.0025 + i * 0.001
             )
             for i in range(3)
         ]
-        repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
+        repository = SQLAlchemyOutOfSampleEvaluationRepository(mock_client)
 
         # When
         repository.add(evaluations)
@@ -106,7 +104,7 @@ class TestSQLAlchemyGeneralisationEvaluationRepository:
         mock_result = MagicMock()
         mock_result.fetchall.return_value = []
         mock_session.execute.return_value = mock_result
-        repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
+        repository = SQLAlchemyOutOfSampleEvaluationRepository(mock_client)
 
         # When
         result = repository.get_evaluated_trial_numbers(
@@ -123,7 +121,7 @@ class TestSQLAlchemyGeneralisationEvaluationRepository:
         mock_result = MagicMock()
         mock_result.fetchall.return_value = [(1,), (2,), (5,)]
         mock_session.execute.return_value = mock_result
-        repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
+        repository = SQLAlchemyOutOfSampleEvaluationRepository(mock_client)
 
         # When
         result = repository.get_evaluated_trial_numbers(
@@ -140,7 +138,7 @@ class TestSQLAlchemyGeneralisationEvaluationRepository:
         mock_result = MagicMock()
         mock_result.fetchall.return_value = []
         mock_session.execute.return_value = mock_result
-        repository = SQLAlchemyGeneralisationEvaluationRepository(mock_client)
+        repository = SQLAlchemyOutOfSampleEvaluationRepository(mock_client)
         study_name = 'my_study'
         start = 1704067200.0
         end = 1704153600.0

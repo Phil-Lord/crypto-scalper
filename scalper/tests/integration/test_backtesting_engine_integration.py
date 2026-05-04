@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import Mock, MagicMock, patch
 
 from backtesting_engine import BacktestingEngine
-from backtesting_engine.generalisation_evaluation import (
+from backtesting_engine.out_of_sample_evaluation import (
     get_top_param_sets,
     run_evaluation,
     save_results
@@ -14,7 +14,7 @@ from data_system import (
     Trade,
     SQLAlchemyClient,
     SQLAlchemyTradeRepository,
-    SQLAlchemyGeneralisationEvaluationRepository
+    SQLAlchemyOutOfSampleEvaluationRepository
 )
 from data_system.models import Signal
 from strategy_manager import SmaStrategy, SmaStrategyConfig
@@ -31,7 +31,7 @@ class TestBacktestingEngineIntegration:
     - BacktestingEngine loading data and running strategies
     - Profit calculation on real strategy results
     - Parameter optimisation objective function
-    - Generalisation evaluation flow
+    - Out-of-sample evaluation flow
     - Integration with Data System (TradeRepository)
     '''
 
@@ -391,7 +391,7 @@ class TestBacktestingEngineIntegration:
         mock_trial.suggest_int.assert_called()
         mock_trial.set_user_attr.assert_called()
 
-    # ==================== Generalisation Evaluation Integration Tests ====================
+    # ==================== Out-of-Sample Evaluation Integration Tests ====================
 
     def test_get_top_param_sets_extracts_completed_trials(self):
         '''
@@ -432,7 +432,7 @@ class TestBacktestingEngineIntegration:
 
     def test_run_evaluation_calculates_metrics(self, mock_trade_repository: Mock, sma_strategy: SmaStrategy):
         '''
-        Test generalisation evaluation calculation.
+        Test out-of-sample evaluation calculation.
         Verifies evaluation metrics computation on new data.
         '''
         # Given
@@ -463,19 +463,16 @@ class TestBacktestingEngineIntegration:
         # Then
         assert len(results) == 1
         assert 'trial_number' in results[0]
-        assert 'final_balance' in results[0]
         assert 'geo_mean_return' in results[0]
 
         assert results[0]['trial_number'] == 1
-        assert isinstance(results[0]['final_balance'], float)
         assert isinstance(results[0]['geo_mean_return'], float)
-        assert results[0]['final_balance'] > 0
         assert results[0]['geo_mean_return'] > 0
 
     def test_save_results_transforms_to_domain_objects(self):
         '''
         Test saving evaluation results to repository.
-        Verifies transformation to GeneralisationEvaluation domain objects.
+        Verifies transformation to OutOfSampleEvaluation domain objects.
         '''
         # Given
         mock_session = MagicMock()
@@ -490,12 +487,11 @@ class TestBacktestingEngineIntegration:
                 mock_sessionmaker.return_value = mock_session_class
 
                 client = SQLAlchemyClient()
-                repository = SQLAlchemyGeneralisationEvaluationRepository(client)
+                repository = SQLAlchemyOutOfSampleEvaluationRepository(client)
 
                 results = [
                     {
                         'trial_number': 1,
-                        'final_balance': 1050.0,
                         'geo_mean_return': 1.05
                     }
                 ]
@@ -516,14 +512,13 @@ class TestBacktestingEngineIntegration:
         # Verify SQL statement
         sql_stmt = str(call_args[0][0])
         assert 'INSERT' in sql_stmt
-        assert 'generalisation_evaluation' in sql_stmt
+        assert 'out_of_sample_evaluation' in sql_stmt
 
         # Verify domain data transformation
         records = call_args[0][1]
         assert len(records) == 1
         assert records[0]['study_name'] == 'SmaStrategy_XXBTZGBP_20240101-20240701'
         assert records[0]['trial_number'] == 1
-        assert records[0]['final_balance'] == 1050.0
         assert records[0]['geo_mean_return'] == 1.05
 
         mock_session.commit.assert_called_once()

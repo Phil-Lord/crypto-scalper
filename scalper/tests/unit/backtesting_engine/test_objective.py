@@ -2,12 +2,7 @@ import optuna
 import pandas as pd
 import pytest
 
-from backtesting_engine.objective import (
-    calculate_penalty,
-    get_objective,
-    suggest_parameters,
-    run_strategy_on_window
-)
+from backtesting_engine.objective import (calculate_penalty, get_objective, suggest_parameters)
 
 
 @pytest.mark.backtesting_engine
@@ -133,54 +128,6 @@ class TestSuggestParameters:
 
         # Then
         assert params == {'window': 10, 'threshold': 0.5}
-
-
-@pytest.mark.backtesting_engine
-@pytest.mark.objective
-class TestRunStrategyOnWindow:
-    def test_creates_strategy_via_factory(self, mocker):
-        # Given
-        mock_engine = mocker.Mock()
-        mock_new_strategy = mocker.MagicMock(name='new_strategy')
-        mock_create = mocker.patch(
-            'backtesting_engine.objective.create_strategy',
-            return_value=mock_new_strategy
-        )
-
-        SmaStrategy = type('SmaStrategy', (), {})
-        mock_engine.strategy = SmaStrategy()
-
-        params = {'short_window': 5, 'long_window': 10}
-        start = pd.Timestamp('2021-01-01')
-        end = pd.Timestamp('2021-03-31')
-
-        # When
-        run_strategy_on_window(mock_engine, params, start, end)
-
-        # Then
-        mock_create.assert_called_once_with('SmaStrategy', params)
-        assert mock_engine.strategy == mock_new_strategy
-        mock_engine.set_ohlc_window.assert_called_once_with(start, end)
-        mock_engine.run.assert_called_once()
-
-    def test_prunes_trial_when_config_raises_value_error(self, mocker):
-        # Given
-        mock_engine = mocker.Mock()
-        mocker.patch(
-            'backtesting_engine.objective.create_strategy',
-            side_effect=ValueError('Invalid params')
-        )
-
-        SmaStrategy = type('SmaStrategy', (), {})
-        mock_engine.strategy = SmaStrategy()
-
-        params = {'short_ema': 20, 'long_ema': 10}  # Invalid
-        start = pd.Timestamp('2021-01-01')
-        end = pd.Timestamp('2021-03-31')
-
-        # When / Then
-        with pytest.raises(optuna.TrialPruned):
-            run_strategy_on_window(mock_engine, params, start, end)
 
 
 @pytest.mark.backtesting_engine

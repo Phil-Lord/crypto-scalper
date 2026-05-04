@@ -90,18 +90,17 @@ Historical trade data fetched from Kraken API.
 > **Note:** Primary key is composite `(trade_id, pair)` since Kraken trade IDs are only unique
 > within a trading pair.
 
-### `generalisation_evaluation`
+### `out_of_sample_evaluation`
 
 Stores out-of-sample evaluation results for Optuna trials.
 
-| Column            | Type           | Description                    |
-| ----------------- | -------------- | ------------------------------ |
-| `study_name`      | TEXT (CPK)     | Optuna study name              |
-| `trial_number`    | INTEGER (CPK)  | Trial number within the study  |
-| `start_timestamp` | FLOAT (CPK)    | Evaluation window start        |
-| `end_timestamp`   | FLOAT (CPK)    | Evaluation window end          |
-| `final_balance`   | FLOAT NOT NULL | Final balance after evaluation |
-| `geo_mean_return` | FLOAT NOT NULL | Geometric mean return          |
+| Column            | Type           | Description                                                    |
+| ----------------- | -------------- | -------------------------------------------------------------- |
+| `study_name`      | TEXT (CPK)     | Optuna study name                                              |
+| `trial_number`    | INTEGER (CPK)  | Trial number within the study                                  |
+| `start_timestamp` | FLOAT (CPK)    | Evaluation period start (Unix seconds)                         |
+| `end_timestamp`   | FLOAT (CPK)    | Evaluation period end (Unix seconds)                           |
+| `geo_mean_return` | FLOAT NOT NULL | Geometric mean of per-window return ratios over the OOS period |
 
 ### `jobs`
 

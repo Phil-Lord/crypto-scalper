@@ -14,7 +14,7 @@ and operational workflows of each.
 | [Data System](data-system/index.md)                       | Storage layer — repositories, dual SQLite/Supabase backends, schema reference.                       |
 | [Exchange Connector](exchange-connector/index.md)         | Kraken integration — three-layer Client/Service/Connector pattern and per-endpoint reference.        |
 | [Strategy Manager](strategy-manager/index.md)             | Indicators, rules, and strategies — dual live/vectorised computation modes and a guide for new ones. |
-| [Backtesting Engine](backtesting-engine/index.md)         | Optuna parameter optimisation, profit calculation, and out-of-sample generalisation evaluation.      |
+| [Backtesting Engine](backtesting-engine/index.md)         | Optuna parameter optimisation, profit calculation, and out-of-sample evaluation.                     |
 | [Trade Executor](trade-executor/index.md)                 | Live-trading engine — warm-up, state recovery, order lifecycle, and operational workflows.           |
 | [Cloud Architecture](cloud-architecture.md)               | How the system runs in production on Fly.io + Supabase.                                              |
 | [Architecture Decision Log](architecture-decision-log.md) | Non-obvious design decisions across all modules with their rationale.                                |

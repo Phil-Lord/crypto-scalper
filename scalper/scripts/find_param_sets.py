@@ -3,7 +3,7 @@ import logging
 import click
 import questionary
 
-from backtesting_engine import find_params
+from backtesting_engine import evaluate_out_of_sample
 from utils import load_env, LOG_FORMAT, get_study_choices, get_second_timestamp, parse_datetime
 
 load_env()
@@ -24,7 +24,7 @@ def find_param_sets(num_sets: int, start: str, end: str) -> None:
     start = get_second_timestamp(*parse_datetime(start))
     end = get_second_timestamp(*parse_datetime(end))
 
-    find_params(study_name, num_sets, start, end)
+    evaluate_out_of_sample(study_name, num_sets, start, end)
 
 
 if __name__ == '__main__':
