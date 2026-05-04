@@ -5,7 +5,6 @@ import warnings
 import optuna
 from optuna.exceptions import ExperimentalWarning
 import pandas as pd
-from tqdm import tqdm
 
 from .objective import get_objective
 from utils import OptunaConfig
@@ -29,8 +28,8 @@ def optimise_parameters(
     :param n_trials: Number of Optuna trials.
     :param n_jobs: Optuna concurrency. ``-1`` uses all available cores.
     :param progress_callback: Optional Optuna callback ``(study, trial) -> None``
-        invoked after each trial. When ``None``, the library installs a default
-        tqdm-backed progress bar to preserve existing CLI behaviour.
+        invoked after each trial. Entry points pick presentation; the library
+        installs no default progress bar.
     '''
     warnings.filterwarnings('ignore', category=ExperimentalWarning)
     windows = create_windows(engine.start, engine.end)
@@ -103,12 +102,12 @@ def validate_search_space(study: optuna.study.Study, param_grid: dict[str, list[
 
 def create_windows(start: float, end: float) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
     '''
-    Generate a list of rolling 3-month windows between two timestamps. 
+    Generate a list of rolling 3-month windows between two timestamps.
 
-    - Each window spans exactly 3 calendar months. 
-    - Windows step forward by 1 month. 
-    - From the second window onward, the start is shifted back by 1 day (warmup). 
-    - The end of each window is exclusive, represented as (logical_end - 1 second). 
+    - Each window spans exactly 3 calendar months.
+    - Windows step forward by 1 month.
+    - From the second window onward, the start is shifted back by 1 day (warmup).
+    - The end of each window is exclusive, represented as (logical_end - 1 second).
     - Incomplete windows beyond the provided end timestamp are discarded.
     '''
     months_in_window = 3
@@ -154,27 +153,10 @@ def optimise(
     progress_callback: OptunaCallback | None = None,
 ) -> None:
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    using_default_pbar = progress_callback is None
-    if using_default_pbar:
-        progress_callback = TqdmProgressCallback(n_trials)
-    try:
-        study.optimize(
-            get_objective(engine, param_grid, windows),
-            n_trials=n_trials,
-            n_jobs=n_jobs,
-            callbacks=[progress_callback]
-        )
-    finally:
-        if using_default_pbar:
-            progress_callback.close()
-
-
-class TqdmProgressCallback:
-    def __init__(self, total_trials: int):
-        self.pbar = tqdm(total=total_trials, desc='Optimising', dynamic_ncols=True)
-
-    def __call__(self, study: optuna.study.Study, trial: optuna.trial.FrozenTrial) -> None:
-        self.pbar.update(1)
-
-    def close(self) -> None:
-        self.pbar.close()
+    callbacks = [progress_callback] if progress_callback is not None else []
+    study.optimize(
+        get_objective(engine, param_grid, windows),
+        n_trials=n_trials,
+        n_jobs=n_jobs,
+        callbacks=callbacks,
+    )

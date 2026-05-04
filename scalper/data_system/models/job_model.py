@@ -8,6 +8,8 @@ class JobType(str, Enum):
     GET_TRADES = 'get_trades'
     FETCH_TRADES = 'fetch_trades'
     RUN_BACKTEST = 'run_backtest'
+    OPTIMISE_IN_SAMPLE = 'optimise_in_sample'
+    EVALUATE_OUT_OF_SAMPLE = 'evaluate_out_of_sample'
 
 
 class JobStatus(str, Enum):

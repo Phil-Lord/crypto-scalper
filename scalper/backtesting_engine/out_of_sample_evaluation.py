@@ -1,11 +1,9 @@
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from contextlib import contextmanager
-from typing import Callable, Generator
+from typing import Callable
 
 import optuna
 import pandas as pd
-from tqdm import tqdm
 
 from data_system import (
     OutOfSampleEvaluation,
@@ -53,8 +51,8 @@ def evaluate_out_of_sample(
         across ``ProcessPoolExecutor`` workers, each constructing its own
         ``BacktestingEngine`` (and loading OHLC data) once.
     :param progress_callback: Optional ``() -> None`` callback invoked once per
-        parameter set evaluated. When ``None``, the library installs a default
-        tqdm-backed progress bar to preserve existing CLI behaviour.
+        parameter set evaluated. Entry points pick presentation; the library
+        installs no default progress bar.
     '''
     study = load_study(study_name)
 
@@ -115,7 +113,13 @@ def get_top_param_sets(study: optuna.Study, n: int, evaluated_trials: set[int]) 
     return top_param_sets
 
 
-def build_engine(pair: str, strategy_name: str, params: dict, start: float, end: float) -> BacktestingEngine:
+def build_engine(
+        pair: str,
+        strategy_name: str,
+        params: dict,
+        start: float,
+        end: float
+) -> BacktestingEngine:
     client = SQLAlchemyClient()
     trade_repo = SQLAlchemyTradeRepository(client)
     strategy = create_strategy(strategy_name, params)
@@ -137,10 +141,10 @@ def run_evaluation(
     progress_callback: Callable[[], None] | None = None,
 ) -> list[dict]:
     results = []
-    with _resolve_progress_callback(progress_callback, len(top_param_sets)) as on_tick:
-        for param_set in top_param_sets:
-            results.append(evaluate_param_set(engine, param_set, windows))
-            on_tick()
+    for param_set in top_param_sets:
+        results.append(evaluate_param_set(engine, param_set, windows))
+        if progress_callback is not None:
+            progress_callback()
     return results
 
 
@@ -173,40 +177,20 @@ def run_evaluation_parallel(
     chunks = chunk_param_sets(top_param_sets, n_workers)
 
     results = []
-    with _resolve_progress_callback(progress_callback, len(top_param_sets)) as on_tick:
-        with ProcessPoolExecutor(max_workers=len(chunks)) as executor:
-            futures = [
-                executor.submit(
-                    _evaluate_chunk_worker, pair, strategy_name, chunk, windows, start, end
-                )
-                for chunk in chunks
-            ]
-            for future in as_completed(futures):
-                chunk_results = future.result()
-                results.extend(chunk_results)
+    with ProcessPoolExecutor(max_workers=len(chunks)) as executor:
+        futures = [
+            executor.submit(
+                _evaluate_chunk_worker, pair, strategy_name, chunk, windows, start, end
+            )
+            for chunk in chunks
+        ]
+        for future in as_completed(futures):
+            chunk_results = future.result()
+            results.extend(chunk_results)
+            if progress_callback is not None:
                 for _ in chunk_results:
-                    on_tick()
+                    progress_callback()
     return results
-
-
-@contextmanager
-def _resolve_progress_callback(
-    progress_callback: Callable[[], None] | None,
-    total: int,
-) -> Generator[Callable[[], None], None, None]:
-    '''
-    Yield a ``() -> None`` tick callback. When ``progress_callback`` is ``None``,
-    install a default tqdm bar that closes on exit so existing CLI behaviour
-    (a single 'Evaluating' progress bar) is preserved.
-    '''
-    if progress_callback is not None:
-        yield progress_callback
-        return
-    pbar = tqdm(total=total, desc='Evaluating', dynamic_ncols=True, bar_format='{l_bar}{bar}')
-    try:
-        yield lambda: pbar.update(1)
-    finally:
-        pbar.close()
 
 
 def chunk_param_sets(param_sets: list[dict], n_chunks: int) -> list[list[dict]]:

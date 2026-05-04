@@ -153,7 +153,8 @@ These are conventions, not all currently enforced by tooling — break them only
 **Backtesting & Optuna**
 
 - `run_backtest.py` — single backtest run
-- `find_param_sets.py` — Optuna parameter search
+- `optimise_in_sample.py` — Optuna parameter search
+- `evaluate_out_of_sample.py` — OOS evaluation of Optuna trials
 - `analyse_study.py`, `delete_study.py` — Optuna study management
 
 **Bot & job management**

@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from sqlalchemy import text
 import optuna
 from questionary import Choice
@@ -5,8 +7,21 @@ from questionary import Choice
 from utils import OptunaConfig
 
 
-def get_study_choices() -> list[Choice]:
-    ''' Retrieve all study names and trial counts from the database as Questionary Choices. '''
+@dataclass(frozen=True)
+class StudySummary:
+    '''
+    Summary of an Optuna study, suitable for non-interactive listing.
+
+    Attributes:
+        study_name (str): The Optuna study name (unique within the storage).
+        n_trials (int): Total number of trials recorded against the study.
+    '''
+    study_name: str
+    n_trials: int
+
+
+def list_studies() -> list[StudySummary]:
+    ''' Retrieve all studies from the Optuna storage as plain summaries. '''
     storage = optuna.storages.RDBStorage(url=OptunaConfig.DB_URL)
     engine = storage.engine
 
@@ -23,8 +38,12 @@ def get_study_choices() -> list[Choice]:
     with engine.connect() as connection:
         result = connection.execute(query).fetchall()
 
-    choices = []
-    for study_name, n_trials in result:
-        display_name = f'{study_name} {n_trials}'
-        choices.append(Choice(title=display_name, value=study_name))
-    return choices
+    return [StudySummary(study_name=name, n_trials=n) for name, n in result]
+
+
+def get_study_choices() -> list[Choice]:
+    ''' Wrap :func:`list_studies` for interactive Questionary CLI prompts. '''
+    return [
+        Choice(title=f'{summary.study_name} {summary.n_trials}', value=summary.study_name)
+        for summary in list_studies()
+    ]

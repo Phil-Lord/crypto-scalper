@@ -53,34 +53,12 @@ class TestOptimise:
         callbacks = study.optimize.call_args.kwargs['callbacks']
         assert user_cb in callbacks
 
-    def test_does_not_install_default_tqdm_when_callback_provided(self, mocker, study, engine):
-        # Given
-        tqdm_cls = mocker.patch(
-            'backtesting_engine.parameter_optimisation.TqdmProgressCallback',
-        )
-
-        # When
-        optimise(
-            n_trials=5, study=study, engine=engine, windows=[], param_grid={},
-            progress_callback=mocker.Mock(),
-        )
-
-        # Then
-        tqdm_cls.assert_not_called()
-
-    def test_installs_default_tqdm_when_callback_none(self, mocker, study, engine):
-        # Given
-        tqdm_cls = mocker.patch(
-            'backtesting_engine.parameter_optimisation.TqdmProgressCallback',
-        )
-
+    def test_passes_no_callbacks_when_none_provided(self, study, engine):
         # When
         optimise(n_trials=5, study=study, engine=engine, windows=[], param_grid={})
 
         # Then
-        tqdm_cls.assert_called_once_with(5)
-        # Default callback must be closed.
-        tqdm_cls.return_value.close.assert_called_once()
+        assert study.optimize.call_args.kwargs['callbacks'] == []
 
 
 @pytest.mark.backtesting_engine
