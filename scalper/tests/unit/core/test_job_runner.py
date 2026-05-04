@@ -10,6 +10,7 @@ from data_system.repositories.job.job_repository import JobRepository
 
 class _MockStdoutStream:
     '''Async-iterable mock for a subprocess stdout stream.'''
+
     def __init__(self, lines: list[bytes]):
         self._lines = iter(lines)
 
@@ -171,3 +172,105 @@ class TestRunSubprocess:
         persisted = mock_repo.update.call_args.args[0]
         assert persisted.status == JobStatus.ERROR
         assert persisted.message == 'cannot spawn'
+
+    def test_passes_cwd_and_env_to_subprocess(self, mocker, mock_repo, job: Job):
+        proc = _MockProc(returncode=0, lines=[])
+        captured: dict = {}
+
+        async def _create(*args, **kwargs):
+            captured.update(kwargs)
+            return proc
+
+        mocker.patch('core.job_runner.asyncio.create_subprocess_exec', side_effect=_create)
+
+        asyncio.run(run_subprocess(
+            mock_repo, job, ['fake'], cwd='/tmp/x', env={'FOO': 'bar'}
+        ))
+
+        assert captured['cwd'] == '/tmp/x'
+        assert captured['env'] == {'FOO': 'bar'}
+
+    def test_cancellation_terminates_process_and_marks_job_error(
+        self, mocker, mock_repo, job: Job
+    ):
+        '''
+        While streaming stdout, a CancelledError raised at the iteration await
+        should: terminate the subprocess, persist the job as ERROR with a
+        ``cancelled`` message, and re-raise CancelledError.
+        '''
+        terminate_called = mocker.MagicMock()
+
+        class _CancellingStdout:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                raise asyncio.CancelledError
+
+        class _Proc:
+            def __init__(self):
+                self.returncode = None
+                self.stdout = _CancellingStdout()
+                self.terminate = terminate_called
+
+            async def wait(self):
+                self.returncode = -15
+                return self.returncode
+
+        proc = _Proc()
+        self._patch_subprocess(mocker, proc)
+
+        with pytest.raises(asyncio.CancelledError):
+            asyncio.run(run_subprocess(
+                mock_repo, job, ['fake'], terminate_grace_seconds=0.1
+            ))
+
+        terminate_called.assert_called_once()
+        persisted = mock_repo.update.call_args.args[0]
+        assert persisted.status == JobStatus.ERROR
+        assert persisted.message == 'cancelled'
+
+    def test_cancellation_kills_unresponsive_process(
+        self, mocker, mock_repo, job: Job
+    ):
+        '''
+        If the process does not exit within ``terminate_grace_seconds`` after
+        SIGTERM, ``kill()`` is invoked.
+        '''
+        kill_called = mocker.MagicMock()
+
+        class _CancellingStdout:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                raise asyncio.CancelledError
+
+        class _StubbornProc:
+            def __init__(self):
+                self.returncode = None
+                self.stdout = _CancellingStdout()
+                self._waited = False
+
+            def terminate(self):
+                pass  # Pretend SIGTERM was ignored.
+
+            def kill(self):
+                self.returncode = -9
+                kill_called()
+
+            async def wait(self):
+                if self.returncode is None:
+                    # First wait (after terminate) hangs until cancelled by timeout.
+                    await asyncio.sleep(10)
+                return self.returncode
+
+        proc = _StubbornProc()
+        self._patch_subprocess(mocker, proc)
+
+        with pytest.raises(asyncio.CancelledError):
+            asyncio.run(run_subprocess(
+                mock_repo, job, ['fake'], terminate_grace_seconds=0.05
+            ))
+
+        kill_called.assert_called_once()
