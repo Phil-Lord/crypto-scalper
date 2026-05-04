@@ -14,8 +14,7 @@ import sys
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
-import optuna
-
+from backtesting_engine import get_top_param_sets, load_study
 from core import run_subprocess
 from data_system import (
     Job,
@@ -181,19 +180,11 @@ def get_top_trials(study_name: str, n: int) -> list[dict]:
     Return the top ``n`` completed trials of a study, highest objective first
     (or lowest if the study minimises).
 
-    Each entry is ``{'trial_number': int, 'value': float, 'params': dict}``.
     Used by the OOS tab to preview which parameter sets the script would
-    evaluate. Read-only — does not write to Optuna or the SQLite eval table.
+    evaluate. Includes already-evaluated trials (the preview shows the full
+    selection, not the to-do list).
     '''
-    storage = optuna.storages.RDBStorage(url=OptunaConfig.DB_URL)
-    study = optuna.load_study(study_name=study_name, storage=storage)
-    completed = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
-    reverse = study.direction == optuna.study.StudyDirection.MAXIMIZE
-    top = sorted(completed, key=lambda t: t.value, reverse=reverse)[:n]
-    return [
-        {'trial_number': t.number, 'value': t.value, 'params': t.params}
-        for t in top
-    ]
+    return get_top_param_sets(load_study(study_name), n)
 
 
 def get_evaluation_results(
