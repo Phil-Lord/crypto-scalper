@@ -117,76 +117,23 @@ class TestSplitTrials:
 @pytest.mark.ui
 @pytest.mark.ui_services
 @pytest.mark.walk_forward
-class TestListStudies:
-    def test_delegates_to_utils_list_studies(self, mocker):
+class TestGetTopTrials:
+    def test_delegates_to_backtesting_engine_helpers(self, mocker):
         # Given
-        sentinel = [object(), object()]
-        mock = mocker.patch('ui.services.walk_forward._list_studies', return_value=sentinel)
+        study_sentinel = object()
+        param_sets_sentinel = [{'trial_number': 1, 'value': 5.0, 'params': {}}]
+        load = mocker.patch.object(svc, 'load_study', return_value=study_sentinel)
+        get_top = mocker.patch.object(
+            svc, 'get_top_param_sets', return_value=param_sets_sentinel,
+        )
 
         # When
-        result = svc.list_studies()
+        result = svc.get_top_trials('my_study', 2)
 
         # Then
-        mock.assert_called_once_with()
-        assert result is sentinel
-
-
-@pytest.mark.ui
-@pytest.mark.ui_services
-@pytest.mark.walk_forward
-class TestGetTopTrials:
-    def _trial(self, number, value, state, params=None):
-        import optuna
-        t = MagicMock()
-        t.number = number
-        t.value = value
-        t.state = state
-        t.params = params or {'a': number}
-        return t
-
-    def test_returns_top_n_completed_trials_for_maximisation(self, mocker):
-        import optuna
-        complete = optuna.trial.TrialState.COMPLETE
-        pruned = optuna.trial.TrialState.PRUNED
-        trials = [
-            self._trial(0, 1.0, complete),
-            self._trial(1, 5.0, complete),
-            self._trial(2, 3.0, complete),
-            self._trial(3, 99.0, pruned),  # Should be excluded.
-            self._trial(4, 4.0, complete),
-        ]
-
-        study = MagicMock()
-        study.trials = trials
-        study.direction = optuna.study.StudyDirection.MAXIMIZE
-
-        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
-        mocker.patch.object(svc.optuna, 'load_study', return_value=study)
-
-        top = svc.get_top_trials('s', 2)
-
-        assert [t['trial_number'] for t in top] == [1, 4]
-        assert top[0]['value'] == 5.0
-        assert top[0]['params'] == {'a': 1}
-
-    def test_reverses_order_for_minimisation(self, mocker):
-        import optuna
-        complete = optuna.trial.TrialState.COMPLETE
-        trials = [
-            self._trial(0, 1.0, complete),
-            self._trial(1, 5.0, complete),
-            self._trial(2, 3.0, complete),
-        ]
-        study = MagicMock()
-        study.trials = trials
-        study.direction = optuna.study.StudyDirection.MINIMIZE
-
-        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
-        mocker.patch.object(svc.optuna, 'load_study', return_value=study)
-
-        top = svc.get_top_trials('s', 2)
-
-        assert [t['trial_number'] for t in top] == [0, 2]
+        load.assert_called_once_with('my_study')
+        get_top.assert_called_once_with(study_sentinel, 2)
+        assert result is param_sets_sentinel
 
 
 @pytest.mark.ui
