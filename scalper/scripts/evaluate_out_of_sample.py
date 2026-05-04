@@ -53,6 +53,7 @@ class JsonProgressCallback:
 
 
 def emit(event: str, payload: dict) -> None:
+    ''' Emit a JSON line to stdout with the given event name and payload. '''
     sys.stdout.write(f'{event} {json.dumps(payload)}\n')
     sys.stdout.flush()
 

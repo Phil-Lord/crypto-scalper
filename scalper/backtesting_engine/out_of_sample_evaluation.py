@@ -113,7 +113,13 @@ def get_top_param_sets(study: optuna.Study, n: int, evaluated_trials: set[int]) 
     return top_param_sets
 
 
-def build_engine(pair: str, strategy_name: str, params: dict, start: float, end: float) -> BacktestingEngine:
+def build_engine(
+        pair: str,
+        strategy_name: str,
+        params: dict,
+        start: float,
+        end: float
+) -> BacktestingEngine:
     client = SQLAlchemyClient()
     trade_repo = SQLAlchemyTradeRepository(client)
     strategy = create_strategy(strategy_name, params)
