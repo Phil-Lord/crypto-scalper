@@ -12,7 +12,7 @@ class OutOfSampleEvaluationRepository(ABC):
         :param evaluations: List of OutOfSampleEvaluation domain objects to persist.
         '''
         pass
-        
+
     @abstractmethod
     def get_evaluated_trial_numbers(self, study_name: str, start: float, end: float) -> set[int]:
         '''
@@ -22,5 +22,17 @@ class OutOfSampleEvaluationRepository(ABC):
         :param start: Start timestamp (Unix seconds).
         :param end: End timestamp (Unix seconds).
         :return: Set of trial numbers already evaluated.
+        '''
+        pass
+
+    @abstractmethod
+    def get(self, study_name: str, start: float, end: float) -> list[OutOfSampleEvaluation]:
+        '''
+        Fetches all stored evaluation rows for a study and time range.
+
+        :param study_name: Name of the Optuna study.
+        :param start: Start timestamp (Unix seconds).
+        :param end: End timestamp (Unix seconds).
+        :return: List of OutOfSampleEvaluation rows, ordered by trial number.
         '''
         pass
