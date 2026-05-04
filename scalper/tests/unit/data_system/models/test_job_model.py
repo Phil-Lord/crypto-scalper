@@ -162,6 +162,12 @@ class TestJobType:
     def test_run_backtest_value(self):
         assert JobType.RUN_BACKTEST.value == 'run_backtest'
 
+    def test_optimise_in_sample_value(self):
+        assert JobType.OPTIMISE_IN_SAMPLE.value == 'optimise_in_sample'
+
+    def test_evaluate_out_of_sample_value(self):
+        assert JobType.EVALUATE_OUT_OF_SAMPLE.value == 'evaluate_out_of_sample'
+
     def test_is_string_enum(self):
         assert isinstance(JobType.GET_TRADES, str)
         assert JobType.GET_TRADES == 'get_trades'
