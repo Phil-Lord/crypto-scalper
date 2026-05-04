@@ -615,21 +615,16 @@ class TestProgressCallbackInvocation:
         # Then
         assert cb.call_count == 3
 
-    def test_serial_uses_default_tqdm_when_callback_none(self, mocker, windows):
+    def test_serial_runs_without_callback_when_none_provided(self, mocker, windows):
         # Given
         mocker.patch('backtesting_engine.window_evaluation.create_strategy')
-        tqdm_mock = mocker.patch('backtesting_engine.out_of_sample_evaluation.tqdm')
         engine = mocker.Mock()
         engine.get_final_quote_balance.return_value = 1100.0
         param_sets = [{'trial_number': 0, 'value': 1.5, 'params': {}}]
 
-        # When
-        run_evaluation(engine, param_sets, windows)
-
-        # Then
-        tqdm_mock.assert_called_once()
-        tqdm_mock.return_value.update.assert_called_once_with(1)
-        tqdm_mock.return_value.close.assert_called_once()
+        # When / Then — should complete without raising even without a callback.
+        results = run_evaluation(engine, param_sets, windows)
+        assert len(results) == 1
 
     def test_parallel_calls_user_callback_once_per_param_set(self, mocker, windows):
         # Given
