@@ -11,7 +11,7 @@ and the surrounding lifecycle (``Job`` rows, cancellation, progress streaming).
 '''
 import asyncio
 import json
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from pathlib import Path
 
 from backtesting_engine import get_top_param_sets, load_study
@@ -89,18 +89,27 @@ async def start_in_sample(
     Cancelling the awaiting task propagates ``CancelledError`` to each worker's
     ``run_subprocess`` call, which terminates the underlying subprocess and
     marks the job ``ERROR``. Optuna persists per-trial, so completed trials are
-    retained.
+    retained. If one worker raises a non-cancellation exception (e.g. a spawn
+    failure), the remaining workers are cancelled and their subprocesses
+    terminated before the exception propagates, so no orphaned children leak.
     '''
     splits = _split_trials(n_trials, n_workers)
     jobs = [Job(job_type=JobType.OPTIMISE_IN_SAMPLE) for _ in splits]
-    coroutines: list[Awaitable[None]] = []
-    for index, (job, n_trials) in enumerate(zip(jobs, splits)):
-        cmd = build_in_sample_command(pair, strategy_name, start, end, n_trials, n_jobs=1)
+    tasks: list[asyncio.Task[None]] = []
+    for index, (job, worker_trials) in enumerate(zip(jobs, splits)):
+        cmd = build_in_sample_command(pair, strategy_name, start, end, worker_trials, n_jobs=1)
         callback = _make_progress_handler(index, on_progress)
-        coroutines.append(
+        tasks.append(asyncio.create_task(
             run_subprocess(job_repo, job, cmd, on_progress=callback, cwd=str(SCALPER_DIR))
-        )
-    await asyncio.gather(*coroutines)
+        ))
+    try:
+        await asyncio.gather(*tasks)
+    except BaseException:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
     return jobs
 
 

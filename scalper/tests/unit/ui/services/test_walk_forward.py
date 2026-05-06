@@ -119,6 +119,50 @@ class TestStartInSample:
         # All run with cwd set to the scalper/ directory.
         assert all(cwd is not None and cwd.endswith('/scalper') for _, _, cwd in captured)
 
+    def test_cancels_sibling_workers_when_one_raises(self, mocker):
+        '''
+        If one worker raises a non-cancellation exception, the remaining
+        workers must be cancelled — otherwise their subprocesses leak as
+        orphans. ``asyncio.gather`` does not cancel siblings on its own when
+        a child raises (see Python docs), so the service has to.
+        '''
+        from data_system import JobRepository
+
+        started: list[int] = []
+        cancelled: list[int] = []
+        completed: list[int] = []
+        counter = {'value': 0}
+
+        async def fake_run_subprocess(
+            job_repo, job, cmd, on_progress=None, cwd=None, **kwargs
+        ):
+            my_index = counter['value']
+            counter['value'] += 1
+            started.append(my_index)
+            if my_index == 0:
+                # Yield once so siblings reach their sleep before we raise.
+                await asyncio.sleep(0)
+                raise OSError('cannot spawn')
+            try:
+                await asyncio.sleep(10)
+                completed.append(my_index)
+            except asyncio.CancelledError:
+                cancelled.append(my_index)
+                raise
+
+        mocker.patch.object(svc, 'run_subprocess', side_effect=fake_run_subprocess)
+        mock_repo = mocker.MagicMock(spec=JobRepository)
+
+        with pytest.raises(OSError, match='cannot spawn'):
+            asyncio.run(svc.start_in_sample(
+                'BTCGBP', 'SmaStrategy', '2025-1-1-0-0-0', '2025-2-1-0-0-0',
+                n_trials=10, n_workers=4, job_repo=mock_repo,
+            ))
+
+        assert started == [0, 1, 2, 3]
+        assert sorted(cancelled) == [1, 2, 3]
+        assert completed == []
+
     def test_progress_callback_is_invoked_per_worker_with_parsed_event(self, mocker):
         '''
         Each worker's per-line callback should parse the ``PROGRESS``/``DONE``
