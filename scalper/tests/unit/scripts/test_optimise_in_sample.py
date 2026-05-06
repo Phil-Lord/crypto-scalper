@@ -1,11 +1,35 @@
 import json
+import sys
 from unittest.mock import MagicMock, patch
 
 import optuna
 import pytest
 from click.testing import CliRunner
 
-from scripts.optimise_in_sample import JsonProgressCallback, optimise_in_sample
+from scripts.optimise_in_sample import JsonProgressCallback, build_command, optimise_in_sample
+
+
+@pytest.mark.scripts
+@pytest.mark.optimise_in_sample
+class TestBuildCommand:
+    def test_includes_all_required_flags(self):
+        cmd = build_command(
+            'BTCGBP', 'PrecisionTrendStrategy', '2025-1-1-0-0-0', '2025-4-1-0-0-0',
+            n_trials=50,
+        )
+
+        assert cmd[0] == sys.executable
+        assert cmd[1:3] == ['-m', 'scripts.optimise_in_sample']
+        assert cmd[cmd.index('-p') + 1] == 'BTCGBP'
+        assert cmd[cmd.index('-sn') + 1] == 'PrecisionTrendStrategy'
+        assert cmd[cmd.index('-s') + 1] == '2025-1-1-0-0-0'
+        assert cmd[cmd.index('-e') + 1] == '2025-4-1-0-0-0'
+        assert cmd[cmd.index('-n') + 1] == '50'
+        assert cmd[cmd.index('-j') + 1] == '1'
+
+    def test_overrides_n_jobs(self):
+        cmd = build_command('BTCGBP', 'SmaStrategy', 's', 'e', n_trials=10, n_jobs=4)
+        assert cmd[cmd.index('-j') + 1] == '4'
 
 
 @pytest.mark.scripts

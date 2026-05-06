@@ -136,6 +136,21 @@ class TestGetTopParamSets:
         # Then
         assert len(result) == 1
 
+    def test_default_evaluated_trials_includes_every_completed_trial(self, mocker):
+        # Given — the UI preview path passes no evaluated_trials and expects to
+        # see every completed trial regardless of prior evaluation state.
+        trials = [
+            _make_trial(mocker, 0, 3.0, {'sma_period': 5}),
+            _make_trial(mocker, 1, 2.0, {'sma_period': 10}),
+        ]
+        study = _make_study(mocker, trials)
+
+        # When
+        result = get_top_param_sets(study, n=2)
+
+        # Then
+        assert {r['trial_number'] for r in result} == {0, 1}
+
 
 @pytest.mark.backtesting_engine
 @pytest.mark.out_of_sample_evaluation

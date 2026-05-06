@@ -32,21 +32,41 @@ async def run_subprocess(
     job: Job,
     cmd: list[str],
     on_progress: Callable[[str], None] | None = None,
+    cwd: str | None = None,
+    env: dict[str, str] | None = None,
+    terminate_grace_seconds: float = 5.0,
 ) -> None:
     '''
     Spawn a separate OS process which runs independently of the UI.
 
-    - This is for long-running, CPU-bound tasks which need to survive if the UI crashes.
-    - The subprocess streams progress updates back to the UI via the Job.message field.
+    - For long-running, CPU-bound tasks which need to survive if the UI crashes.
+    - Streams stdout lines back to the UI via the ``Job.message`` field.
+    - Cooperates with ``asyncio.CancelledError``: on cancellation the child is sent
+      ``SIGTERM``, given ``terminate_grace_seconds`` to exit, then ``SIGKILL``-ed
+      if still alive. The job is persisted as ``ERROR`` with a ``cancelled`` message
+      and ``CancelledError`` is re-raised so the caller's task remains cancelled.
+
+    :param job_repo: Repository used to persist job lifecycle transitions.
+    :param job: Initial pending job.
+    :param cmd: Argv list passed to ``asyncio.create_subprocess_exec``.
+    :param on_progress: Optional callback invoked with each decoded stdout line.
+    :param cwd: Optional working directory for the subprocess.
+    :param env: Optional environment for the subprocess. ``None`` inherits the
+        parent's environment.
+    :param terminate_grace_seconds: Seconds to wait after ``terminate()`` before
+        escalating to ``kill()``.
     '''
     job = job.update(status=JobStatus.RUNNING)
     job_repo.add(job)
 
+    proc: asyncio.subprocess.Process | None = None
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT
+            stderr=asyncio.subprocess.STDOUT,
+            cwd=cwd,
+            env=env,
         )
 
         last_update = 0.0
@@ -62,7 +82,39 @@ async def run_subprocess(
         await proc.wait()
         job = job.update(status=JobStatus.DONE if proc.returncode == 0 else JobStatus.ERROR)
         job_repo.update(job)
+    except asyncio.CancelledError:
+        if proc is not None:
+            await _terminate_process(proc, terminate_grace_seconds)
+        job = job.update(status=JobStatus.ERROR, message='cancelled')
+        job_repo.update(job)
+        raise
     except Exception as e:
         job = job.update(status=JobStatus.ERROR, message=str(e))
         job_repo.update(job)
         raise
+
+
+async def _terminate_process(
+    proc: asyncio.subprocess.Process, grace_seconds: float
+) -> None:
+    '''
+    Send SIGTERM, wait up to ``grace_seconds`` for the process to exit, then SIGKILL.
+
+    Swallows ``ProcessLookupError`` since the process may have already exited.
+    '''
+    if proc.returncode is not None:
+        return
+
+    try:
+        proc.terminate()
+    except ProcessLookupError:
+        return
+
+    try:
+        await asyncio.wait_for(proc.wait(), timeout=grace_seconds)
+    except asyncio.TimeoutError:
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            return
+        await proc.wait()

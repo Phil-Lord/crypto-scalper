@@ -94,23 +94,29 @@ def load_study(study_name: str) -> optuna.Study:
     return optuna.load_study(study_name=study_name, storage=storage)
 
 
-def get_top_param_sets(study: optuna.Study, n: int, evaluated_trials: set[int]) -> list[dict]:
+def get_top_param_sets(
+    study: optuna.Study, n: int, evaluated_trials: set[int] | None = None
+) -> list[dict]:
+    '''
+    Return the top ``n`` completed trials of ``study`` as parameter-set dicts,
+    highest objective first (or lowest if the study minimises).
+
+    :param evaluated_trials: Trial numbers to exclude (already evaluated). Pass
+        ``None`` to include every completed trial — used by the UI preview which
+        shows what *would* be evaluated, regardless of prior evaluation state.
+    '''
     logger.info(f'Extracting top {n} parameter sets from study...')
     completed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
     reverse = study.direction == optuna.study.StudyDirection.MAXIMIZE
     top_trials = sorted(completed_trials, key=lambda t: t.value, reverse=reverse)[:n]
-    top_trials = [t for t in top_trials if t.number not in evaluated_trials]
-    logger.info(f'Selected {len(top_trials)} new parameter sets for evaluation.')
+    if evaluated_trials is not None:
+        top_trials = [t for t in top_trials if t.number not in evaluated_trials]
+    logger.info(f'Selected {len(top_trials)} parameter sets for evaluation.')
 
-    top_param_sets = [
-        {
-            'trial_number': t.number,
-            'value': t.value,
-            'params': t.params
-        }
+    return [
+        {'trial_number': t.number, 'value': t.value, 'params': t.params}
         for t in top_trials
     ]
-    return top_param_sets
 
 
 def build_engine(
