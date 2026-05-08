@@ -4,14 +4,14 @@ from unittest.mock import MagicMock
 import optuna
 import pytest
 
-from ui.services import walk_forward as svc
-from ui.services.walk_forward import (
+from ui.models.walk_forward import (
     OosWindowSummary,
     StudyDirection,
     StudySummary,
     TrialVerdict,
     TrialWithOos,
 )
+from ui.services import walk_forward as svc
 
 
 @pytest.mark.ui
