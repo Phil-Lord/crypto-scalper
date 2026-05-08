@@ -301,7 +301,7 @@ class TestListStudiesWithSummary:
 @pytest.mark.ui_services
 @pytest.mark.walk_forward
 class TestListOosWindows:
-    def test_returns_repo_aggregates(self, mocker):
+    def test_returns_repo_aggregates(self):
         aggregates = [
             OosWindowAggregate(start=1.0, end=2.0, best_oos=0.9,
                                generalised_count=3, overfit_count=1),
@@ -310,27 +310,19 @@ class TestListOosWindows:
         ]
         repo = MagicMock()
         repo.aggregate_windows.return_value = aggregates
-        mocker.patch.object(
-            svc, 'SQLAlchemyOutOfSampleEvaluationRepository', return_value=repo
-        )
-        mocker.patch.object(svc, 'SQLAlchemyClient')
 
-        result = svc.list_oos_windows('study-x')
+        result = svc.list_oos_windows('study-x', repo)
 
         assert result == aggregates
         repo.aggregate_windows.assert_called_once_with(
             'study-x', svc.OOS_OVERFIT_THRESHOLD
         )
 
-    def test_returns_empty_when_repo_returns_no_rows(self, mocker):
+    def test_returns_empty_when_repo_returns_no_rows(self):
         repo = MagicMock()
         repo.aggregate_windows.return_value = []
-        mocker.patch.object(
-            svc, 'SQLAlchemyOutOfSampleEvaluationRepository', return_value=repo
-        )
-        mocker.patch.object(svc, 'SQLAlchemyClient')
 
-        assert svc.list_oos_windows('empty') == []
+        assert svc.list_oos_windows('empty', repo) == []
 
 
 @pytest.mark.ui
@@ -351,12 +343,10 @@ class TestGetTopTrialsWithOos:
             _make_oos_eval(trial_number=2, geo_mean_return=0.3),
             # trial 3 has no OOS row → pending
         ]
-        mocker.patch.object(
-            svc, 'SQLAlchemyOutOfSampleEvaluationRepository', return_value=repo
-        )
-        mocker.patch.object(svc, 'SQLAlchemyClient')
 
-        result = svc.get_top_trials_with_oos('study-x', (10.0, 20.0), n_trials=3)
+        result = svc.get_top_trials_with_oos(
+            'study-x', (10.0, 20.0), n_trials=3, oos_repo=repo,
+        )
 
         assert result == [
             TrialWithOos(
@@ -385,12 +375,10 @@ class TestGetTopTrialsWithOos:
         repo.get.return_value = [
             _make_oos_eval(trial_number=1, geo_mean_return=svc.OOS_OVERFIT_THRESHOLD),
         ]
-        mocker.patch.object(
-            svc, 'SQLAlchemyOutOfSampleEvaluationRepository', return_value=repo
-        )
-        mocker.patch.object(svc, 'SQLAlchemyClient')
 
-        result = svc.get_top_trials_with_oos('s', (0.0, 1.0), n_trials=1)
+        result = svc.get_top_trials_with_oos(
+            's', (0.0, 1.0), n_trials=1, oos_repo=repo,
+        )
 
         assert result[0].verdict == TrialVerdict.GENERALISES
 
@@ -400,13 +388,13 @@ class TestGetTopTrialsWithOos:
             {'trial_number': 1, 'value': 1.5, 'params': {}},
             {'trial_number': 2, 'value': 0.9, 'params': {}},
         ])
-        repo_cls = mocker.patch.object(
-            svc, 'SQLAlchemyOutOfSampleEvaluationRepository'
+        repo = MagicMock()
+
+        result = svc.get_top_trials_with_oos(
+            's', None, n_trials=2, oos_repo=repo,
         )
 
-        result = svc.get_top_trials_with_oos('s', None, n_trials=2)
-
-        repo_cls.assert_not_called()
+        repo.get.assert_not_called()
         assert all(t.verdict == TrialVerdict.PENDING for t in result)
         assert all(t.oos_score is None and t.delta is None for t in result)
 
@@ -418,13 +406,9 @@ class TestGetTopTrialsWithOos:
         study = MagicMock()
         load = mocker.patch.object(svc, 'load_study', return_value=study)
         get_top = mocker.patch.object(svc, 'get_top_param_sets', return_value=[])
-        mocker.patch.object(svc, 'SQLAlchemyClient')
-        mocker.patch.object(
-            svc, 'SQLAlchemyOutOfSampleEvaluationRepository',
-            return_value=MagicMock(get=MagicMock(return_value=[])),
-        )
+        repo = MagicMock(get=MagicMock(return_value=[]))
 
-        svc.get_top_trials_with_oos('s', (0.0, 1.0), n_trials=5)
+        svc.get_top_trials_with_oos('s', (0.0, 1.0), n_trials=5, oos_repo=repo)
 
         load.assert_called_once_with('s')
         get_top.assert_called_once_with(study, 5)

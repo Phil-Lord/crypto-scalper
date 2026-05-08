@@ -41,8 +41,7 @@ from data_system import (
     JobType,
     OosWindowAggregate,
     OutOfSampleEvaluation,
-    SQLAlchemyClient,
-    SQLAlchemyOutOfSampleEvaluationRepository,
+    OutOfSampleEvaluationRepository,
 )
 from scripts.evaluate_out_of_sample import build_command as build_out_of_sample_command
 from scripts.optimise_in_sample import build_command as build_in_sample_command
@@ -205,7 +204,10 @@ def list_studies_with_summary() -> list[StudySummary]:
     return [_to_study_summary(summary) for summary in summaries]
 
 
-def list_oos_windows(study_name: str) -> list[OosWindowAggregate]:
+def list_oos_windows(
+    study_name: str,
+    oos_repo: OutOfSampleEvaluationRepository,
+) -> list[OosWindowAggregate]:
     '''
     Aggregate the OOS evaluation table by ``(start_timestamp, end_timestamp)``
     for a single study, applying ``OOS_OVERFIT_THRESHOLD`` to split each
@@ -214,8 +216,7 @@ def list_oos_windows(study_name: str) -> list[OosWindowAggregate]:
     :return: One aggregate per evaluated window, ordered by start timestamp.
         Empty if the study has no OOS evaluations yet.
     '''
-    repo = SQLAlchemyOutOfSampleEvaluationRepository(SQLAlchemyClient())
-    return repo.aggregate_windows(study_name, OOS_OVERFIT_THRESHOLD)
+    return oos_repo.aggregate_windows(study_name, OOS_OVERFIT_THRESHOLD)
 
 
 def get_top_trials(study_name: str, n: int) -> list[dict]:
@@ -234,6 +235,7 @@ def get_top_trials_with_oos(
     study_name: str,
     window: tuple[float, float] | None,
     n_trials: int,
+    oos_repo: OutOfSampleEvaluationRepository,
 ) -> list[TrialWithOos]:
     '''
     Top ``n_trials`` trials for a study, left-joined with OOS scores from ``window``.
@@ -252,8 +254,7 @@ def get_top_trials_with_oos(
     if window is None:
         oos_by_trial: dict[int, float] = {}
     else:
-        repo = SQLAlchemyOutOfSampleEvaluationRepository(SQLAlchemyClient())
-        evaluations = repo.get(study_name, window[0], window[1])
+        evaluations = oos_repo.get(study_name, window[0], window[1])
         oos_by_trial = {e.trial_number: e.geo_mean_return for e in evaluations}
 
     return [
@@ -275,14 +276,16 @@ def get_trial_params(study_name: str, trial_number: int) -> dict:
 
 
 def get_evaluation_results(
-    study_name: str, start: float, end: float
+    study_name: str,
+    start: float,
+    end: float,
+    oos_repo: OutOfSampleEvaluationRepository,
 ) -> list[OutOfSampleEvaluation]:
     '''
     Read previously persisted out-of-sample evaluation rows for a study and
     time window.
     '''
-    repo = SQLAlchemyOutOfSampleEvaluationRepository(SQLAlchemyClient())
-    return repo.get(study_name, start, end)
+    return oos_repo.get(study_name, start, end)
 
 
 def _split_trials(n_trials: int, n_workers: int) -> list[int]:
