@@ -3,38 +3,89 @@ Walk-forward UI service.
 
 Parses the shared ``PROGRESS`` / ``DONE`` JSON contract emitted by
 ``scripts/optimise_in_sample.py`` and ``scripts/evaluate_out_of_sample.py`` and
-orchestrates subprocess execution via :func:`core.run_subprocess`. Each script
-exposes its own ``build_command`` colocated with the click options.
+orchestrates subprocess execution via :func:`core.run_subprocess`.
+Each script exposes its own ``build_command`` colocated with the click options.
 
 The two phases share a single module because they share both the JSON contract
 and the surrounding lifecycle (``Job`` rows, cancellation, progress streaming).
+
+Also exposes read-only helpers the redesigned walk-forward page consumes:
+
+- study summaries
+- OOS-window aggregates
+- top trials joined with OOS scores
+- single-trial param lookups.
+
+``load_study`` results are cached in-process so the page can rerender
+without paying the Optuna round-trip; :func:`invalidate_study_cache`
+lets the page drop entries when a phase finishes.
+
+TODO: Update the wording here once the page is redesigned.
 '''
 import asyncio
 import json
 from collections.abc import Callable
 from pathlib import Path
 
-from backtesting_engine import get_top_param_sets, load_study
+import optuna
+
+from backtesting_engine import (
+    OOS_OVERFIT_THRESHOLD,
+    get_top_param_sets,
+    load_study as _load_study_from_storage
+)
 from core import run_subprocess
 from data_system import (
     Job,
     JobRepository,
     JobType,
+    OosWindowAggregate,
     OutOfSampleEvaluation,
-    SQLAlchemyClient,
-    SQLAlchemyOutOfSampleEvaluationRepository,
+    OutOfSampleEvaluationRepository,
 )
 from scripts.evaluate_out_of_sample import build_command as build_out_of_sample_command
 from scripts.optimise_in_sample import build_command as build_in_sample_command
+from ui.models.walk_forward import (
+    StudyDirection,
+    StudySummary,
+    TrialVerdict,
+    TrialWithOos,
+)
+from utils import OptunaConfig
 
 
 SCALPER_DIR = Path(__file__).resolve().parents[2]
 
 
+# Parsed progress line: ``{'event': 'PROGRESS' | 'DONE', 'payload': dict}``.
 ProgressEvent = dict
-'''
-Parsed progress line: ``{'event': 'PROGRESS' | 'DONE', 'payload': dict}``.
-'''
+
+
+_study_cache: dict[str, optuna.Study] = {}
+
+
+def load_study(study_name: str) -> optuna.Study:
+    '''
+    Return a cached :class:`optuna.Study` for ``study_name``, loading it on
+    first access. Subsequent calls reuse the cached instance — call
+    :func:`invalidate_study_cache` after a phase finishes to pick up new trials.
+    '''
+    if study_name not in _study_cache:
+        _study_cache[study_name] = _load_study_from_storage(study_name)
+    return _study_cache[study_name]
+
+
+def invalidate_study_cache(study_name: str | None = None) -> None:
+    '''
+    Drop cached :class:`optuna.Study` instances.
+
+    :param study_name: If provided, drop only that study; otherwise clear the
+        whole cache. Missing entries are a no-op.
+    '''
+    if study_name is None:
+        _study_cache.clear()
+    else:
+        _study_cache.pop(study_name, None)
 
 
 def parse_progress(line: str) -> ProgressEvent | None:
@@ -140,6 +191,34 @@ async def start_out_of_sample(
     return job
 
 
+def list_studies_with_summary() -> list[StudySummary]:
+    '''
+    Return a summary row for every Optuna study in storage, ordered by name.
+
+    Pair and strategy are parsed from the study name's
+    ``{Strategy}_{pair}_{YYYYMMDD-YYYYMMDD}`` shape; legacy or hand-renamed
+    studies that don't match are returned with empty pair/strategy strings.
+    '''
+    storage = optuna.storages.RDBStorage(url=OptunaConfig.DB_URL)
+    summaries = optuna.get_all_study_summaries(storage)
+    return [_to_study_summary(summary) for summary in summaries]
+
+
+def list_oos_windows(
+    study_name: str,
+    oos_repo: OutOfSampleEvaluationRepository,
+) -> list[OosWindowAggregate]:
+    '''
+    Aggregate the OOS evaluation table by ``(start_timestamp, end_timestamp)``
+    for a single study, applying ``OOS_OVERFIT_THRESHOLD`` to split each
+    window's trials into generalised vs overfit counts.
+
+    :return: One aggregate per evaluated window, ordered by start timestamp.
+        Empty if the study has no OOS evaluations yet.
+    '''
+    return oos_repo.aggregate_windows(study_name, OOS_OVERFIT_THRESHOLD)
+
+
 def get_top_trials(study_name: str, n: int) -> list[dict]:
     '''
     Return the top ``n`` completed trials of a study, highest objective first
@@ -152,15 +231,61 @@ def get_top_trials(study_name: str, n: int) -> list[dict]:
     return get_top_param_sets(load_study(study_name), n)
 
 
+def get_top_trials_with_oos(
+    study_name: str,
+    window: tuple[float, float] | None,
+    n_trials: int,
+    oos_repo: OutOfSampleEvaluationRepository,
+) -> list[TrialWithOos]:
+    '''
+    Top ``n_trials`` trials for a study, left-joined with OOS scores from ``window``.
+
+    Trials are picked by Optuna direction (max vs min); the OOS join adds a
+    ``delta`` (``oos - is``) and ``verdict`` per row. ``window=None`` returns
+    the top trials with every row marked ``PENDING`` — used by the page when
+    no OOS window has been selected yet.
+
+    :param window: ``(start, end)`` Unix seconds matching one of
+        :func:`list_oos_windows`'s rows, or ``None``.
+    '''
+    study = load_study(study_name)
+    top_trials = get_top_param_sets(study, n_trials)
+
+    if window is None:
+        oos_by_trial: dict[int, float] = {}
+    else:
+        evaluations = oos_repo.get(study_name, window[0], window[1])
+        oos_by_trial = {e.trial_number: e.geo_mean_return for e in evaluations}
+
+    return [
+        _to_trial_with_oos(trial, oos_by_trial.get(trial['trial_number']))
+        for trial in top_trials
+    ]
+
+
+def get_trial_params(study_name: str, trial_number: int) -> dict:
+    '''
+    Return the params dict for a single trial. Used by the page's
+    copy-params button as an eager prefetch.
+    '''
+    study = load_study(study_name)
+    for trial in study.trials:
+        if trial.number == trial_number:
+            return trial.params
+    raise KeyError(f'Trial {trial_number} not found in study {study_name}')
+
+
 def get_evaluation_results(
-    study_name: str, start: float, end: float
+    study_name: str,
+    start: float,
+    end: float,
+    oos_repo: OutOfSampleEvaluationRepository,
 ) -> list[OutOfSampleEvaluation]:
     '''
     Read previously persisted out-of-sample evaluation rows for a study and
     time window.
     '''
-    repo = SQLAlchemyOutOfSampleEvaluationRepository(SQLAlchemyClient())
-    return repo.get(study_name, start, end)
+    return oos_repo.get(study_name, start, end)
 
 
 def _split_trials(n_trials: int, n_workers: int) -> list[int]:
@@ -185,3 +310,56 @@ def _make_progress_handler(
         if event is not None and on_progress is not None:
             on_progress(index, event)
     return handler
+
+
+def _to_study_summary(summary: optuna.study.StudySummary) -> StudySummary:
+    # Extract details from study name (Strategy_pair_yyymmdd-yyymmdd)
+    name_parts = summary.study_name.rsplit('_', 2)
+    strategy = name_parts[0] if len(name_parts) == 3 else ''
+    pair = name_parts[1] if len(name_parts) == 3 else ''
+
+    direction = (
+        StudyDirection.MAXIMIZE
+        if summary.direction == optuna.study.StudyDirection.MAXIMIZE
+        else StudyDirection.MINIMIZE
+    )
+    best_is = summary.best_trial.value if summary.best_trial is not None else None
+
+    return StudySummary(
+        name=summary.study_name,
+        pair=pair,
+        strategy=strategy,
+        trial_count=summary.n_trials,
+        best_is=best_is,
+        direction=direction,
+    )
+
+
+def _to_trial_with_oos(trial: dict, oos_score: float | None) -> TrialWithOos:
+    '''
+    Join a trial dict with its OOS score to produce a TrialWithOos for the UI.
+
+    :param trial: Dict with keys ``trial_number``, ``value``, and ``params``.
+    :param oos_score: Geo-mean return for the trial in the selected OOS window, or
+        ``None`` if the trial has not been evaluated in that window yet.
+    '''
+    is_value = trial['value']
+    if oos_score is None:
+        delta = None
+        verdict = TrialVerdict.PENDING
+    else:
+        delta = oos_score - is_value
+        verdict = (
+            TrialVerdict.GENERALISES
+            if oos_score >= OOS_OVERFIT_THRESHOLD
+            else TrialVerdict.OVERFIT
+        )
+
+    return TrialWithOos(
+        trial_number=trial['trial_number'],
+        is_value=is_value,
+        oos_score=oos_score,
+        delta=delta,
+        verdict=verdict,
+        params=trial['params']
+    )

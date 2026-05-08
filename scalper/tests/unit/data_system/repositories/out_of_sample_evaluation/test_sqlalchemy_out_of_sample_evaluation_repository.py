@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from data_system.clients.sqlalchemy_client import SQLAlchemyClient
+from data_system.models.oos_window_aggregate_model import OosWindowAggregate
 from data_system.models.out_of_sample_evaluation_model import OutOfSampleEvaluation
 from data_system.repositories.out_of_sample_evaluation.sqlalchemy_out_of_sample_evaluation_repository import (
     SQLAlchemyOutOfSampleEvaluationRepository,
@@ -152,3 +153,52 @@ class TestSQLAlchemyOutOfSampleEvaluationRepository:
         assert params['study_name'] == study_name
         assert params['start'] == start
         assert params['end'] == end
+
+    def test_aggregate_windows_returns_empty_when_no_rows(self, mock_client, mock_session):
+        # Given
+        mock_result = MagicMock()
+        mock_result.fetchall.return_value = []
+        mock_session.execute.return_value = mock_result
+        repository = SQLAlchemyOutOfSampleEvaluationRepository(mock_client)
+
+        # When
+        result = repository.aggregate_windows('test_study', generalisation_threshold=0.5)
+
+        # Then
+        assert result == []
+
+    def test_aggregate_windows_maps_rows_to_domain_objects(self, mock_client, mock_session):
+        # Given
+        mock_result = MagicMock()
+        mock_result.fetchall.return_value = [
+            (1.0, 2.0, 0.9, 3, 1),
+            (3.0, 4.0, 0.4, 0, 2),
+        ]
+        mock_session.execute.return_value = mock_result
+        repository = SQLAlchemyOutOfSampleEvaluationRepository(mock_client)
+
+        # When
+        result = repository.aggregate_windows('study-x', generalisation_threshold=0.5)
+
+        # Then
+        assert result == [
+            OosWindowAggregate(start=1.0, end=2.0, best_oos=0.9,
+                               generalised_count=3, overfit_count=1),
+            OosWindowAggregate(start=3.0, end=4.0, best_oos=0.4,
+                               generalised_count=0, overfit_count=2),
+        ]
+
+    def test_aggregate_windows_passes_threshold_and_study_name(self, mock_client, mock_session):
+        # Given
+        mock_result = MagicMock()
+        mock_result.fetchall.return_value = []
+        mock_session.execute.return_value = mock_result
+        repository = SQLAlchemyOutOfSampleEvaluationRepository(mock_client)
+
+        # When
+        repository.aggregate_windows('study-x', generalisation_threshold=0.75)
+
+        # Then
+        params = mock_session.execute.call_args[0][1]
+        assert params['study_name'] == 'study-x'
+        assert params['threshold'] == 0.75

@@ -1,7 +1,16 @@
 import asyncio
+from unittest.mock import MagicMock
 
+import optuna
 import pytest
 
+from data_system.models.oos_window_aggregate_model import OosWindowAggregate
+from ui.models.walk_forward import (
+    StudyDirection,
+    StudySummary,
+    TrialVerdict,
+    TrialWithOos,
+)
 from ui.services import walk_forward as svc
 
 
@@ -192,3 +201,438 @@ class TestStartInSample:
         assert len(captured) == 4
         assert all(isinstance(i, int) and 0 <= i < 2 for i, _ in captured)
         assert {e['event'] for _, e in captured} == {'PROGRESS', 'DONE'}
+
+
+def _make_optuna_summary(
+    name: str,
+    direction: optuna.study.StudyDirection,
+    n_trials: int,
+    best_value: float | None,
+) -> MagicMock:
+    summary = MagicMock(spec=optuna.study.StudySummary)
+    summary.study_name = name
+    summary.direction = direction
+    summary.n_trials = n_trials
+    if best_value is None:
+        summary.best_trial = None
+    else:
+        best_trial = MagicMock()
+        best_trial.value = best_value
+        summary.best_trial = best_trial
+    return summary
+
+
+@pytest.mark.ui
+@pytest.mark.ui_services
+@pytest.mark.walk_forward
+class TestListStudiesWithSummary:
+    def test_parses_pair_and_strategy_from_study_name(self, mocker):
+        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
+        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[
+            _make_optuna_summary(
+                'PrecisionTrendStrategy_XXBTZGBP_20240101-20240601',
+                optuna.study.StudyDirection.MAXIMIZE,
+                n_trials=42,
+                best_value=1.7,
+            ),
+        ])
+
+        result = svc.list_studies_with_summary()
+
+        assert result == [StudySummary(
+            name='PrecisionTrendStrategy_XXBTZGBP_20240101-20240601',
+            pair='XXBTZGBP',
+            strategy='PrecisionTrendStrategy',
+            trial_count=42,
+            best_is=1.7,
+            direction=StudyDirection.MAXIMIZE,
+        )]
+
+    def test_handles_missing_best_trial(self, mocker):
+        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
+        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[
+            _make_optuna_summary(
+                'SmaStrategy_BTCGBP_20240101-20240601',
+                optuna.study.StudyDirection.MAXIMIZE,
+                n_trials=0,
+                best_value=None,
+            ),
+        ])
+
+        result = svc.list_studies_with_summary()
+
+        assert result[0].best_is is None
+        assert result[0].trial_count == 0
+
+    def test_translates_minimise_direction(self, mocker):
+        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
+        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[
+            _make_optuna_summary(
+                'SmaStrategy_BTCGBP_20240101-20240601',
+                optuna.study.StudyDirection.MINIMIZE,
+                n_trials=10,
+                best_value=0.2,
+            ),
+        ])
+
+        result = svc.list_studies_with_summary()
+
+        assert result[0].direction == StudyDirection.MINIMIZE
+
+    def test_returns_empty_pair_and_strategy_for_non_conforming_name(self, mocker):
+        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
+        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[
+            _make_optuna_summary(
+                'legacy-study-name',
+                optuna.study.StudyDirection.MAXIMIZE,
+                n_trials=5,
+                best_value=1.0,
+            ),
+        ])
+
+        result = svc.list_studies_with_summary()
+
+        assert result[0].pair == ''
+        assert result[0].strategy == ''
+        assert result[0].name == 'legacy-study-name'
+
+    def test_returns_empty_when_no_studies(self, mocker):
+        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
+        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[])
+
+        assert svc.list_studies_with_summary() == []
+
+    def test_returns_one_summary_per_study_in_order(self, mocker):
+        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
+        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[
+            _make_optuna_summary(
+                'SmaStrategy_BTCGBP_20240101-20240601',
+                optuna.study.StudyDirection.MAXIMIZE,
+                n_trials=10, best_value=1.1,
+            ),
+            _make_optuna_summary(
+                'PrecisionTrendStrategy_XXBTZGBP_20240601-20241201',
+                optuna.study.StudyDirection.MINIMIZE,
+                n_trials=20, best_value=0.4,
+            ),
+        ])
+
+        result = svc.list_studies_with_summary()
+
+        assert [s.name for s in result] == [
+            'SmaStrategy_BTCGBP_20240101-20240601',
+            'PrecisionTrendStrategy_XXBTZGBP_20240601-20241201',
+        ]
+        assert result[0].direction == StudyDirection.MAXIMIZE
+        assert result[1].direction == StudyDirection.MINIMIZE
+
+    def test_handles_strategy_name_containing_underscores(self, mocker):
+        '''
+        ``rsplit('_', 2)`` splits on the *last* two underscores so a strategy
+        name with internal underscores still parses cleanly.
+        '''
+        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
+        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[
+            _make_optuna_summary(
+                'My_Custom_Strategy_BTCGBP_20240101-20240601',
+                optuna.study.StudyDirection.MAXIMIZE,
+                n_trials=1, best_value=1.0,
+            ),
+        ])
+
+        result = svc.list_studies_with_summary()
+
+        assert result[0].strategy == 'My_Custom_Strategy'
+        assert result[0].pair == 'BTCGBP'
+
+
+@pytest.mark.ui
+@pytest.mark.ui_services
+@pytest.mark.walk_forward
+class TestListOosWindows:
+    def test_returns_repo_aggregates(self):
+        aggregates = [
+            OosWindowAggregate(start=1.0, end=2.0, best_oos=0.9,
+                               generalised_count=3, overfit_count=1),
+            OosWindowAggregate(start=3.0, end=4.0, best_oos=0.4,
+                               generalised_count=0, overfit_count=2),
+        ]
+        repo = MagicMock()
+        repo.aggregate_windows.return_value = aggregates
+
+        result = svc.list_oos_windows('study-x', repo)
+
+        assert result == aggregates
+        repo.aggregate_windows.assert_called_once_with(
+            'study-x', svc.OOS_OVERFIT_THRESHOLD
+        )
+
+    def test_returns_empty_when_repo_returns_no_rows(self):
+        repo = MagicMock()
+        repo.aggregate_windows.return_value = []
+
+        assert svc.list_oos_windows('empty', repo) == []
+
+
+@pytest.mark.ui
+@pytest.mark.ui_services
+@pytest.mark.walk_forward
+class TestGetTopTrialsWithOos:
+    def test_left_merges_oos_scores_and_computes_verdicts(self, mocker):
+        study = object()
+        mocker.patch.object(svc, 'load_study', return_value=study)
+        mocker.patch.object(svc, 'get_top_param_sets', return_value=[
+            {'trial_number': 1, 'value': 1.5, 'params': {'a': 1}},
+            {'trial_number': 2, 'value': 1.2, 'params': {'a': 2}},
+            {'trial_number': 3, 'value': 0.8, 'params': {'a': 3}},
+        ])
+        repo = MagicMock()
+        repo.get.return_value = [
+            _make_oos_eval(trial_number=1, geo_mean_return=0.9),
+            _make_oos_eval(trial_number=2, geo_mean_return=0.3),
+            # trial 3 has no OOS row → pending
+        ]
+
+        result = svc.get_top_trials_with_oos(
+            'study-x', (10.0, 20.0), n_trials=3, oos_repo=repo,
+        )
+
+        assert result == [
+            TrialWithOos(
+                trial_number=1, is_value=1.5, oos_score=0.9,
+                delta=pytest.approx(-0.6), verdict=TrialVerdict.GENERALISES,
+                params={'a': 1},
+            ),
+            TrialWithOos(
+                trial_number=2, is_value=1.2, oos_score=0.3,
+                delta=pytest.approx(-0.9), verdict=TrialVerdict.OVERFIT,
+                params={'a': 2},
+            ),
+            TrialWithOos(
+                trial_number=3, is_value=0.8, oos_score=None, delta=None,
+                verdict=TrialVerdict.PENDING, params={'a': 3},
+            ),
+        ]
+        repo.get.assert_called_once_with('study-x', 10.0, 20.0)
+
+    def test_oos_exactly_at_threshold_generalises(self, mocker):
+        mocker.patch.object(svc, 'load_study')
+        mocker.patch.object(svc, 'get_top_param_sets', return_value=[
+            {'trial_number': 1, 'value': 1.0, 'params': {}},
+        ])
+        repo = MagicMock()
+        repo.get.return_value = [
+            _make_oos_eval(trial_number=1, geo_mean_return=svc.OOS_OVERFIT_THRESHOLD),
+        ]
+
+        result = svc.get_top_trials_with_oos(
+            's', (0.0, 1.0), n_trials=1, oos_repo=repo,
+        )
+
+        assert result[0].verdict == TrialVerdict.GENERALISES
+
+    def test_window_none_marks_all_pending_and_skips_repo(self, mocker):
+        mocker.patch.object(svc, 'load_study')
+        mocker.patch.object(svc, 'get_top_param_sets', return_value=[
+            {'trial_number': 1, 'value': 1.5, 'params': {}},
+            {'trial_number': 2, 'value': 0.9, 'params': {}},
+        ])
+        repo = MagicMock()
+
+        result = svc.get_top_trials_with_oos(
+            's', None, n_trials=2, oos_repo=repo,
+        )
+
+        repo.get.assert_not_called()
+        assert all(t.verdict == TrialVerdict.PENDING for t in result)
+        assert all(t.oos_score is None and t.delta is None for t in result)
+
+    def test_respects_minimise_direction(self, mocker):
+        '''
+        Direction-awareness lives in ``get_top_param_sets``. This test pins
+        that the service forwards the study unchanged so direction is honoured.
+        '''
+        study = MagicMock()
+        load = mocker.patch.object(svc, 'load_study', return_value=study)
+        get_top = mocker.patch.object(svc, 'get_top_param_sets', return_value=[])
+        repo = MagicMock(get=MagicMock(return_value=[]))
+
+        svc.get_top_trials_with_oos('s', (0.0, 1.0), n_trials=5, oos_repo=repo)
+
+        load.assert_called_once_with('s')
+        get_top.assert_called_once_with(study, 5)
+
+    def test_returns_empty_when_no_top_trials(self, mocker):
+        mocker.patch.object(svc, 'load_study')
+        mocker.patch.object(svc, 'get_top_param_sets', return_value=[])
+        repo = MagicMock()
+        repo.get.return_value = []
+
+        result = svc.get_top_trials_with_oos(
+            's', (0.0, 1.0), n_trials=10, oos_repo=repo,
+        )
+
+        assert result == []
+
+    def test_oos_just_below_threshold_marks_as_overfit(self, mocker):
+        '''
+        Pin the strict-greater-or-equal contract on ``OOS_OVERFIT_THRESHOLD``:
+        a trial just under the threshold must be classed as overfit.
+        '''
+        mocker.patch.object(svc, 'load_study')
+        mocker.patch.object(svc, 'get_top_param_sets', return_value=[
+            {'trial_number': 1, 'value': 1.0, 'params': {}},
+        ])
+        repo = MagicMock()
+        repo.get.return_value = [
+            _make_oos_eval(
+                trial_number=1,
+                geo_mean_return=svc.OOS_OVERFIT_THRESHOLD - 1e-9,
+            ),
+        ]
+
+        result = svc.get_top_trials_with_oos(
+            's', (0.0, 1.0), n_trials=1, oos_repo=repo,
+        )
+
+        assert result[0].verdict == TrialVerdict.OVERFIT
+
+    def test_oos_for_trial_outside_top_n_is_ignored(self, mocker):
+        '''
+        OOS rows for trials that aren't in the top-N selection are silently
+        dropped — the service joins onto top-trials, not the other way around.
+        '''
+        mocker.patch.object(svc, 'load_study')
+        mocker.patch.object(svc, 'get_top_param_sets', return_value=[
+            {'trial_number': 1, 'value': 1.5, 'params': {}},
+        ])
+        repo = MagicMock()
+        repo.get.return_value = [
+            _make_oos_eval(trial_number=1, geo_mean_return=0.9),
+            _make_oos_eval(trial_number=99, geo_mean_return=0.95),
+        ]
+
+        result = svc.get_top_trials_with_oos(
+            's', (0.0, 1.0), n_trials=1, oos_repo=repo,
+        )
+
+        assert len(result) == 1
+        assert result[0].trial_number == 1
+        assert result[0].oos_score == 0.9
+
+    def test_window_with_no_oos_rows_marks_all_pending(self, mocker):
+        '''
+        Distinct from ``window=None``: a real window is provided (so the repo
+        is queried), but the repo returns nothing — all trials should still
+        come back as pending rather than overfit.
+        '''
+        mocker.patch.object(svc, 'load_study')
+        mocker.patch.object(svc, 'get_top_param_sets', return_value=[
+            {'trial_number': 1, 'value': 1.5, 'params': {}},
+            {'trial_number': 2, 'value': 1.2, 'params': {}},
+        ])
+        repo = MagicMock()
+        repo.get.return_value = []
+
+        result = svc.get_top_trials_with_oos(
+            's', (10.0, 20.0), n_trials=2, oos_repo=repo,
+        )
+
+        repo.get.assert_called_once_with('s', 10.0, 20.0)
+        assert all(t.verdict == TrialVerdict.PENDING for t in result)
+        assert all(t.oos_score is None and t.delta is None for t in result)
+
+
+def _make_oos_eval(trial_number: int, geo_mean_return: float):
+    eval_obj = MagicMock()
+    eval_obj.trial_number = trial_number
+    eval_obj.geo_mean_return = geo_mean_return
+    return eval_obj
+
+
+@pytest.mark.ui
+@pytest.mark.ui_services
+@pytest.mark.walk_forward
+class TestGetTrialParams:
+    def test_returns_params_for_matching_trial(self, mocker):
+        trial_a = MagicMock(number=0, params={'a': 1})
+        trial_b = MagicMock(number=7, params={'a': 2, 'b': 3})
+        study = MagicMock(trials=[trial_a, trial_b])
+        mocker.patch.object(svc, 'load_study', return_value=study)
+
+        assert svc.get_trial_params('s', 7) == {'a': 2, 'b': 3}
+
+    def test_raises_keyerror_when_trial_missing(self, mocker):
+        study = MagicMock(trials=[MagicMock(number=0)])
+        mocker.patch.object(svc, 'load_study', return_value=study)
+
+        with pytest.raises(KeyError, match='Trial 99'):
+            svc.get_trial_params('s', 99)
+
+    def test_raises_keyerror_when_study_has_no_trials(self, mocker):
+        study = MagicMock(trials=[])
+        mocker.patch.object(svc, 'load_study', return_value=study)
+
+        with pytest.raises(KeyError, match='Trial 0'):
+            svc.get_trial_params('s', 0)
+
+
+@pytest.mark.ui
+@pytest.mark.ui_services
+@pytest.mark.walk_forward
+class TestStudyCache:
+    def setup_method(self) -> None:
+        svc.invalidate_study_cache()
+
+    def teardown_method(self) -> None:
+        svc.invalidate_study_cache()
+
+    def test_caches_load_study_per_name(self, mocker):
+        loader = mocker.patch.object(
+            svc, '_load_study_from_storage', side_effect=[object(), object()],
+        )
+
+        first = svc.load_study('a')
+        second = svc.load_study('a')
+        third = svc.load_study('b')
+
+        assert first is second
+        assert first is not third
+        assert loader.call_count == 2
+        loader.assert_any_call('a')
+        loader.assert_any_call('b')
+
+    def test_invalidate_single_study_evicts_only_that_entry(self, mocker):
+        loader = mocker.patch.object(
+            svc, '_load_study_from_storage',
+            side_effect=[object(), object(), object()],
+        )
+
+        a1 = svc.load_study('a')
+        b1 = svc.load_study('b')
+
+        svc.invalidate_study_cache('a')
+
+        a2 = svc.load_study('a')
+        b2 = svc.load_study('b')
+
+        assert a1 is not a2  # 'a' was evicted and reloaded
+        assert b1 is b2      # 'b' was untouched
+        assert loader.call_count == 3
+
+    def test_invalidate_without_arg_clears_all(self, mocker):
+        loader = mocker.patch.object(
+            svc, '_load_study_from_storage',
+            side_effect=[object(), object(), object(), object()],
+        )
+
+        svc.load_study('a')
+        svc.load_study('b')
+        svc.invalidate_study_cache()
+        svc.load_study('a')
+        svc.load_study('b')
+
+        assert loader.call_count == 4
+
+    def test_invalidate_missing_entry_is_noop(self):
+        svc.invalidate_study_cache('does-not-exist')

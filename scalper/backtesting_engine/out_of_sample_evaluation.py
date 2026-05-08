@@ -27,6 +27,15 @@ INITIAL_BALANCE = 1000
 PAIR = 'XXBTZGBP'
 STRATEGY_NAME = 'PrecisionTrendStrategy'
 
+'''
+Geometric mean OOS return cutoff: a trial generalises when
+``oos_geo_mean_return >= OOS_OVERFIT_THRESHOLD``, otherwise it is overfit.
+
+This lives here on the domain layer because robustness is a backtesting concept;
+the walk-forward UI just renders the verdict.
+'''
+OOS_OVERFIT_THRESHOLD = 0.5
+
 
 def evaluate_out_of_sample(
     study_name: str,
