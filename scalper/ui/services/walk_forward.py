@@ -27,7 +27,12 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
-from backtesting_engine import get_top_param_sets, load_study
+import optuna
+
+from backtesting_engine import (
+    get_top_param_sets,
+    load_study as _load_study_from_storage
+)
 from core import run_subprocess
 from data_system import (
     Job,
@@ -44,10 +49,34 @@ from scripts.optimise_in_sample import build_command as build_in_sample_command
 SCALPER_DIR = Path(__file__).resolve().parents[2]
 
 
+# Parsed progress line: ``{'event': 'PROGRESS' | 'DONE', 'payload': dict}``.
 ProgressEvent = dict
-'''
-Parsed progress line: ``{'event': 'PROGRESS' | 'DONE', 'payload': dict}``.
-'''
+
+_study_cache: dict[str, optuna.Study] = {}
+
+
+def load_study(study_name: str) -> optuna.Study:
+    '''
+    Return a cached :class:`optuna.Study` for ``study_name``, loading it on
+    first access. Subsequent calls reuse the cached instance — call
+    :func:`invalidate_study_cache` after a phase finishes to pick up new trials.
+    '''
+    if study_name not in _study_cache:
+        _study_cache[study_name] = _load_study_from_storage(study_name)
+    return _study_cache[study_name]
+
+
+def invalidate_study_cache(study_name: str | None = None) -> None:
+    '''
+    Drop cached :class:`optuna.Study` instances.
+
+    :param study_name: If provided, drop only that study; otherwise clear the
+        whole cache. Missing entries are a no-op.
+    '''
+    if study_name is None:
+        _study_cache.clear()
+    else:
+        _study_cache.pop(study_name, None)
 
 
 def parse_progress(line: str) -> ProgressEvent | None:
