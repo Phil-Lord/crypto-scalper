@@ -48,25 +48,6 @@ class StudySummary:
 
 
 @dataclass(frozen=True)
-class OosWindowSummary:
-    '''
-    Aggregate of OOS evaluations for a single (start, end) window.
-
-    Attributes:
-        start (float): Window start (Unix seconds).
-        end (float): Window end (Unix seconds).
-        best_oos (float): Highest geo-mean OOS return across evaluated trials.
-        generalised_count (int): Trials with OOS at or above ``OOS_OVERFIT_THRESHOLD``.
-        overfit_count (int): Trials with OOS below ``OOS_OVERFIT_THRESHOLD``.
-    '''
-    start: float
-    end: float
-    best_oos: float
-    generalised_count: int
-    overfit_count: int
-
-
-@dataclass(frozen=True)
 class TrialWithOos:
     '''
     Top-trial row joined with its OOS score for the selected window.

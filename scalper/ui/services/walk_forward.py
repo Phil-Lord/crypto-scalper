@@ -28,7 +28,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 import optuna
-from sqlalchemy import text
 
 from backtesting_engine import (
     OOS_OVERFIT_THRESHOLD,
@@ -40,6 +39,7 @@ from data_system import (
     Job,
     JobRepository,
     JobType,
+    OosWindowAggregate,
     OutOfSampleEvaluation,
     SQLAlchemyClient,
     SQLAlchemyOutOfSampleEvaluationRepository,
@@ -47,7 +47,6 @@ from data_system import (
 from scripts.evaluate_out_of_sample import build_command as build_out_of_sample_command
 from scripts.optimise_in_sample import build_command as build_in_sample_command
 from ui.models.walk_forward import (
-    OosWindowSummary,
     StudyDirection,
     StudySummary,
     TrialVerdict,
@@ -206,43 +205,17 @@ def list_studies_with_summary() -> list[StudySummary]:
     return [_to_study_summary(summary) for summary in summaries]
 
 
-def list_oos_windows(study_name: str) -> list[OosWindowSummary]:
+def list_oos_windows(study_name: str) -> list[OosWindowAggregate]:
     '''
     Aggregate the OOS evaluation table by ``(start_timestamp, end_timestamp)``
-    for a single study.
+    for a single study, applying ``OOS_OVERFIT_THRESHOLD`` to split each
+    window's trials into generalised vs overfit counts.
 
-    :return: One summary model per evaluated window, ordered by start timestamp.
+    :return: One aggregate per evaluated window, ordered by start timestamp.
         Empty if the study has no OOS evaluations yet.
     '''
-    client = SQLAlchemyClient()
-    with client.session() as session:
-        rows = session.execute(
-            text(
-                '''
-                SELECT
-                    start_timestamp,
-                    end_timestamp,
-                    MAX(geo_mean_return) AS best_oos,
-                    SUM(CASE WHEN geo_mean_return >= :threshold THEN 1 ELSE 0 END) AS generalised,
-                    SUM(CASE WHEN geo_mean_return < :threshold THEN 1 ELSE 0 END) AS overfit
-                FROM out_of_sample_evaluation
-                WHERE study_name = :study_name
-                GROUP BY start_timestamp, end_timestamp
-                ORDER BY start_timestamp
-                '''
-            ),
-            {'study_name': study_name, 'threshold': OOS_OVERFIT_THRESHOLD},
-        ).fetchall()
-    return [
-        OosWindowSummary(
-            start=row[0],
-            end=row[1],
-            best_oos=row[2],
-            generalised_count=int(row[3]),
-            overfit_count=int(row[4]),
-        )
-        for row in rows
-    ]
+    repo = SQLAlchemyOutOfSampleEvaluationRepository(SQLAlchemyClient())
+    return repo.aggregate_windows(study_name, OOS_OVERFIT_THRESHOLD)
 
 
 def get_top_trials(study_name: str, n: int) -> list[dict]:

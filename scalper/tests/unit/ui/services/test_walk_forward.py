@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 import optuna
 import pytest
 
+from data_system.models.oos_window_aggregate_model import OosWindowAggregate
 from ui.models.walk_forward import (
-    OosWindowSummary,
     StudyDirection,
     StudySummary,
     TrialVerdict,
@@ -301,35 +301,34 @@ class TestListStudiesWithSummary:
 @pytest.mark.ui_services
 @pytest.mark.walk_forward
 class TestListOosWindows:
-    def test_aggregates_rows_into_window_summaries(self, mocker):
-        rows = [
-            (1.0, 2.0, 0.9, 3, 1),
-            (3.0, 4.0, 0.4, 0, 2),
+    def test_returns_repo_aggregates(self, mocker):
+        aggregates = [
+            OosWindowAggregate(start=1.0, end=2.0, best_oos=0.9,
+                               generalised_count=3, overfit_count=1),
+            OosWindowAggregate(start=3.0, end=4.0, best_oos=0.4,
+                               generalised_count=0, overfit_count=2),
         ]
-        session = MagicMock()
-        session.execute.return_value.fetchall.return_value = rows
-        client = MagicMock()
-        client.session.return_value.__enter__.return_value = session
-        mocker.patch.object(svc, 'SQLAlchemyClient', return_value=client)
+        repo = MagicMock()
+        repo.aggregate_windows.return_value = aggregates
+        mocker.patch.object(
+            svc, 'SQLAlchemyOutOfSampleEvaluationRepository', return_value=repo
+        )
+        mocker.patch.object(svc, 'SQLAlchemyClient')
 
         result = svc.list_oos_windows('study-x')
 
-        assert result == [
-            OosWindowSummary(start=1.0, end=2.0, best_oos=0.9,
-                             generalised_count=3, overfit_count=1),
-            OosWindowSummary(start=3.0, end=4.0, best_oos=0.4,
-                             generalised_count=0, overfit_count=2),
-        ]
-        bound_params = session.execute.call_args.args[1]
-        assert bound_params['study_name'] == 'study-x'
-        assert bound_params['threshold'] == svc.OOS_OVERFIT_THRESHOLD
+        assert result == aggregates
+        repo.aggregate_windows.assert_called_once_with(
+            'study-x', svc.OOS_OVERFIT_THRESHOLD
+        )
 
-    def test_returns_empty_when_no_rows(self, mocker):
-        session = MagicMock()
-        session.execute.return_value.fetchall.return_value = []
-        client = MagicMock()
-        client.session.return_value.__enter__.return_value = session
-        mocker.patch.object(svc, 'SQLAlchemyClient', return_value=client)
+    def test_returns_empty_when_repo_returns_no_rows(self, mocker):
+        repo = MagicMock()
+        repo.aggregate_windows.return_value = []
+        mocker.patch.object(
+            svc, 'SQLAlchemyOutOfSampleEvaluationRepository', return_value=repo
+        )
+        mocker.patch.object(svc, 'SQLAlchemyClient')
 
         assert svc.list_oos_windows('empty') == []
 
