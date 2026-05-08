@@ -343,30 +343,23 @@ def _to_trial_with_oos(trial: dict, oos_score: float | None) -> TrialWithOos:
     :param oos_score: Geo-mean return for the trial in the selected OOS window, or
         ``None`` if the trial has not been evaluated in that window yet.
     '''
-    trial_number = trial['trial_number']
     is_value = trial['value']
-    params = trial['params']
-
     if oos_score is None:
-        return TrialWithOos(
-            trial_number=trial_number,
-            is_value=is_value,
-            oos_score=None,
-            delta=None,
-            verdict=TrialVerdict.PENDING,
-            params=params
+        delta = None
+        verdict = TrialVerdict.PENDING
+    else:
+        delta = oos_score - is_value
+        verdict = (
+            TrialVerdict.GENERALISES
+            if oos_score >= OOS_OVERFIT_THRESHOLD
+            else TrialVerdict.OVERFIT
         )
 
-    verdict = (
-        TrialVerdict.GENERALISES
-        if oos_score >= OOS_OVERFIT_THRESHOLD
-        else TrialVerdict.OVERFIT
-    )
     return TrialWithOos(
-        trial_number=trial_number,
+        trial_number=trial['trial_number'],
         is_value=is_value,
         oos_score=oos_score,
-        delta=oos_score - is_value,
+        delta=delta,
         verdict=verdict,
-        params=params
+        params=trial['params']
     )
