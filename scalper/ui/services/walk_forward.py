@@ -63,6 +63,20 @@ class StudyDirection(str, Enum):
     MAXIMIZE = 'maximize'
     MINIMIZE = 'minimize'
 
+
+class TrialVerdict(str, Enum):
+    '''
+    Generalisation verdict for a trial against an OOS window.
+
+    ``PENDING`` — trial has no OOS evaluation in the chosen window yet.
+    ``GENERALISES`` — OOS geo-mean return at or above ``OOS_OVERFIT_THRESHOLD``.
+    ``OVERFIT`` — OOS geo-mean return below ``OOS_OVERFIT_THRESHOLD``.
+    '''
+    PENDING = 'pending'
+    GENERALISES = 'generalises'
+    OVERFIT = 'overfit'
+
+
 @dataclass(frozen=True)
 class StudySummary:
     '''
@@ -106,6 +120,29 @@ class OosWindowSummary:
     best_oos: float
     generalised_count: int
     overfit_count: int
+
+
+@dataclass(frozen=True)
+class TrialWithOos:
+    '''
+    Top-trial row joined with its OOS score for the selected window.
+
+    Attributes:
+        trial_number (int): Optuna trial number.
+        is_value (float): In-sample objective value.
+        oos_score (float | None): OOS geo-mean return for the chosen window, or
+            ``None`` if the trial has not been evaluated in that window yet.
+        delta (float | None): ``oos_score - is_value``;
+            ``None`` when ``oos_score`` is ``None``.
+        verdict (TrialVerdict): Pending / generalises / overfit.
+        params (dict): Trial parameter dict (same shape as ``trial.params``).
+    '''
+    trial_number: int
+    is_value: float
+    oos_score: float | None
+    delta: float | None
+    verdict: TrialVerdict
+    params: dict
 
 
 _study_cache: dict[str, optuna.Study] = {}
@@ -302,6 +339,38 @@ def get_top_trials(study_name: str, n: int) -> list[dict]:
     return get_top_param_sets(load_study(study_name), n)
 
 
+def get_top_trials_with_oos(
+    study_name: str,
+    window: tuple[float, float] | None,
+    n_trials: int,
+) -> list[TrialWithOos]:
+    '''
+    Top ``n_trials`` trials for a study, left-joined with OOS scores from ``window``.
+
+    Trials are picked by Optuna direction (max vs min); the OOS join adds a
+    ``delta`` (``oos - is``) and ``verdict`` per row. ``window=None`` returns
+    the top trials with every row marked ``PENDING`` — used by the page when
+    no OOS window has been selected yet.
+
+    :param window: ``(start, end)`` Unix seconds matching one of
+        :func:`list_oos_windows`'s rows, or ``None``.
+    '''
+    study = load_study(study_name)
+    top_trials = get_top_param_sets(study, n_trials)
+
+    if window is None:
+        oos_by_trial: dict[int, float] = {}
+    else:
+        repo = SQLAlchemyOutOfSampleEvaluationRepository(SQLAlchemyClient())
+        evaluations = repo.get(study_name, window[0], window[1])
+        oos_by_trial = {e.trial_number: e.geo_mean_return for e in evaluations}
+
+    return [
+        _to_trial_with_oos(trial, oos_by_trial.get(trial['trial_number']))
+        for trial in top_trials
+    ]
+
+
 def get_evaluation_results(
     study_name: str, start: float, end: float
 ) -> list[OutOfSampleEvaluation]:
@@ -357,4 +426,41 @@ def _to_study_summary(summary: optuna.study.StudySummary) -> StudySummary:
         trial_count=summary.n_trials,
         best_is=best_is,
         direction=direction,
+    )
+
+
+def _to_trial_with_oos(trial: dict, oos_score: float | None) -> TrialWithOos:
+    '''
+    Join a trial dict with its OOS score to produce a TrialWithOos for the UI.
+
+    :param trial: Dict with keys ``trial_number``, ``value``, and ``params``.
+    :param oos_score: Geo-mean return for the trial in the selected OOS window, or
+        ``None`` if the trial has not been evaluated in that window yet.
+    '''
+    trial_number = trial['trial_number']
+    is_value = trial['value']
+    params = trial['params']
+
+    if oos_score is None:
+        return TrialWithOos(
+            trial_number=trial_number,
+            is_value=is_value,
+            oos_score=None,
+            delta=None,
+            verdict=TrialVerdict.PENDING,
+            params=params
+        )
+
+    verdict = (
+        TrialVerdict.GENERALISES
+        if oos_score >= OOS_OVERFIT_THRESHOLD
+        else TrialVerdict.OVERFIT
+    )
+    return TrialWithOos(
+        trial_number=trial_number,
+        is_value=is_value,
+        oos_score=oos_score,
+        delta=oos_score - is_value,
+        verdict=verdict,
+        params=params
     )
