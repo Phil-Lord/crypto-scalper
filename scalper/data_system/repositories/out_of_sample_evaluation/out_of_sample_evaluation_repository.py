@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from data_system.models import OutOfSampleEvaluation
+from data_system.models import OosWindowAggregate, OutOfSampleEvaluation
 
 
 class OutOfSampleEvaluationRepository(ABC):
@@ -34,5 +34,24 @@ class OutOfSampleEvaluationRepository(ABC):
         :param start: Start timestamp (Unix seconds).
         :param end: End timestamp (Unix seconds).
         :return: List of OutOfSampleEvaluation rows, ordered by trial number.
+        '''
+        pass
+
+    @abstractmethod
+    def aggregate_windows(
+        self, study_name: str, generalisation_threshold: float
+    ) -> list[OosWindowAggregate]:
+        '''
+        Aggregates evaluation rows for a study by ``(start_timestamp, end_timestamp)``.
+
+        For each window, returns the best geo-mean return alongside counts of
+        trials whose geo-mean return is at or above the supplied threshold
+        (``generalised_count``) and below it (``overfit_count``).
+
+        :param study_name: Name of the Optuna study.
+        :param generalisation_threshold: Geo-mean return at or above which a
+            trial is considered to have generalised.
+        :return: One aggregate per evaluated window, ordered by start timestamp.
+            Empty if the study has no OOS evaluations yet.
         '''
         pass

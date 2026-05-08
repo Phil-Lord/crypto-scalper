@@ -13,6 +13,7 @@ from .models import (
     Job,
     JobStatus,
     JobType,
+    OosWindowAggregate,
     OutOfSampleEvaluation,
     Signal,
     Trade

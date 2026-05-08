@@ -3,7 +3,7 @@ from dataclasses import asdict
 from sqlalchemy import text
 
 from data_system.clients import SQLAlchemyClient
-from data_system.models import OutOfSampleEvaluation
+from data_system.models import OosWindowAggregate, OutOfSampleEvaluation
 from .out_of_sample_evaluation_repository import OutOfSampleEvaluationRepository
 
 
@@ -68,4 +68,35 @@ class SQLAlchemyOutOfSampleEvaluationRepository(OutOfSampleEvaluationRepository)
                     geo_mean_return=row[4],
                 )
                 for row in result.fetchall()
+            ]
+
+    def aggregate_windows(
+        self, study_name: str, generalisation_threshold: float
+    ) -> list[OosWindowAggregate]:
+        with self.client.session() as session:
+            query = text("""
+                SELECT
+                    start_timestamp,
+                    end_timestamp,
+                    MAX(geo_mean_return) AS best_oos,
+                    SUM(CASE WHEN geo_mean_return >= :threshold THEN 1 ELSE 0 END) AS generalised,
+                    SUM(CASE WHEN geo_mean_return < :threshold THEN 1 ELSE 0 END) AS overfit
+                FROM out_of_sample_evaluation
+                WHERE study_name = :study_name
+                GROUP BY start_timestamp, end_timestamp
+                ORDER BY start_timestamp
+            """)
+            rows = session.execute(query, {
+                'study_name': study_name,
+                'threshold': generalisation_threshold,
+            }).fetchall()
+            return [
+                OosWindowAggregate(
+                    start=row[0],
+                    end=row[1],
+                    best_oos=row[2],
+                    generalised_count=int(row[3]),
+                    overfit_count=int(row[4]),
+                )
+                for row in rows
             ]
