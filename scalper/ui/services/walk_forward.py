@@ -30,8 +30,10 @@ from enum import Enum
 from pathlib import Path
 
 import optuna
+from sqlalchemy import text
 
 from backtesting_engine import (
+    OOS_OVERFIT_THRESHOLD,
     get_top_param_sets,
     load_study as _load_study_from_storage
 )
@@ -85,6 +87,25 @@ class StudySummary:
     trial_count: int
     best_is: float | None
     direction: StudyDirection
+
+
+@dataclass(frozen=True)
+class OosWindowSummary:
+    '''
+    Aggregate of OOS evaluations for a single (start, end) window.
+
+    Attributes:
+        start (float): Window start (Unix seconds).
+        end (float): Window end (Unix seconds).
+        best_oos (float): Highest geo-mean OOS return across evaluated trials.
+        generalised_count (int): Trials with OOS at or above ``OOS_OVERFIT_THRESHOLD``.
+        overfit_count (int): Trials with OOS below ``OOS_OVERFIT_THRESHOLD``.
+    '''
+    start: float
+    end: float
+    best_oos: float
+    generalised_count: int
+    overfit_count: int
 
 
 _study_cache: dict[str, optuna.Study] = {}
@@ -228,6 +249,46 @@ def list_studies_with_summary() -> list[StudySummary]:
     storage = optuna.storages.RDBStorage(url=OptunaConfig.DB_URL)
     summaries = optuna.get_all_study_summaries(storage)
     return [_to_study_summary(summary) for summary in summaries]
+
+
+def list_oos_windows(study_name: str) -> list[OosWindowSummary]:
+    '''
+    Aggregate the OOS evaluation table by ``(start_timestamp, end_timestamp)``
+    for a single study.
+
+    :return: One summary model per evaluated window, ordered by start timestamp.
+        Empty if the study has no OOS evaluations yet.
+    '''
+    client = SQLAlchemyClient()
+    with client.session() as session:
+        rows = session.execute(
+            text(
+                '''
+                SELECT
+                    start_timestamp,
+                    end_timestamp,
+                    MAX(geo_mean_return) AS best_oos,
+                    SUM(CASE WHEN geo_mean_return >= :threshold THEN 1 ELSE 0 END) AS generalised,
+                    SUM(CASE WHEN geo_mean_return < :threshold THEN 1 ELSE 0 END) AS overfit
+                FROM out_of_sample_evaluation
+                WHERE study_name = :study_name
+                GROUP BY start_timestamp, end_timestamp
+                ORDER BY start_timestamp
+                '''
+            ),
+            {'study_name': study_name, 'threshold': OOS_OVERFIT_THRESHOLD},
+        ).fetchall()
+    return [
+        OosWindowSummary(
+            start=row[0],
+            end=row[1],
+            best_oos=row[2],
+            generalised_count=int(row[3]),
+            overfit_count=int(row[4]),
+        )
+        for row in rows
+    ]
+
 
 def get_top_trials(study_name: str, n: int) -> list[dict]:
     '''
