@@ -25,6 +25,8 @@ TODO: Update the wording here once the page is redesigned.
 import asyncio
 import json
 from collections.abc import Callable
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 
 import optuna
@@ -44,6 +46,7 @@ from data_system import (
 )
 from scripts.evaluate_out_of_sample import build_command as build_out_of_sample_command
 from scripts.optimise_in_sample import build_command as build_in_sample_command
+from utils import OptunaConfig
 
 
 SCALPER_DIR = Path(__file__).resolve().parents[2]
@@ -51,6 +54,38 @@ SCALPER_DIR = Path(__file__).resolve().parents[2]
 
 # Parsed progress line: ``{'event': 'PROGRESS' | 'DONE', 'payload': dict}``.
 ProgressEvent = dict
+
+
+class StudyDirection(str, Enum):
+    ''' Optimisation direction for an Optuna study. '''
+    MAXIMIZE = 'maximize'
+    MINIMIZE = 'minimize'
+
+@dataclass(frozen=True)
+class StudySummary:
+    '''
+    Summary row for the studies rail.
+
+    Attributes:
+        name (str): Optuna study name.
+        pair (str): Trading pair parsed from the study name.
+        strategy (str): Strategy class name parsed from the study name.
+        trial_count (int): Total trials recorded against the study.
+        best_is (float | None): Best in-sample objective value, or ``None`` if
+            the study has no completed trial yet.
+        direction (StudyDirection): Optimisation direction.
+
+    Note:
+        Does not include ``last_run_state`` — that is a UI concern merged in by
+        the page from in-process state.
+    '''
+    name: str
+    pair: str
+    strategy: str
+    trial_count: int
+    best_is: float | None
+    direction: StudyDirection
+
 
 _study_cache: dict[str, optuna.Study] = {}
 
@@ -182,6 +217,18 @@ async def start_out_of_sample(
     return job
 
 
+def list_studies_with_summary() -> list[StudySummary]:
+    '''
+    Return a summary row for every Optuna study in storage, ordered by name.
+
+    Pair and strategy are parsed from the study name's
+    ``{Strategy}_{pair}_{YYYYMMDD-YYYYMMDD}`` shape; legacy or hand-renamed
+    studies that don't match are returned with empty pair/strategy strings.
+    '''
+    storage = optuna.storages.RDBStorage(url=OptunaConfig.DB_URL)
+    summaries = optuna.get_all_study_summaries(storage)
+    return [_to_study_summary(summary) for summary in summaries]
+
 def get_top_trials(study_name: str, n: int) -> list[dict]:
     '''
     Return the top ``n`` completed trials of a study, highest objective first
@@ -227,3 +274,26 @@ def _make_progress_handler(
         if event is not None and on_progress is not None:
             on_progress(index, event)
     return handler
+
+
+def _to_study_summary(summary: optuna.study.StudySummary) -> StudySummary:
+    # Extract details from study name (Strategy_pair_yyymmdd-yyymmdd)
+    name_parts = summary.study_name.rsplit('_', 2)
+    strategy = name_parts[0] if len(name_parts) == 3 else ''
+    pair = name_parts[1] if len(name_parts) == 3 else ''
+
+    direction = (
+        StudyDirection.MAXIMIZE
+        if summary.direction == optuna.study.StudyDirection.MAXIMIZE
+        else StudyDirection.MINIMIZE
+    )
+    best_is = summary.best_trial.value if summary.best_trial is not None else None
+
+    return StudySummary(
+        name=summary.study_name,
+        pair=pair,
+        strategy=strategy,
+        trial_count=summary.n_trials,
+        best_is=best_is,
+        direction=direction,
+    )
