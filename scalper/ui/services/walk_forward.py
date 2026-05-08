@@ -3,11 +3,24 @@ Walk-forward UI service.
 
 Parses the shared ``PROGRESS`` / ``DONE`` JSON contract emitted by
 ``scripts/optimise_in_sample.py`` and ``scripts/evaluate_out_of_sample.py`` and
-orchestrates subprocess execution via :func:`core.run_subprocess`. Each script
-exposes its own ``build_command`` colocated with the click options.
+orchestrates subprocess execution via :func:`core.run_subprocess`.
+Each script exposes its own ``build_command`` colocated with the click options.
 
 The two phases share a single module because they share both the JSON contract
 and the surrounding lifecycle (``Job`` rows, cancellation, progress streaming).
+
+Also exposes read-only helpers the redesigned walk-forward page consumes:
+
+- study summaries
+- OOS-window aggregates
+- top trials joined with OOS scores
+- single-trial param lookups.
+
+``load_study`` results are cached in-process so the page can rerender
+without paying the Optuna round-trip; :func:`invalidate_study_cache`
+lets the page drop entries when a phase finishes.
+
+TODO: Update the wording here once the page is redesigned.
 '''
 import asyncio
 import json
