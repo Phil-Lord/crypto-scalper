@@ -9,6 +9,7 @@ from .walk_forward import (
     get_evaluation_results,
     get_top_trials,
     get_top_trials_with_oos,
+    get_trial_params,
     invalidate_study_cache,
     list_oos_windows,
     list_studies_with_summary,

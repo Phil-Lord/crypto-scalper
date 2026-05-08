@@ -371,6 +371,18 @@ def get_top_trials_with_oos(
     ]
 
 
+def get_trial_params(study_name: str, trial_number: int) -> dict:
+    '''
+    Return the params dict for a single trial. Used by the page's
+    copy-params button as an eager prefetch.
+    '''
+    study = load_study(study_name)
+    for trial in study.trials:
+        if trial.number == trial_number:
+            return trial.params
+    raise KeyError(f'Trial {trial_number} not found in study {study_name}')
+
+
 def get_evaluation_results(
     study_name: str, start: float, end: float
 ) -> list[OutOfSampleEvaluation]:
