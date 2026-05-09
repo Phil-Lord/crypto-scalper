@@ -1,14 +1,21 @@
 '''
 Walk-forward UI page (``/walk-forward``).
 
-Two tabs share a single page: in-sample Optuna optimisation, and out-of-sample
-evaluation of the resulting top trials. The page itself is a thin shell — each
-tab lives in its own module and owns its widgets, lifecycle, and progress
-handling.
+Studies rail on the left, single detail panel on the right.
+The detail panel hosts the in-sample and out-of-sample sections;
+this shell renders empty placeholders that WF6/WF7 fill in.
+
+Constructs a single :class:`SQLAlchemyClient` for the page and shares it across
+the job and out-of-sample-evaluation repositories so subordinate panels and
+service calls can reuse the same connection pool.
 '''
 from nicegui import ui
 
-from data_system import SQLAlchemyClient, SQLAlchemyJobRepository
+from data_system import (
+    SQLAlchemyClient,
+    SQLAlchemyJobRepository,
+    SQLAlchemyOutOfSampleEvaluationRepository,
+)
 from ui.components import render_header
 
 from .in_sample_tab import InSampleTab
@@ -21,7 +28,9 @@ class WalkForwardPage:
         ui.query('.nicegui-content').classes('p-0 gap-0')  # Remove padding/gap from main content
         ui.query('body').style('overflow: hidden')  # Prevent page scrolling
 
-        self.job_repo = SQLAlchemyJobRepository(SQLAlchemyClient())
+        client = SQLAlchemyClient()
+        self.job_repo = SQLAlchemyJobRepository(client)
+        self.oos_repo = SQLAlchemyOutOfSampleEvaluationRepository(client)
 
         render_header()
 
