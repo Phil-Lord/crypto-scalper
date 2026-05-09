@@ -55,3 +55,28 @@ def StatusPill(status: PillStatus, label: str | None = None) -> ui.label:
         'inline-block px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider '
         f'rounded border {_PILL_CLASSES[status]}'
     )
+
+
+def SectionTitle(
+    number: str | int,
+    label: str,
+    pill: tuple[PillStatus, str | None] | None = None,
+) -> None:
+    '''
+    Two-digit number prefix, label, horizontal rule, and an optional trailing
+    :func:`StatusPill`. Used as the heading for sections within the
+    walk-forward page (e.g. ``01 IN-SAMPLE``, ``02 OUT-OF-SAMPLE``).
+
+    :param number: Section number — passed through verbatim, so callers
+        usually pass ``'01'`` / ``'02'`` to get zero-padded display.
+    :param label: Section label (rendered upper-case).
+    :param pill: Optional ``(status, label)`` tuple to render a trailing status pill.
+        ``label`` may be ``None`` to use the status name.
+    '''
+    with ui.row().classes('w-full items-center gap-2 no-wrap'):
+        ui.label(str(number)).classes('text-xs font-mono text-neutral-500')
+        ui.label(label).classes('text-xs uppercase tracking-wider text-neutral-300 font-semibold')
+        ui.element('div').classes('flex-1 h-px bg-neutral-800')
+        if pill is not None:
+            status, pill_label = pill
+            StatusPill(status, pill_label)
