@@ -19,9 +19,9 @@ from data_system import (
 from ui.components import render_header
 from ui.models.walk_forward import StudySummary
 from ui.services import list_studies_with_summary
-from ui.theme import primary_button
+from ui.theme import SectionTitle, primary_button
 
-from .components import StudyRailRow
+from .components import StatBlock, StudyRailRow
 
 
 RAIL_WIDTH_PX = 320
@@ -44,6 +44,7 @@ class WalkForwardPage:
 
         with ui.row().classes('w-full no-wrap gap-0').style('height: calc(100vh - 50px)'):
             self._render_rail()
+            self._render_detail()
 
     def _load_studies(self) -> list[StudySummary]:
         '''
@@ -102,11 +103,78 @@ class WalkForwardPage:
                     on_click=lambda s=study: self._select_study(s),
                 )
 
+    def _render_detail(self) -> None:
+        with ui.column().classes('flex-1 min-w-0 h-full gap-0'):
+            self._context_strip = ui.row().classes(
+                'w-full items-center gap-6 px-6 py-3 border-b border-neutral-800 no-wrap'
+            )
+            self._render_context_strip()
+
+            self._is_row = ui.column().classes(
+                'w-full px-6 py-4 border-b border-neutral-800 gap-2'
+            )
+            self._oos_row = ui.column().classes(
+                'w-full px-6 py-4 flex-1 min-h-0 gap-2'
+            )
+            self._render_is_placeholder()
+            self._render_oos_placeholder()
+
+    def _render_context_strip(self) -> None:
+        self._context_strip.clear()
+        with self._context_strip:
+            study = self._selected_study
+            with ui.column().classes('gap-0.5 items-start'):
+                ui.label('Selected study').classes(
+                    'text-[10px] uppercase tracking-wider text-neutral-500'
+                )
+                ui.label(study.name if study is not None else '—').classes(
+                    'text-[13px] font-mono text-neutral-100'
+                )
+            ui.element('div').classes('h-8 w-px bg-neutral-800')
+
+            if study is None:
+                ui.label('Select or create a study to begin.').classes(
+                    'text-xs text-neutral-500'
+                )
+                return
+
+            StatBlock('Strategy', study.strategy or '—')
+            StatBlock('Pair', study.pair or '—')
+            StatBlock('Trials', f'{study.trial_count:,}')
+            StatBlock(
+                'Best IS',
+                f'{study.best_is:.3f}' if study.best_is is not None else '—',
+                highlight=study.best_is is not None,
+            )
+
+    def _render_is_placeholder(self) -> None:
+        self._is_row.clear()
+        with self._is_row:
+            SectionTitle('01', 'IN-SAMPLE')
+            ui.label(
+                'In-sample optimisation panel.'
+                if self._selected_study is not None
+                else 'Create a study to enable in-sample optimisation.'
+            ).classes('text-xs text-neutral-500')
+
+    def _render_oos_placeholder(self) -> None:
+        self._oos_row.clear()
+        with self._oos_row:
+            SectionTitle('02', 'OUT-OF-SAMPLE')
+            ui.label(
+                'Out-of-sample evaluation panel.'
+                if self._selected_study is not None
+                else 'Create a study to enable out-of-sample evaluation.'
+            ).classes('text-xs text-neutral-500')
+
     def _select_study(self, study: StudySummary) -> None:
         if self._selected_study is not None and study.name == self._selected_study.name:
             return
         self._selected_study = study
         self._render_rail_rows()
+        self._render_context_strip()
+        self._render_is_placeholder()
+        self._render_oos_placeholder()
 
     def _on_new_study(self) -> None:
         ui.notify('New-study modal lands in WF5/E.', type='info')
