@@ -22,6 +22,7 @@ from ui.services import list_studies_with_summary
 from ui.theme import SectionTitle, primary_button
 
 from .components import StatBlock, StudyRailRow
+from .phase_mutex import PhaseMutex
 
 
 RAIL_WIDTH_PX = 320
@@ -36,6 +37,9 @@ class WalkForwardPage:
         client = SQLAlchemyClient()
         self.job_repo = SQLAlchemyJobRepository(client)
         self.oos_repo = SQLAlchemyOutOfSampleEvaluationRepository(client)
+
+        self.phase_mutex = PhaseMutex()
+        self.phase_mutex.subscribe(self._on_phase_change)
 
         self._studies: list[StudySummary] = self._load_studies()
         self._selected_study: StudySummary | None = (self._studies[0] if self._studies else None)
@@ -99,7 +103,8 @@ class WalkForwardPage:
                 StudyRailRow(
                     study,
                     active=is_selected,
-                    last_run_state='idle',
+                    last_run_state='running' if (
+                        is_selected and self.phase_mutex.is_busy) else 'idle',
                     on_click=lambda s=study: self._select_study(s),
                 )
 
@@ -178,6 +183,15 @@ class WalkForwardPage:
 
     def _on_new_study(self) -> None:
         ui.notify('New-study modal lands in WF5/E.', type='info')
+
+    def _on_phase_change(self) -> None:
+        '''
+        Re-render fragments that depend on phase state when the mutex
+        changes. Panels (WF6/WF7) read ``phase_mutex`` directly to drive
+        their own CTAs and pills; the page re-renders the rail so the
+        selected study's row reflects ``running`` / ``idle``.
+        '''
+        self._render_rail_rows()
 
 
 @ui.page('/walk-forward')
