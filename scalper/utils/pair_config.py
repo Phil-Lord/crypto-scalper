@@ -38,6 +38,17 @@ def get_kraken_pair(raw_pair: str) -> str:
     return kraken_pair
 
 
+_kraken_to_raw_pairs = {kraken: raw for raw, kraken in raw_to_kraken_pairs.items()}
+
+
+def get_raw_pair(kraken_pair: str) -> str:
+    ''' Given a Kraken pair (e.g. 'XXBTZGBP'), return the raw pair (e.g. 'BTCGBP'). '''
+    raw_pair = _kraken_to_raw_pairs.get(kraken_pair, None)
+    if raw_pair is None:
+        raise ValueError(f"Invalid Kraken pair: {kraken_pair}")
+    return raw_pair
+
+
 def get_kraken_pair_symbols(kraken_pair: str) -> PairSymbols:
     ''' Given a Kraken pair (e.g. 'XXBTZGBP'), return the base and quote symbols. '''
     symbols = kraken_pair_to_symbols.get(kraken_pair, None)

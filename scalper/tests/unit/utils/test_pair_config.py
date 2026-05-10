@@ -1,6 +1,6 @@
 import pytest
 
-from utils.pair_config import get_kraken_pair, get_kraken_pair_symbols, PairSymbols
+from utils.pair_config import get_kraken_pair, get_kraken_pair_symbols, get_raw_pair, PairSymbols
 
 
 @pytest.mark.utils
@@ -24,6 +24,21 @@ class TestGetKrakenPair:
         # When / Then
         with pytest.raises(ValueError):
             get_kraken_pair('INVALID')
+
+
+@pytest.mark.utils
+@pytest.mark.pair_config
+class TestGetRawPair:
+    def test_returns_raw_pair_for_valid_kraken_pair(self):
+        assert get_raw_pair('XXBTZGBP') == 'BTCGBP'
+
+    def test_round_trips_with_get_kraken_pair(self):
+        for raw in ('BTCGBP', 'DOGEGBP', 'ETHGBP', 'BTCUSD'):
+            assert get_raw_pair(get_kraken_pair(raw)) == raw
+
+    def test_raises_value_error_for_unknown_kraken_pair(self):
+        with pytest.raises(ValueError):
+            get_raw_pair('NOTAPAIR')
 
 
 @pytest.mark.utils

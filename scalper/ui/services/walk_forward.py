@@ -144,7 +144,7 @@ async def start_in_sample(
     failure), the remaining workers are cancelled and their subprocesses
     terminated before the exception propagates, so no orphaned children leak.
     '''
-    splits = _split_trials(n_trials, n_workers)
+    splits = split_trials(n_trials, n_workers)
     jobs = [Job(job_type=JobType.OPTIMISE_IN_SAMPLE) for _ in splits]
     tasks: list[asyncio.Task[None]] = []
     for index, (job, worker_trials) in enumerate(zip(jobs, splits)):
@@ -288,11 +288,14 @@ def get_evaluation_results(
     return oos_repo.get(study_name, start, end)
 
 
-def _split_trials(n_trials: int, n_workers: int) -> list[int]:
+def split_trials(n_trials: int, n_workers: int) -> list[int]:
     '''
     Split ``n_trials`` across ``n_workers``, distributing the remainder to the
     first workers. Returns one positive trial count per active worker — workers
     that would receive zero trials are dropped.
+
+    Public so the IS panel can seed its worker grid with the same per-worker
+    trial counts the run will actually use.
     '''
     if n_trials <= 0 or n_workers <= 0:
         return []
