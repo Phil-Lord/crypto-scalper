@@ -206,13 +206,41 @@ class WalkForwardPage:
         Kick off an in-sample run under the page-level mutex.
 
         Inserts an optimistic placeholder row for the new study and selects it
-        immediately. The Optuna study only materialises once the subprocess
-        reaches ``create_study``, which races with any rail reload here — the
+        immediately, *before* arming the mutex, so that the synchronous
+        listener fired by ``PhaseMutex.start`` sees the running name and
+        placeholder already in place and produces a single coherent re-render.
+        State is rolled back if ``start`` raises.
+
+        The Optuna study only materialises once the subprocess reaches
+        ``create_study``, which races with any rail reload here — the
         placeholder ensures the row is visible and selected (and so wears the
         running pill) from the moment the user confirms. Phase-done refresh
         replaces the placeholder with the real summary.
+
+        ``derive_study_name`` returns an empty string when its inputs cannot be
+        converted (defensive against bypassed validation); in that case we skip
+        the placeholder entirely and let the post-run refresh discover the row.
         '''
         predicted_name = derive_study_name(form)
+        previous_studies = self._studies
+        previous_selected = self._selected_study
+        previous_running_name = self._running_study_name
+
+        if predicted_name:
+            placeholder = StudySummary(
+                name=predicted_name,
+                pair=form.pair,
+                strategy=form.strategy,
+                trial_count=0,
+                best_is=None,
+                direction=StudyDirection.MAXIMIZE,
+            )
+            self._studies = [placeholder] + [
+                s for s in self._studies if s.name != predicted_name
+            ]
+            self._selected_study = placeholder
+            self._running_study_name = predicted_name
+
         try:
             task = self.phase_mutex.start(
                 'is',
@@ -227,22 +255,12 @@ class WalkForwardPage:
                 )
             )
         except RuntimeError as e:
+            self._studies = previous_studies
+            self._selected_study = previous_selected
+            self._running_study_name = previous_running_name
             ui.notify(str(e), type='negative')
             return
 
-        self._running_study_name = predicted_name
-        placeholder = StudySummary(
-            name=predicted_name,
-            pair=form.pair,
-            strategy=form.strategy,
-            trial_count=0,
-            best_is=None,
-            direction=StudyDirection.MAXIMIZE,
-        )
-        self._studies = [placeholder] + [
-            s for s in self._studies if s.name != predicted_name
-        ]
-        self._selected_study = placeholder
         self._render_rail_rows()
         self._render_context_strip()
         self._render_is_placeholder()
