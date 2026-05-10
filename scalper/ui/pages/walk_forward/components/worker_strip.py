@@ -2,22 +2,20 @@
 Single horizontally-scrolling row of :func:`WorkerTile`s.
 
 Mounts once into the IS panel. The panel calls :meth:`show_workers` when a
-run begins, feeds per-worker events through :meth:`on_event` (matching
-``start_in_sample``'s ``on_progress`` signature), and calls
-:meth:`reset_to_idle` when the run finishes — success, error, or cancel —
-so stale tiles never linger.
+run begins and feeds per-worker events through :meth:`on_event` (matching
+``start_in_sample``'s ``on_progress`` signature). Tile cleanup at run-end
+is handled by the page re-rendering the IS panel on phase done, which
+rebuilds a fresh idle strip; :meth:`reset_to_idle` is only used when the
+panel itself needs to roll back a failed run start.
 
 The OOS phase has a single-process callback, not per-worker, and is not
 wired into this component.
 '''
 from nicegui import ui
 
-from ui.theme import PillStatus, StatusPill
+from ui.theme import StatusPill
 
 from .worker_tile import WorkerTile, WorkerTileState, apply_done, apply_progress
-
-
-_TERMINAL_STATUSES: tuple[PillStatus, ...] = ('done', 'error', 'cancelled')
 
 
 class WorkerStrip:
@@ -34,11 +32,6 @@ class WorkerStrip:
         self._container = ui.column().classes('w-full gap-0 min-w-0')
         self._states: list[WorkerTileState] = []
         self._render()
-
-    @property
-    def states(self) -> list[WorkerTileState]:
-        ''' Snapshot of the current tile states (defensive copy). '''
-        return list(self._states)
 
     def show_workers(self, trials_per_worker: list[int]) -> None:
         '''
@@ -85,39 +78,6 @@ class WorkerStrip:
         else:
             return
         self._render()
-
-    def mark_pending_as(self, status: PillStatus) -> None:
-        '''
-        Bulk-set every non-terminal tile to ``status``.
-
-        Used by the IS panel when the run is cancelled or fails after some
-        workers have already finished — the still-running and pending tiles
-        get a final pill state without overwriting workers that already
-        reached ``done``.
-
-        :param status: One of ``error`` / ``cancelled``. Other values are
-            accepted for completeness but the panel only uses these two.
-        '''
-        if status not in ('pending', 'running', 'done', 'error', 'cancelled'):
-            raise ValueError(
-                f'Unknown WorkerStrip status {status!r}; '
-                f"expected one of 'pending', 'running', 'done', 'error', 'cancelled'"
-            )
-        changed = False
-        for index, state in enumerate(self._states):
-            if state.status in _TERMINAL_STATUSES:
-                continue
-            self._states[index] = WorkerTileState(
-                worker_id=state.worker_id,
-                status=status,
-                latest_trial=state.latest_trial,
-                best_value=state.best_value,
-                trials_done=state.trials_done,
-                total_trials=state.total_trials
-            )
-            changed = True
-        if changed:
-            self._render()
 
     def reset_to_idle(self) -> None:
         ''' Drop all tiles and re-render the empty-state placeholder. '''
