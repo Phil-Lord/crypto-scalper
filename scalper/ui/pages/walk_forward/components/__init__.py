@@ -7,6 +7,7 @@ from .new_study_dialog import (
 )
 from .stat_block import StatBlock
 from .study_rail_row import StudyRailRow
+from .window_tabs import WindowKey, WindowTabs, auto_select_window
 from .worker_strip import WorkerStrip
 from .worker_tile import WorkerTile, WorkerTileState
 
@@ -17,6 +18,8 @@ __all__ = [
     'NewStudyForm',
     'StatBlock',
     'StudyRailRow',
+    'WindowKey',
+    'WindowTabs',
     'WorkerStrip',
     'WorkerTile',
     'WorkerTileState',
