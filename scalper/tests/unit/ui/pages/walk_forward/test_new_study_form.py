@@ -161,3 +161,33 @@ class TestDeriveStudyName:
         )
 
         assert derive_study_name(form) == 'SmaStrategy_XXBTZGBP_20250101-20250401'
+
+    def test_returns_empty_string_when_pair_is_unknown(self):
+        '''
+        Defensive: derive_study_name is called on an already-validated form, so
+        the unknown-pair case is unreachable through the dialog. If callers
+        later bypass validation, the function must fall through silently
+        because the page uses a non-empty result purely as a selection hint.
+        '''
+        form = NewStudyForm(
+            pair='NOT_A_PAIR',
+            strategy='SmaStrategy',
+            start='2025-1-1-0-0-0',
+            end='2025-4-1-0-0-0',
+            n_trials=10,
+            n_workers=1,
+        )
+
+        assert derive_study_name(form) == ''
+
+    def test_returns_empty_string_when_dates_are_unparseable(self):
+        form = NewStudyForm(
+            pair='BTCGBP',
+            strategy='SmaStrategy',
+            start='not-a-date',
+            end='2025-4-1-0-0-0',
+            n_trials=10,
+            n_workers=1,
+        )
+
+        assert derive_study_name(form) == ''
