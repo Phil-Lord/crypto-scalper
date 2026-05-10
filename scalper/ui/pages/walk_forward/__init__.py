@@ -9,6 +9,8 @@ Constructs a single :class:`SQLAlchemyClient` for the page and shares it across
 the job and out-of-sample-evaluation repositories so subordinate panels and
 service calls can reuse the same connection pool.
 '''
+import asyncio
+
 from nicegui import ui
 
 from data_system import (
@@ -18,10 +20,16 @@ from data_system import (
 )
 from ui.components import render_header
 from ui.models.walk_forward import StudySummary
-from ui.services import list_studies_with_summary
+from ui.services import list_studies_with_summary, start_in_sample
 from ui.theme import SectionTitle, primary_button
 
-from .components import StatBlock, StudyRailRow
+from .components import (
+    NewStudyForm,
+    StatBlock,
+    StudyRailRow,
+    derive_study_name,
+    show_new_study_dialog,
+)
 from .phase_mutex import PhaseMutex
 
 
@@ -181,17 +189,91 @@ class WalkForwardPage:
         self._render_is_placeholder()
         self._render_oos_placeholder()
 
-    def _on_new_study(self) -> None:
-        ui.notify('New-study modal lands in WF5/E.', type='info')
+    async def _on_new_study(self) -> None:
+        if self.phase_mutex.is_busy:
+            return
+        form = await show_new_study_dialog()
+        if form is None:
+            return
+        await self._start_in_sample_from_form(form)
+
+    async def _start_in_sample_from_form(self, form: NewStudyForm) -> None:
+        '''
+        Kick off an in-sample run under the page-level mutex.
+
+        Pre-selects the study row in the rail (using the deterministic study
+        name derived from the form) so the user sees their new study
+        highlighted immediately. Refreshes the rail again on completion so
+        trial counts and the best-IS reading catch up.
+        '''
+        predicted_name = derive_study_name(form)
+        try:
+            task = self.phase_mutex.start(
+                'is',
+                start_in_sample(
+                    form.pair,
+                    form.strategy,
+                    form.start,
+                    form.end,
+                    form.n_trials,
+                    form.n_workers,
+                    self.job_repo
+                )
+            )
+        except RuntimeError as e:
+            ui.notify(str(e), type='negative')
+            return
+
+        self._refresh_rail(select_name=predicted_name)
+        try:
+            await task
+        except asyncio.CancelledError:
+            ui.notify('In-sample run cancelled.', type='warning')
+        except Exception as e:
+            ui.notify(f'In-sample run failed: {e}', type='negative')
+        finally:
+            self._refresh_rail(select_name=predicted_name)
+
+    def _refresh_rail(self, select_name: str | None = None) -> None:
+        '''
+        Reload studies and re-render the rail. When ``select_name`` matches a
+        study, that study becomes the selection; otherwise the existing
+        selection is preserved if it still exists.
+        '''
+        self._studies = self._load_studies()
+        if select_name:
+            match = next(
+                (s for s in self._studies if s.name == select_name), None
+            )
+            if match is not None:
+                self._selected_study = match
+        elif self._selected_study is not None:
+            still_present = any(
+                s.name == self._selected_study.name for s in self._studies
+            )
+            if not still_present:
+                self._selected_study = self._studies[0] if self._studies else None
+        else:
+            self._selected_study = self._studies[0] if self._studies else None
+
+        self._render_rail_rows()
+        self._render_context_strip()
+        self._render_is_placeholder()
+        self._render_oos_placeholder()
 
     def _on_phase_change(self) -> None:
         '''
         Re-render fragments that depend on phase state when the mutex
         changes. Panels (WF6/WF7) read ``phase_mutex`` directly to drive
         their own CTAs and pills; the page re-renders the rail so the
-        selected study's row reflects ``running`` / ``idle``.
+        selected study's row reflects ``running`` / ``idle`` and
+        enables / disables the "+ NEW STUDY" button.
         '''
         self._render_rail_rows()
+        if self.phase_mutex.is_busy:
+            self.new_study_button.disable()
+        else:
+            self.new_study_button.enable()
 
 
 @ui.page('/walk-forward')
