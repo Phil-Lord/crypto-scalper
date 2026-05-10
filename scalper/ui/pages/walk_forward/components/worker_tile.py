@@ -23,7 +23,7 @@ class WorkerTileState:
     Attributes:
         worker_id (int): Display id (1-based).
         status (PillStatus): Pill state.
-            — ``pending`` before the first PROGRESS event
+            - ``pending`` before the first PROGRESS event
             - ``running`` while trials are streaming in
             - ``done`` after the worker emits ``DONE``
             The IS panel may also set ``error`` or ``cancelled`` on the

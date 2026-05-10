@@ -307,4 +307,4 @@ def _format_window(inputs: IsRunInputs | None) -> str:
     if inputs is None:
         return 'unparseable study name'
     # Drop the '-0-0-0' time suffix for display.
-    return f'{inputs.start.removesuffix("-0-0-0")} → {inputs.end.removesuffix("-0-0-0")}'
+    return f'{inputs.start.removesuffix('-0-0-0')} → {inputs.end.removesuffix('-0-0-0')}'
