@@ -5,6 +5,7 @@ from .new_study_dialog import (
     show_new_study_dialog,
     validate_new_study_form,
 )
+from .oos_panel import OosPanel, OosRunInputs, derive_window_key, validate_oos_form
 from .stat_block import StatBlock
 from .study_rail_row import StudyRailRow
 from .window_tabs import WindowKey, WindowTabs, auto_select_window
@@ -16,6 +17,8 @@ __all__ = [
     'IsPanel',
     'IsRunInputs',
     'NewStudyForm',
+    'OosPanel',
+    'OosRunInputs',
     'StatBlock',
     'StudyRailRow',
     'WindowKey',
@@ -23,9 +26,12 @@ __all__ = [
     'WorkerStrip',
     'WorkerTile',
     'WorkerTileState',
+    'auto_select_window',
     'derive_run_inputs',
     'derive_study_name',
+    'derive_window_key',
     'show_new_study_dialog',
     'validate_is_form',
     'validate_new_study_form',
+    'validate_oos_form',
 ]
