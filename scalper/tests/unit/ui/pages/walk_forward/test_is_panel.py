@@ -122,9 +122,11 @@ def _make_panel(
     phase_mutex.is_active.return_value = False
     job_repo = mocker.MagicMock()
     set_running = mocker.MagicMock()
-    fake_start = mocker.patch.object(
-        is_panel_module, 'start_in_sample', return_value='<coro-sentinel>',
-    )
+    # Replace ``start_in_sample`` with a plain ``MagicMock`` (not the default
+    # ``AsyncMock`` autospec gives async functions) so calling it returns a
+    # sentinel rather than a coroutine that pytest will flag as never awaited.
+    fake_start = mocker.MagicMock(return_value='<coro-sentinel>')
+    mocker.patch.object(is_panel_module, 'start_in_sample', fake_start)
 
     panel = IsPanel(
         phase_mutex=phase_mutex,
