@@ -19,7 +19,7 @@ from data_system import (
     SQLAlchemyOutOfSampleEvaluationRepository,
 )
 from ui.components import render_header
-from ui.models.walk_forward import StudySummary
+from ui.models.walk_forward import StudyDirection, StudySummary
 from ui.services import list_studies_with_summary, start_in_sample
 from ui.theme import SectionTitle, primary_button
 
@@ -51,6 +51,7 @@ class WalkForwardPage:
 
         self._studies: list[StudySummary] = self._load_studies()
         self._selected_study: StudySummary | None = (self._studies[0] if self._studies else None)
+        self._running_study_name: str | None = None
 
         render_header()
 
@@ -108,11 +109,14 @@ class WalkForwardPage:
                     self._selected_study is not None
                     and study.name == self._selected_study.name
                 )
+                is_running = (
+                    self.phase_mutex.is_busy
+                    and study.name == self._running_study_name
+                )
                 StudyRailRow(
                     study,
                     active=is_selected,
-                    last_run_state='running' if (
-                        is_selected and self.phase_mutex.is_busy) else 'idle',
+                    last_run_state='running' if is_running else 'idle',
                     on_click=lambda s=study: self._select_study(s),
                 )
 
@@ -201,10 +205,12 @@ class WalkForwardPage:
         '''
         Kick off an in-sample run under the page-level mutex.
 
-        Pre-selects the study row in the rail (using the deterministic study
-        name derived from the form) so the user sees their new study
-        highlighted immediately. Refreshes the rail again on completion so
-        trial counts and the best-IS reading catch up.
+        Inserts an optimistic placeholder row for the new study and selects it
+        immediately. The Optuna study only materialises once the subprocess
+        reaches ``create_study``, which races with any rail reload here — the
+        placeholder ensures the row is visible and selected (and so wears the
+        running pill) from the moment the user confirms. Phase-done refresh
+        replaces the placeholder with the real summary.
         '''
         predicted_name = derive_study_name(form)
         try:
@@ -224,7 +230,24 @@ class WalkForwardPage:
             ui.notify(str(e), type='negative')
             return
 
-        self._refresh_rail(select_name=predicted_name)
+        self._running_study_name = predicted_name
+        placeholder = StudySummary(
+            name=predicted_name,
+            pair=form.pair,
+            strategy=form.strategy,
+            trial_count=0,
+            best_is=None,
+            direction=StudyDirection.MAXIMIZE,
+        )
+        self._studies = [placeholder] + [
+            s for s in self._studies if s.name != predicted_name
+        ]
+        self._selected_study = placeholder
+        self._render_rail_rows()
+        self._render_context_strip()
+        self._render_is_placeholder()
+        self._render_oos_placeholder()
+
         try:
             await task
         except asyncio.CancelledError:
@@ -239,18 +262,14 @@ class WalkForwardPage:
         selection is preserved if it still exists.
         '''
         self._studies = self._load_studies()
-        if select_name:
-            match = next(
-                (s for s in self._studies if s.name == select_name), None
+        target_name = select_name or (
+            self._selected_study.name if self._selected_study is not None else None
+        )
+        if target_name is not None:
+            match = next((s for s in self._studies if s.name == target_name), None)
+            self._selected_study = match if match is not None else (
+                self._studies[0] if self._studies else None
             )
-            if match is not None:
-                self._selected_study = match
-        elif self._selected_study is not None:
-            still_present = any(
-                s.name == self._selected_study.name for s in self._studies
-            )
-            if not still_present:
-                self._selected_study = self._studies[0] if self._studies else None
         else:
             self._selected_study = self._studies[0] if self._studies else None
 
@@ -277,6 +296,7 @@ class WalkForwardPage:
             self._render_rail_rows()
             self.new_study_button.disable()
         else:
+            self._running_study_name = None
             self._refresh_rail()
             self.new_study_button.enable()
 
