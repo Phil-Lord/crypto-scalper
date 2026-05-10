@@ -33,20 +33,27 @@ def optimise_parameters(
     '''
     warnings.filterwarnings('ignore', category=ExperimentalWarning)
     windows = create_windows(engine.start, engine.end)
-    study_name = create_study_name(engine)
+    study_name = create_study_name(
+        engine.strategy.__class__.__name__, engine.pair, engine.start, engine.end,
+    )
     storage = create_storage()
     study = create_study(storage, study_name, n_trials)
     validate_search_space(study, param_grid)
     optimise(n_trials, study, engine, windows, param_grid, n_jobs, progress_callback)
 
 
-def create_study_name(engine) -> str:
-    return (
-        f'{engine.strategy.__class__.__name__}_'
-        f'{engine.pair}_'
-        f'{pd.to_datetime(engine.start, unit='s').strftime('%Y%m%d')}-'
-        f'{pd.to_datetime(engine.end, unit='s').strftime('%Y%m%d')}'
-    )
+def create_study_name(strategy_name: str, kraken_pair: str, start_ts: float, end_ts: float) -> str:
+    '''
+    Build the canonical Optuna study name for a backtest configuration.
+
+    :param strategy_name: Strategy class name, e.g. ``'SmaStrategy'``.
+    :param kraken_pair: Kraken-format pair, e.g. ``'XXBTZGBP'``.
+    :param start_ts: In-sample window start as a Unix second timestamp.
+    :param end_ts: In-sample window end as a Unix second timestamp.
+    '''
+    start_str = pd.to_datetime(start_ts, unit='s').strftime('%Y%m%d')
+    end_str = pd.to_datetime(end_ts, unit='s').strftime('%Y%m%d')
+    return f'{strategy_name}_{kraken_pair}_{start_str}-{end_str}'
 
 
 def create_storage() -> optuna.storages.RDBStorage:
