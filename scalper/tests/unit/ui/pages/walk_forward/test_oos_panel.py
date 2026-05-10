@@ -385,6 +385,39 @@ class TestOnProgress:
 
 @pytest.mark.ui
 @pytest.mark.walk_forward_oos_panel
+class TestEffectiveRunningWindow:
+    '''
+    The page's phase-done listener re-renders this panel synchronously
+    inside ``mutex._on_task_done``, which fires before ``_on_start``'s
+    ``finally`` clears ``_running_window``. Gating on the mutex keeps a
+    stale LIVE pill off the just-finished tab and off another study's
+    tabs after a mid-run study switch.
+    '''
+    def test_returns_running_window_while_oos_active(self, mocker):
+        panel, deps = _make_panel(mocker)
+        deps['phase_mutex'].is_active.return_value = True
+        panel._running_window = (100.0, 200.0)
+
+        assert panel._effective_running_window() == (100.0, 200.0)
+        deps['phase_mutex'].is_active.assert_called_with('oos')
+
+    def test_returns_none_when_oos_no_longer_active(self, mocker):
+        panel, deps = _make_panel(mocker)
+        deps['phase_mutex'].is_active.return_value = False
+        panel._running_window = (100.0, 200.0)
+
+        assert panel._effective_running_window() is None
+
+    def test_returns_none_when_no_running_window_set(self, mocker):
+        panel, deps = _make_panel(mocker)
+        deps['phase_mutex'].is_active.return_value = True
+        panel._running_window = None
+
+        assert panel._effective_running_window() is None
+
+
+@pytest.mark.ui
+@pytest.mark.walk_forward_oos_panel
 class TestParamsCache:
     def test_copy_uses_cached_params_without_lazy_fetch(self, mocker):
         panel, deps = _make_panel(mocker)

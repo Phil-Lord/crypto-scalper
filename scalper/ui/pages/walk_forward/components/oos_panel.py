@@ -267,9 +267,24 @@ class OosPanel:
             WindowTabs(
                 self._windows,
                 self._selected_window,
-                self._running_window,
+                self._effective_running_window(),
                 on_select=self._on_select_window
             )
+
+    def _effective_running_window(self) -> WindowKey | None:
+        '''
+        ``_running_window`` gated on ``phase_mutex.is_active('oos')``.
+
+        The page's phase-done listener re-renders this panel synchronously
+        inside ``mutex._on_task_done`` — that fires before ``_on_start``'s
+        ``finally`` clears ``_running_window``, so a naive read would
+        leave a stale LIVE pill on the just-finished tab. Gating on the
+        mutex also makes a study switch mid-run drop the previous study's
+        running marker on the new study's tabs.
+        '''
+        if not self._phase_mutex.is_active('oos'):
+            return None
+        return self._running_window
 
     def _render_table_section(self) -> None:
         with ui.row().classes('w-full items-center gap-2 no-wrap mt-2 mb-1'):
@@ -400,17 +415,16 @@ class OosPanel:
         # Drop selection that no longer maps to a real window (study change
         # or window deleted), unless we are still tracking it as the
         # in-flight run's window.
+        running = self._effective_running_window()
         if self._selected_window is not None:
             still_present = any(
                 (w.start, w.end) == self._selected_window for w in self._windows
             )
-            if not still_present and self._selected_window != self._running_window:
+            if not still_present and self._selected_window != running:
                 self._selected_window = None
 
         if self._selected_window is None:
-            self._selected_window = auto_select_window(
-                self._windows, self._running_window
-            )
+            self._selected_window = auto_select_window(self._windows, running)
 
         top_n = self._current_top_n()
         try:
