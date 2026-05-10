@@ -26,8 +26,9 @@ class WorkerTileState:
             - ``pending`` before the first PROGRESS event
             - ``running`` while trials are streaming in
             - ``done`` after the worker emits ``DONE``
-            The IS panel may also set ``error`` or ``cancelled`` on the
-            strip directly when the run fails or is cancelled.
+            Cancellation and errors are surfaced via a notify and a panel
+            re-render that rebuilds the strip in its idle state, so tiles
+            never carry an ``error`` / ``cancelled`` status here.
         latest_trial (int | None): Global Optuna trial number from the most
             recent PROGRESS event. ``None`` while the tile is pending.
         best_value (float | None): Worker's best value so far. ``None`` until
