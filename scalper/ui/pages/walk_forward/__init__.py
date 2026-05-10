@@ -231,8 +231,6 @@ class WalkForwardPage:
             ui.notify('In-sample run cancelled.', type='warning')
         except Exception as e:
             ui.notify(f'In-sample run failed: {e}', type='negative')
-        finally:
-            self._refresh_rail(select_name=predicted_name)
 
     def _refresh_rail(self, select_name: str | None = None) -> None:
         '''
@@ -265,14 +263,21 @@ class WalkForwardPage:
         '''
         Re-render fragments that depend on phase state when the mutex
         changes. Panels (WF6/WF7) read ``phase_mutex`` directly to drive
-        their own CTAs and pills; the page re-renders the rail so the
-        selected study's row reflects ``running`` / ``idle`` and
-        enables / disables the "+ NEW STUDY" button.
+        their own CTAs and pills.
+
+        The page handles rail-wide concerns:
+            - Running / idle pill on the active study's row
+            - "+ NEW STUDY" enabledness
+            - Full rail reload on phase done so trial counts and best-IS readings catch up.
+
+        No timer — the rail can be stale until phase done
+        (live trial counts climb in WF6's worker grid).
         '''
-        self._render_rail_rows()
         if self.phase_mutex.is_busy:
+            self._render_rail_rows()
             self.new_study_button.disable()
         else:
+            self._refresh_rail()
             self.new_study_button.enable()
 
 
