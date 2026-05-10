@@ -12,9 +12,9 @@ without instantiating NiceGUI components.
 '''
 from dataclasses import dataclass
 
-import pandas as pd
 from nicegui import ui
 
+from backtesting_engine import create_study_name
 from strategy_manager import STRATEGIES
 from ui.theme import primary_button, sidebar_input, sidebar_select
 from utils import get_kraken_pair, get_second_timestamp, parse_datetime, raw_to_kraken_pairs
@@ -109,20 +109,20 @@ def validate_new_study_form(
 
 def derive_study_name(form: NewStudyForm) -> str:
     '''
-    Reproduce ``backtesting_engine.parameter_optimisation.create_study_name``
-    so the page can pre-select the study row in the rail before the worker
-    has emitted its first PROGRESS line.
+    UI-side adapter around ``backtesting_engine.create_study_name`` — converts
+    the form's raw pair / text-format datetimes into the engine's expected
+    types (kraken pair + second timestamps) and delegates.
 
-    Returns an empty string if the inputs cannot be converted to timestamps;
-    the caller falls back to refreshing the rail without a target selection.
+    Used by the page to pre-select the new study row in the rail before the
+    worker has emitted its first PROGRESS line. Returns an empty string if
+    the inputs cannot be converted; the caller falls back to refreshing the
+    rail without a target selection.
     '''
     try:
         kraken_pair = get_kraken_pair(form.pair)
         start_ts = get_second_timestamp(*parse_datetime(form.start))
         end_ts = get_second_timestamp(*parse_datetime(form.end))
-        start_str = pd.to_datetime(start_ts, unit='s').strftime('%Y%m%d')
-        end_str = pd.to_datetime(end_ts, unit='s').strftime('%Y%m%d')
-        return f'{form.strategy}_{kraken_pair}_{start_str}-{end_str}'
+        return create_study_name(form.strategy, kraken_pair, start_ts, end_ts)
     except Exception:
         return ''
 
