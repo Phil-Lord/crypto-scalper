@@ -21,9 +21,11 @@ from data_system import (
 from ui.components import render_header
 from ui.models.walk_forward import StudyDirection, StudySummary
 from ui.services import list_studies_with_summary, start_in_sample
+from ui.services.walk_forward import split_trials
 from ui.theme import SectionTitle, primary_button
 
 from .components import (
+    IsPanel,
     NewStudyForm,
     StatBlock,
     StudyRailRow,
@@ -52,6 +54,13 @@ class WalkForwardPage:
         self._studies: list[StudySummary] = self._load_studies()
         self._selected_study: StudySummary | None = (self._studies[0] if self._studies else None)
         self._running_study_name: str | None = None
+
+        self.is_panel = IsPanel(
+            phase_mutex=self.phase_mutex,
+            get_selected_study=lambda: self._selected_study,
+            job_repo=self.job_repo,
+            set_running_study_name=self._set_running_study_name
+        )
 
         render_header()
 
@@ -133,7 +142,7 @@ class WalkForwardPage:
             self._oos_row = ui.column().classes(
                 'w-full px-6 py-4 flex-1 min-h-0 gap-2'
             )
-            self._render_is_placeholder()
+            self._render_is_panel()
             self._render_oos_placeholder()
 
     def _render_context_strip(self) -> None:
@@ -164,15 +173,11 @@ class WalkForwardPage:
                 highlight=study.best_is is not None,
             )
 
-    def _render_is_placeholder(self) -> None:
-        self._is_row.clear()
-        with self._is_row:
-            SectionTitle('01', 'IN-SAMPLE')
-            ui.label(
-                'In-sample optimisation panel.'
-                if self._selected_study is not None
-                else 'Create a study to enable in-sample optimisation.'
-            ).classes('text-xs text-neutral-500')
+    def _render_is_panel(self) -> None:
+        self.is_panel.render(self._is_row)
+
+    def _set_running_study_name(self, name: str | None) -> None:
+        self._running_study_name = name
 
     def _render_oos_placeholder(self) -> None:
         self._oos_row.clear()
@@ -190,7 +195,7 @@ class WalkForwardPage:
         self._selected_study = study
         self._render_rail_rows()
         self._render_context_strip()
-        self._render_is_placeholder()
+        self._render_is_panel()
         self._render_oos_placeholder()
 
     async def _on_new_study(self) -> None:
@@ -241,6 +246,7 @@ class WalkForwardPage:
             self._selected_study = placeholder
             self._running_study_name = predicted_name
 
+        splits = split_trials(form.n_trials, form.n_workers)
         try:
             task = self.phase_mutex.start(
                 'is',
@@ -251,7 +257,8 @@ class WalkForwardPage:
                     form.end,
                     form.n_trials,
                     form.n_workers,
-                    self.job_repo
+                    self.job_repo,
+                    self.is_panel.on_progress,
                 )
             )
         except RuntimeError as e:
@@ -263,8 +270,9 @@ class WalkForwardPage:
 
         self._render_rail_rows()
         self._render_context_strip()
-        self._render_is_placeholder()
+        self._render_is_panel()
         self._render_oos_placeholder()
+        self.is_panel.seed_strip(splits)
 
         try:
             await task
@@ -293,7 +301,7 @@ class WalkForwardPage:
 
         self._render_rail_rows()
         self._render_context_strip()
-        self._render_is_placeholder()
+        self._render_is_panel()
         self._render_oos_placeholder()
 
     def _on_phase_change(self) -> None:

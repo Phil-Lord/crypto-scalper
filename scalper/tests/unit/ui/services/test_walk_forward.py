@@ -54,19 +54,19 @@ class TestParseProgress:
 @pytest.mark.walk_forward
 class TestSplitTrials:
     def test_splits_evenly(self):
-        assert svc._split_trials(10, 5) == [2, 2, 2, 2, 2]
+        assert svc.split_trials(10, 5) == [2, 2, 2, 2, 2]
 
     def test_distributes_remainder_to_first_workers(self):
-        assert svc._split_trials(11, 4) == [3, 3, 3, 2]
+        assert svc.split_trials(11, 4) == [3, 3, 3, 2]
 
     def test_drops_workers_when_more_workers_than_trials(self):
-        assert svc._split_trials(3, 8) == [1, 1, 1]
+        assert svc.split_trials(3, 8) == [1, 1, 1]
 
     def test_returns_empty_when_no_trials(self):
-        assert svc._split_trials(0, 4) == []
+        assert svc.split_trials(0, 4) == []
 
     def test_returns_empty_when_no_workers(self):
-        assert svc._split_trials(10, 0) == []
+        assert svc.split_trials(10, 0) == []
 
 
 @pytest.mark.ui

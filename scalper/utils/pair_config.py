@@ -34,13 +34,24 @@ def get_kraken_pair(raw_pair: str) -> str:
     raw_pair = raw_pair.upper()
     kraken_pair = raw_to_kraken_pairs.get(raw_pair, None)
     if kraken_pair is None:
-        raise ValueError(f"Invalid raw pair: {raw_pair}")
+        raise ValueError(f'Invalid raw pair: {raw_pair}')
     return kraken_pair
+
+
+_kraken_to_raw_pairs = {kraken: raw for raw, kraken in raw_to_kraken_pairs.items()}
+
+
+def get_raw_pair(kraken_pair: str) -> str:
+    ''' Given a Kraken pair (e.g. 'XXBTZGBP'), return the raw pair (e.g. 'BTCGBP'). '''
+    raw_pair = _kraken_to_raw_pairs.get(kraken_pair, None)
+    if raw_pair is None:
+        raise ValueError(f'Invalid Kraken pair: {kraken_pair}')
+    return raw_pair
 
 
 def get_kraken_pair_symbols(kraken_pair: str) -> PairSymbols:
     ''' Given a Kraken pair (e.g. 'XXBTZGBP'), return the base and quote symbols. '''
     symbols = kraken_pair_to_symbols.get(kraken_pair, None)
     if symbols is None:
-        raise ValueError(f"Invalid Kraken pair: {kraken_pair}")
+        raise ValueError(f'Invalid Kraken pair: {kraken_pair}')
     return symbols
