@@ -577,8 +577,8 @@ class OosPanel:
             return
         confirmed = await confirm_dialog(
             title='Stop out-of-sample evaluation?',
-            message='The subprocess will be terminated. '
-                    'Already-evaluated trials are kept.',
+            message='The subprocess will be terminated and '
+                    'all evaluation results will be lost.',
             confirm_text='Stop',
         )
         if confirmed:
