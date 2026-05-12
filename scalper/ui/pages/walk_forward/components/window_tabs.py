@@ -41,6 +41,8 @@ def format_window_dates(key: WindowKey) -> tuple[str, str]:
 
 
 def _format_dt(ts: float) -> str:
+    # Must stay in UTC to round-trip with utils.get_second_timestamp,
+    # which builds the inverse timestamp without applying a TZ offset.
     dt = datetime.fromtimestamp(ts, tz=timezone.utc)
     return f'{dt.year}-{dt.month}-{dt.day}-{dt.hour}-{dt.minute}-{dt.second}'
 

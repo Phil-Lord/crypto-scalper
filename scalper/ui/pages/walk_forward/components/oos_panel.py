@@ -29,6 +29,7 @@ import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from nicegui import ui
 
@@ -191,7 +192,7 @@ class OosPanel:
         self._selected_window: WindowKey | None = None
         self._running_window: WindowKey | None = None
         self._trials: list[TrialWithOos] = []
-        self._params_cache: dict[int, dict] = {}
+        self._params_cache: dict[int, dict[str, Any]] = {}
         self._progress_count: int = 0
         self._progress_total: int = 0
 
