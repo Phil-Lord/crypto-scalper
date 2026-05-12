@@ -42,6 +42,7 @@ from ui.models.walk_forward import StudySummary, TrialVerdict, TrialWithOos
 from ui.services.walk_forward import (
     get_top_trials_with_oos,
     get_trial_params,
+    invalidate_study_cache,
     list_oos_windows,
     start_out_of_sample,
 )
@@ -405,7 +406,15 @@ class OosPanel:
         Fetch windows, resolve the selected tab, and load + cache the top
         trials for it. Best-effort: errors at any step degrade gracefully
         to an empty section rather than tearing down the panel.
+
+        Drops the module-level Optuna study cache for ``study_name`` so each
+        render reads fresh trials. Optuna's ``_CachedStorage`` wraps the
+        ``RDBStorage`` the cached :class:`optuna.Study` holds onto, and that
+        view can drift across an IS run completing in another process or a
+        long-idle UI session — symptom is an empty trials table even though
+        trials are visible in the database.
         '''
+        invalidate_study_cache(study_name)
         try:
             self._windows = list_oos_windows(study_name, self._oos_repo)
         except Exception as e:
