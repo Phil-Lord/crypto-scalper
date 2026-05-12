@@ -16,16 +16,13 @@ from strategy_manager import create_strategy
 from utils import OptunaConfig
 
 from .backtesting_engine import BacktestingEngine
-from .parameter_optimisation import create_windows
+from .parameter_optimisation import create_windows, parse_study_name
 from .window_evaluation import evaluate_param_set_over_windows
 
 logger = logging.getLogger(__name__)
 
 
 INITIAL_BALANCE = 1000
-
-PAIR = 'XXBTZGBP'
-STRATEGY_NAME = 'PrecisionTrendStrategy'
 
 '''
 Geometric mean OOS return cutoff: a trial generalises when
@@ -63,6 +60,7 @@ def evaluate_out_of_sample(
         parameter set evaluated. Entry points pick presentation; the library
         installs no default progress bar.
     '''
+    strategy_name, pair = parse_study_name(study_name)
     study = load_study(study_name)
 
     client = SQLAlchemyClient()
@@ -78,11 +76,11 @@ def evaluate_out_of_sample(
     if n_workers <= 1:
         # Seed params are a placeholder; engine.strategy is replaced per param set
         # inside evaluate_param_set_over_windows.
-        engine = build_engine(PAIR, STRATEGY_NAME, top_param_sets[0]['params'], start, end)
+        engine = build_engine(pair, strategy_name, top_param_sets[0]['params'], start, end)
         results = run_evaluation(engine, top_param_sets, windows, progress_callback)
     else:
         results = run_evaluation_parallel(
-            PAIR, STRATEGY_NAME, top_param_sets, windows, start, end, n_workers, progress_callback
+            pair, strategy_name, top_param_sets, windows, start, end, n_workers, progress_callback
         )
 
     save_results(eval_repo, results, study_name, start, end)

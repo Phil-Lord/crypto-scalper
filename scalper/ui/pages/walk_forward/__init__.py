@@ -1,9 +1,8 @@
 '''
 Walk-forward UI page (``/walk-forward``).
 
-Studies rail on the left, single detail panel on the right.
-The detail panel hosts the in-sample and out-of-sample sections;
-this shell renders empty placeholders that WF6/WF7 fill in.
+Studies rail on the left, single detail panel on the right hosting the
+in-sample and out-of-sample sections.
 
 Constructs a single :class:`SQLAlchemyClient` for the page and shares it across
 the job and out-of-sample-evaluation repositories so subordinate panels and
@@ -22,11 +21,12 @@ from ui.components import render_header
 from ui.models.walk_forward import StudyDirection, StudySummary
 from ui.services import list_studies_with_summary, start_in_sample
 from ui.services.walk_forward import split_trials
-from ui.theme import SectionTitle, primary_button
+from ui.theme import primary_button
 
 from .components import (
     IsPanel,
     NewStudyForm,
+    OosPanel,
     StatBlock,
     StudyRailRow,
     derive_study_name,
@@ -58,6 +58,13 @@ class WalkForwardPage:
         self.is_panel = IsPanel(
             phase_mutex=self.phase_mutex,
             get_selected_study=lambda: self._selected_study,
+            job_repo=self.job_repo,
+            set_running_study_name=self._set_running_study_name
+        )
+        self.oos_panel = OosPanel(
+            phase_mutex=self.phase_mutex,
+            get_selected_study=lambda: self._selected_study,
+            oos_repo=self.oos_repo,
             job_repo=self.job_repo,
             set_running_study_name=self._set_running_study_name
         )
@@ -143,7 +150,7 @@ class WalkForwardPage:
                 'w-full px-6 py-4 flex-1 min-h-0 gap-2'
             )
             self._render_is_panel()
-            self._render_oos_placeholder()
+            self._render_oos_panel()
 
     def _render_context_strip(self) -> None:
         self._context_strip.clear()
@@ -179,15 +186,8 @@ class WalkForwardPage:
     def _set_running_study_name(self, name: str | None) -> None:
         self._running_study_name = name
 
-    def _render_oos_placeholder(self) -> None:
-        self._oos_row.clear()
-        with self._oos_row:
-            SectionTitle('02', 'OUT-OF-SAMPLE')
-            ui.label(
-                'Out-of-sample evaluation panel.'
-                if self._selected_study is not None
-                else 'Create a study to enable out-of-sample evaluation.'
-            ).classes('text-xs text-neutral-500')
+    def _render_oos_panel(self) -> None:
+        self.oos_panel.render(self._oos_row)
 
     def _select_study(self, study: StudySummary) -> None:
         if self._selected_study is not None and study.name == self._selected_study.name:
@@ -196,7 +196,7 @@ class WalkForwardPage:
         self._render_rail_rows()
         self._render_context_strip()
         self._render_is_panel()
-        self._render_oos_placeholder()
+        self._render_oos_panel()
 
     async def _on_new_study(self) -> None:
         if self.phase_mutex.is_busy:
@@ -271,7 +271,7 @@ class WalkForwardPage:
         self._render_rail_rows()
         self._render_context_strip()
         self._render_is_panel()
-        self._render_oos_placeholder()
+        self._render_oos_panel()
         self.is_panel.seed_strip(splits)
 
         try:
@@ -302,7 +302,7 @@ class WalkForwardPage:
         self._render_rail_rows()
         self._render_context_strip()
         self._render_is_panel()
-        self._render_oos_placeholder()
+        self._render_oos_panel()
 
     def _on_phase_change(self) -> None:
         '''

@@ -5,4 +5,4 @@ from .out_of_sample_evaluation import (
     get_top_param_sets,
     load_study,
 )
-from .parameter_optimisation import create_study_name
+from .parameter_optimisation import create_study_name, parse_study_name

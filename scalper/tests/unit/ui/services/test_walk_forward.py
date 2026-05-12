@@ -580,6 +580,42 @@ class TestGetTrialParams:
 @pytest.mark.ui
 @pytest.mark.ui_services
 @pytest.mark.walk_forward
+class TestGetTrialParamsBulk:
+    def test_returns_params_for_requested_trials_in_single_pass(self, mocker):
+        trials = [
+            MagicMock(number=0, params={'a': 1}),
+            MagicMock(number=7, params={'a': 2}),
+            MagicMock(number=9, params={'a': 3}),
+        ]
+        study = MagicMock(trials=trials)
+        load = mocker.patch.object(svc, 'load_study', return_value=study)
+
+        result = svc.get_trial_params_bulk('s', [0, 9])
+
+        assert result == {0: {'a': 1}, 9: {'a': 3}}
+        load.assert_called_once_with('s')
+
+    def test_omits_missing_trial_numbers(self, mocker):
+        '''
+        Missing trial numbers don't raise; the panel falls back to a lazy
+        per-click lookup via :func:`get_trial_params` for any number it
+        didn't get back.
+        '''
+        study = MagicMock(trials=[MagicMock(number=0, params={'a': 1})])
+        mocker.patch.object(svc, 'load_study', return_value=study)
+
+        assert svc.get_trial_params_bulk('s', [0, 42]) == {0: {'a': 1}}
+
+    def test_empty_input_skips_load_study(self, mocker):
+        load = mocker.patch.object(svc, 'load_study')
+
+        assert svc.get_trial_params_bulk('s', []) == {}
+        load.assert_not_called()
+
+
+@pytest.mark.ui
+@pytest.mark.ui_services
+@pytest.mark.walk_forward
 class TestStudyCache:
     def setup_method(self) -> None:
         svc.invalidate_study_cache()

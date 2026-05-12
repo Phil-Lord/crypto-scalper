@@ -24,7 +24,7 @@ TODO: Update the wording here once the page is redesigned.
 '''
 import asyncio
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 import optuna
@@ -266,13 +266,34 @@ def get_top_trials_with_oos(
 def get_trial_params(study_name: str, trial_number: int) -> dict:
     '''
     Return the params dict for a single trial. Used by the page's
-    copy-params button as an eager prefetch.
+    copy-params button as a lazy-fetch fallback when the bulk prefetch
+    is unavailable.
     '''
     study = load_study(study_name)
     for trial in study.trials:
         if trial.number == trial_number:
             return trial.params
     raise KeyError(f'Trial {trial_number} not found in study {study_name}')
+
+
+def get_trial_params_bulk(study_name: str, trial_numbers: Iterable[int]) -> dict[int, dict]:
+    '''
+    Return ``{trial_number: params}`` for every requested trial in a single
+    pass over ``study.trials``. Used by the OOS panel's eager prefetch so
+    loading N rows is O(study.trials) rather than O(N * study.trials).
+
+    Missing trial numbers are silently omitted — callers fall back to a
+    per-click lookup via :func:`get_trial_params`.
+    '''
+    needed = set(trial_numbers)
+    if not needed:
+        return {}
+    study = load_study(study_name)
+    return {
+        trial.number: trial.params
+        for trial in study.trials
+        if trial.number in needed
+    }
 
 
 def get_evaluation_results(
