@@ -10,6 +10,7 @@ from ui.pages.walk_forward.components.oos_panel import (
     derive_window_key,
     validate_oos_form,
 )
+from ui.pages.walk_forward.components.window_tabs import WindowKey
 from ui.pages.walk_forward.phase_mutex import PhaseMutex
 
 
@@ -232,22 +233,28 @@ class TestOnStart:
         appear in ``aggregate_windows``. The panel must track it locally
         so :func:`auto_select_window` can return it and the running pill
         renders on the right tab.
+
+        Captures ``_running_window`` inside the ``mutex.start`` side_effect
+        — that's the moment between assignment and the ``finally`` clear,
+        which is when the running pill needs to be visible.
         '''
         panel, deps = _make_panel(mocker)
-        deps['phase_mutex'].start.side_effect = lambda phase, coro: _completed_task()
+        captured: dict[str, WindowKey | None] = {}
+
+        def capture(phase, coro):
+            captured['running'] = panel._running_window
+            captured['selected'] = panel._selected_window
+            return _completed_task()
+        deps['phase_mutex'].start.side_effect = capture
         mocker.patch.object(oos_panel_module.ui, 'notify')
 
-        async def _run() -> None:
-            task_coro = panel._on_start()
-            # Drive the coroutine far enough to hit mutex.start, then
-            # observe state before awaiting the inner task.
-            await task_coro
-        asyncio.run(_run())
+        asyncio.run(panel._on_start())
 
-        # After completion the running window is cleared in the finally
-        # block — but during the run, _selected_window matches the tuple.
-        assert panel._selected_window is not None
-        assert panel._running_window is None  # cleared in finally
+        expected_key = derive_window_key('2025-1-1-0-0-0', '2025-4-1-0-0-0')
+        assert captured['running'] == expected_key
+        assert captured['selected'] == expected_key
+        # And cleared again once the task completes.
+        assert panel._running_window is None
 
     def test_clears_running_window_after_task_completes(self, mocker):
         panel, deps = _make_panel(mocker)
@@ -261,7 +268,7 @@ class TestOnStart:
     def test_rolls_back_running_state_when_mutex_start_raises(self, mocker):
         panel, deps = _make_panel(mocker)
         deps['phase_mutex'].start.side_effect = RuntimeError(
-            'is is already running'
+            "Cannot start 'oos': 'is' is already running"
         )
         notify = mocker.patch.object(oos_panel_module.ui, 'notify')
 
@@ -484,10 +491,11 @@ class TestParamsCache:
         notify.assert_called_once()
         assert notify.call_args.kwargs['type'] == 'negative'
 
-    def test_per_trial_prefetch_failure_caches_other_trials(self, mocker):
+    def test_prefetch_populates_cache_from_bulk_fetch(self, mocker):
         '''
-        A failure on one trial must not blow away the cache for the rest —
-        click on a healthy trial should still hit the cache.
+        The panel asks the service for params in one pass, keyed by trial
+        number. Subsequent copy clicks then hit the cache rather than
+        re-querying Optuna.
         '''
         panel, _ = _make_panel(mocker)
         from ui.models.walk_forward import TrialVerdict, TrialWithOos
@@ -501,19 +509,50 @@ class TestParamsCache:
                 delta=None, verdict=TrialVerdict.PENDING, params={},
             ),
         ]
-
-        def fake_get(study_name, trial_number):
-            if trial_number == 1:
-                raise RuntimeError('boom')
-            return {'sma': 10}
-        mocker.patch.object(
-            oos_panel_module, 'get_trial_params', side_effect=fake_get,
+        bulk = mocker.patch.object(
+            oos_panel_module, 'get_trial_params_bulk',
+            return_value={1: {'sma': 5}, 2: {'sma': 10}},
         )
 
         panel._refresh_params_cache('study')
 
-        assert 1 not in panel._params_cache
-        assert panel._params_cache[2] == {'sma': 10}
+        assert panel._params_cache == {1: {'sma': 5}, 2: {'sma': 10}}
+        call = bulk.call_args
+        assert call.args[0] == 'study'
+        assert sorted(call.args[1]) == [1, 2]
+
+    def test_prefetch_failure_falls_back_to_empty_cache(self, mocker):
+        '''
+        If the bulk fetch raises (e.g. Optuna storage offline), the cache
+        is cleared so every copy click falls back to the lazy lookup
+        rather than wedging on a stale entry.
+        '''
+        panel, _ = _make_panel(mocker)
+        from ui.models.walk_forward import TrialVerdict, TrialWithOos
+        panel._trials = [
+            TrialWithOos(
+                trial_number=1, is_value=1.0, oos_score=None,
+                delta=None, verdict=TrialVerdict.PENDING, params={},
+            ),
+        ]
+        mocker.patch.object(
+            oos_panel_module, 'get_trial_params_bulk',
+            side_effect=RuntimeError('storage offline'),
+        )
+
+        panel._refresh_params_cache('study')
+
+        assert panel._params_cache == {}
+
+    def test_prefetch_with_no_trials_is_a_no_op(self, mocker):
+        panel, _ = _make_panel(mocker)
+        panel._trials = []
+        bulk = mocker.patch.object(oos_panel_module, 'get_trial_params_bulk')
+
+        panel._refresh_params_cache('study')
+
+        assert panel._params_cache == {}
+        bulk.assert_not_called()
 
 
 @pytest.mark.ui
