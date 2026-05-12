@@ -36,6 +36,7 @@ from .phase_mutex import PhaseMutex
 
 
 RAIL_WIDTH_PX = 320
+LIVE_REFRESH_INTERVAL_S = 5.0
 
 
 class WalkForwardPage:
@@ -74,6 +75,13 @@ class WalkForwardPage:
         with ui.row().classes('w-full no-wrap gap-0').style('height: calc(100vh - 50px)'):
             self._render_rail()
             self._render_detail()
+
+        # Live IS refresh timer: ticks while an in-sample run is active so
+        # the OOS panel's window list and top-trials table catch up with
+        # new trials. Activated/deactivated by ``_on_phase_change``; the
+        # rail intentionally does NOT refresh on the timer (only on phase
+        # done) since per-trial counts climb in IsPanel's worker grid.
+        self._live_timer = ui.timer(LIVE_REFRESH_INTERVAL_S, self._on_live_tick, active=False)
 
     def _load_studies(self) -> list[StudySummary]:
         '''
@@ -314,17 +322,34 @@ class WalkForwardPage:
             - Running / idle pill on the active study's row
             - "+ NEW STUDY" enabledness
             - Full rail reload on phase done so trial counts and best-IS readings catch up.
+            - Live OOS-panel refresh timer activated only while IS is running.
 
-        No timer — the rail can be stale until phase done
-        (live trial counts climb in WF6's worker grid).
+        Rail-row trial counts intentionally remain stale until phase done
+        (live counts climb in the worker grid), so the timer skips it.
         '''
         if self.phase_mutex.is_busy:
             self._render_rail_rows()
             self.new_study_button.disable()
+            if self.phase_mutex.is_active('is'):
+                self._live_timer.activate()
+            else:
+                self._live_timer.deactivate()
         else:
+            self._live_timer.deactivate()
             self._running_study_name = None
             self._refresh_rail()
             self.new_study_button.enable()
+
+    def _on_live_tick(self) -> None:
+        '''
+        Per-tick callback for ``_live_timer``. Refreshes the OOS panel
+        (windows + top trials) so trials produced by the in-flight IS run
+        surface without a manual refresh. Defensive guard against a stray
+        tick after deactivation: only fires while IS is the active phase.
+        '''
+        if not self.phase_mutex.is_active('is'):
+            return
+        self.oos_panel.refresh()
 
 
 @ui.page('/walk-forward')
