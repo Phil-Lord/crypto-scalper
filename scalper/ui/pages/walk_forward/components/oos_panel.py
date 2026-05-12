@@ -214,7 +214,7 @@ class OosPanel:
                 ).classes('text-xs text-neutral-500')
                 return
             with ui.row().classes(
-                'w-full no-wrap gap-7 items-start flex-1 min-h-0'
+                'w-full no-wrap gap-7 items-stretch flex-1 min-h-0'
             ):
                 with ui.column().classes('w-64 shrink-0 gap-2'):
                     self._render_sidebar()
