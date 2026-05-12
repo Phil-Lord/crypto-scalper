@@ -42,6 +42,7 @@ from ui.models.walk_forward import StudySummary, TrialVerdict, TrialWithOos
 from ui.services.walk_forward import (
     get_top_trials_with_oos,
     get_trial_params,
+    get_trial_params_bulk,
     invalidate_study_cache,
     list_oos_windows,
     start_out_of_sample,
@@ -474,23 +475,23 @@ class OosPanel:
 
     def _refresh_params_cache(self, study_name: str) -> None:
         '''
-        Eagerly populate the params cache for every visible trial.
+        Eagerly populate the params cache for every visible trial in a
+        single pass over the cached Optuna study.
 
-        Per-trial fetch failures are logged and silently dropped so the
-        copy button can still lazy-fetch on click rather than disappear.
+        Bulk-fetch failure falls back to an empty cache; the copy button
+        still works via :func:`get_trial_params` on click rather than
+        disappearing.
         '''
-        cache: dict[int, dict] = {}
-        for trial in self._trials:
-            try:
-                cache[trial.trial_number] = get_trial_params(
-                    study_name, trial.trial_number,
-                )
-            except Exception as e:
-                logger.warning(
-                    'Failed to prefetch params for trial %d: %s',
-                    trial.trial_number, e,
-                )
-        self._params_cache = cache
+        if not self._trials:
+            self._params_cache = {}
+            return
+        try:
+            self._params_cache = get_trial_params_bulk(
+                study_name, (t.trial_number for t in self._trials),
+            )
+        except Exception as e:
+            logger.warning('Failed to prefetch trial params for %s: %s', study_name, e)
+            self._params_cache = {}
 
     def _on_select_window(self, key: WindowKey) -> None:
         if self._selected_window == key:
