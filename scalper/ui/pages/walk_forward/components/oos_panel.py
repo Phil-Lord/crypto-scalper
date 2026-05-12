@@ -323,7 +323,7 @@ class OosPanel:
             )
             ui.element('div').classes('flex-1 h-px bg-neutral-800')
             ui.button(
-                icon='refresh', on_click=self._on_refresh,
+                icon='refresh', on_click=self.refresh,
             ).props('flat dense round').classes('text-neutral-400')
         self._table_container = ui.column().classes(
             'w-full gap-0 flex-1 min-h-0 overflow-auto'
@@ -421,7 +421,13 @@ class OosPanel:
             type='positive',
         )
 
-    async def _on_refresh(self) -> None:
+    def refresh(self) -> None:
+        '''
+        Re-fetch windows + top trials and re-render the tabs strip and trials
+        table. Wired to the manual refresh button and called every tick by the
+        page's IS-run live timer so accumulating trials surface without a
+        manual click.
+        '''
         study = self._get_selected_study()
         if study is None:
             return
