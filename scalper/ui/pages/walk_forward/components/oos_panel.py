@@ -50,7 +50,12 @@ from ui.theme import SectionTitle, StatusPill, primary_button, sidebar_input
 from utils import get_second_timestamp, parse_datetime
 
 from ..phase_mutex import PhaseMutex
-from .window_tabs import WindowKey, WindowTabs, auto_select_window
+from .window_tabs import (
+    WindowKey,
+    WindowTabs,
+    auto_select_window,
+    format_window_dates
+)
 
 
 logger = logging.getLogger(__name__)
@@ -264,13 +269,34 @@ class OosPanel:
         if self._tabs_container is None:
             return
         self._tabs_container.clear()
+        # Hide the template button while OOS is running — the sidebar
+        # inputs are unmounted during a run (replaced by STOP + progress)
+        # so there is nowhere to populate.
+        on_use_as_template: Callable[[WindowKey], None] | None
+        if self._phase_mutex.is_active('oos'):
+            on_use_as_template = None
+        else:
+            on_use_as_template = self._on_use_as_template
         with self._tabs_container:
             WindowTabs(
                 self._windows,
                 self._selected_window,
                 self._effective_running_window(),
-                on_select=self._on_select_window
+                on_select=self._on_select_window,
+                on_use_as_template=on_use_as_template,
             )
+
+    def _on_use_as_template(self, key: WindowKey) -> None:
+        '''
+        Copy the tab's window dates into the sidebar form. Top N and
+        workers are left untouched so the user can change them
+        independently before clicking EVALUATE.
+        '''
+        if self._start_input is None or self._end_input is None:
+            return
+        start_text, end_text = format_window_dates(key)
+        self._start_input.value = start_text
+        self._end_input.value = end_text
 
     def _effective_running_window(self) -> WindowKey | None:
         '''

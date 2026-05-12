@@ -393,6 +393,7 @@ class TestEffectiveRunningWindow:
     stale LIVE pill off the just-finished tab and off another study's
     tabs after a mid-run study switch.
     '''
+
     def test_returns_running_window_while_oos_active(self, mocker):
         panel, deps = _make_panel(mocker)
         deps['phase_mutex'].is_active.return_value = True
@@ -513,3 +514,53 @@ class TestParamsCache:
 
         assert 1 not in panel._params_cache
         assert panel._params_cache[2] == {'sma': 10}
+
+
+@pytest.mark.ui
+@pytest.mark.walk_forward_oos_panel
+class TestOnUseAsTemplate:
+    '''
+    Re-evaluating an existing window after extending IS is the bread-and-
+    butter walk-forward flow. The template button is the explicit
+    affordance for it — populates the sidebar but does not run.
+    '''
+
+    def test_populates_start_and_end_inputs(self, mocker):
+        panel, _ = _make_panel(
+            mocker,
+            start_value='2099-1-1-0-0-0',
+            end_value='2099-1-2-0-0-0',
+        )
+        key = derive_window_key('2025-1-1-0-0-0', '2025-4-1-0-0-0')
+
+        panel._on_use_as_template(key)
+
+        assert panel._start_input.value == '2025-1-1-0-0-0'
+        assert panel._end_input.value == '2025-4-1-0-0-0'
+
+    def test_leaves_top_n_and_workers_untouched(self, mocker):
+        '''
+        Per design, Top N and Workers are independent of the window —
+        the user often wants to re-run with the same trial budget on a
+        different window, or vice versa.
+        '''
+        panel, _ = _make_panel(mocker, top_n_value='25', workers_value='4')
+        key = derive_window_key('2025-1-1-0-0-0', '2025-4-1-0-0-0')
+
+        panel._on_use_as_template(key)
+
+        assert panel._top_n_input.value == '25'
+        assert panel._workers_input.value == '4'
+
+    def test_no_op_when_inputs_not_mounted(self, mocker):
+        '''
+        Defensive: ``_render_tabs`` already hides the button when OOS is
+        running (inputs unmounted), but a stale callback shouldn't
+        AttributeError if it slips through.
+        '''
+        panel, _ = _make_panel(mocker)
+        panel._start_input = None
+        panel._end_input = None
+        key = derive_window_key('2025-1-1-0-0-0', '2025-4-1-0-0-0')
+
+        panel._on_use_as_template(key)  # must not raise

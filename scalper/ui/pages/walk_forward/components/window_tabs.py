@@ -2,10 +2,16 @@
 Window tabs for the OOS panel.
 
 Each tab is a display selector for one ``(start, end)`` window in the
-``out_of_sample_evaluation`` table. Clicking a tab swaps which scores the
-trials table shows; the OOS sidebar inputs are NOT populated from the
-click — sidebar inputs always represent a *new* window the user wants to
-evaluate (per WF7).
+``out_of_sample_evaluation`` table. Clicking the tab body swaps which
+scores the trials table shows; the OOS sidebar inputs are NOT populated
+from a body click — sidebar inputs always represent a *new* window the
+user wants to evaluate (per WF7).
+
+A small ``↑`` button on each tab copies the window's dates into the
+sidebar form. It is the explicit affordance for re-evaluating an
+existing window after extending IS, when the top-N trials may have
+shifted. The data layer (``get_top_param_sets``) skips trials already
+evaluated for the window, so re-running is naturally additive.
 
 :func:`auto_select_window` is the panel's tab-resolution rule: a window
 that is currently being evaluated wins over the most-recently-created
@@ -21,6 +27,22 @@ from ui.theme import StatusPill
 
 
 WindowKey = tuple[float, float]
+
+
+def format_window_dates(key: WindowKey) -> tuple[str, str]:
+    '''
+    Inverse of ``derive_window_key``: ``(start_ts, end_ts)`` floats in UTC
+    seconds → ``'YYYY-M-D-h-m-s'`` text pair the sidebar inputs accept.
+
+    Used by the "use as template" tab button to populate the OOS form
+    from an existing window.
+    '''
+    return _format_dt(key[0]), _format_dt(key[1])
+
+
+def _format_dt(ts: float) -> str:
+    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+    return f'{dt.year}-{dt.month}-{dt.day}-{dt.hour}-{dt.minute}-{dt.second}'
 
 
 def auto_select_window(
@@ -51,6 +73,7 @@ def WindowTabs(
     selected: WindowKey | None,
     running_window: WindowKey | None,
     on_select: Callable[[WindowKey], None],
+    on_use_as_template: Callable[[WindowKey], None] | None = None,
 ) -> None:
     '''
     Horizontal row of tabs, one per OOS window.
@@ -62,7 +85,11 @@ def WindowTabs(
         evaluation, or ``None`` when idle. Drives the LIVE pill on the
         matching tab.
     :param on_select: Invoked with the tab's ``(start_ts, end_ts)`` when
-        the user clicks it.
+        the tab body is clicked.
+    :param on_use_as_template: Invoked with the tab's ``(start_ts, end_ts)``
+        when the template button is clicked. Pass ``None`` to hide the
+        button — used while OOS is running, when the sidebar inputs are
+        not mounted.
     '''
     if not windows:
         ui.label('No OOS windows yet — evaluate a new window to populate.').classes(
@@ -78,7 +105,8 @@ def WindowTabs(
                 key=key,
                 is_active=selected == key,
                 is_running=running_window == key,
-                on_select=on_select
+                on_select=on_select,
+                on_use_as_template=on_use_as_template,
             )
 
 
@@ -88,6 +116,7 @@ def _render_tab(
     is_active: bool,
     is_running: bool,
     on_select: Callable[[WindowKey], None],
+    on_use_as_template: Callable[[WindowKey], None] | None,
 ) -> None:
     bg = 'bg-neutral-800/60' if is_active else 'hover:bg-neutral-900'
     border = 'border-emerald-500' if is_active else 'border-neutral-800'
@@ -101,8 +130,20 @@ def _render_tab(
             ui.label(_format_window(window)).classes(
                 'text-[12px] font-mono text-neutral-200'
             )
-            if is_running:
-                StatusPill('running', 'LIVE')
+            with ui.row().classes('items-center gap-1 no-wrap'):
+                if is_running:
+                    StatusPill('running', 'LIVE')
+                if on_use_as_template is not None:
+                    button = ui.button(
+                        icon='arrow_upward',
+                        on_click=lambda _e, k=key: on_use_as_template(k),
+                    ).props('flat dense round size=xs').classes(
+                        'text-neutral-400'
+                    )
+                    button.tooltip('Use these dates in the sidebar form.')
+                    # Stop the bubble: clicking the icon shouldn't also
+                    # fire the tab's body click handler.
+                    button.on('click.stop')
         with ui.row().classes('w-full items-center gap-3 mt-1 no-wrap'):
             ui.label(f'best {window.best_oos:.3f}').classes(
                 'text-[10px] font-mono text-neutral-400'
