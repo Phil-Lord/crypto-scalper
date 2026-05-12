@@ -529,7 +529,8 @@ class TestEvaluateOutOfSample:
 
     def test_uses_serial_path_by_default(self, patches):
         # When
-        evaluate_out_of_sample('study', num_sets=2, start=1.0, end=2.0)
+        evaluate_out_of_sample(
+            'PrecisionTrendStrategy_XXBTZGBP_20250101-20250401', num_sets=2, start=1.0, end=2.0)
 
         # Then
         patches['run_serial'].assert_called_once()
@@ -537,7 +538,8 @@ class TestEvaluateOutOfSample:
 
     def test_uses_serial_path_when_n_workers_is_one(self, patches):
         # When
-        evaluate_out_of_sample('study', num_sets=2, start=1.0, end=2.0, n_workers=1)
+        evaluate_out_of_sample('PrecisionTrendStrategy_XXBTZGBP_20250101-20250401',
+                               num_sets=2, start=1.0, end=2.0, n_workers=1)
 
         # Then
         patches['run_serial'].assert_called_once()
@@ -545,7 +547,8 @@ class TestEvaluateOutOfSample:
 
     def test_uses_parallel_path_when_n_workers_above_one(self, patches):
         # When
-        evaluate_out_of_sample('study', num_sets=2, start=1.0, end=2.0, n_workers=4)
+        evaluate_out_of_sample('PrecisionTrendStrategy_XXBTZGBP_20250101-20250401',
+                               num_sets=2, start=1.0, end=2.0, n_workers=4)
 
         # Then
         patches['run_parallel'].assert_called_once()
@@ -555,7 +558,8 @@ class TestEvaluateOutOfSample:
 
     def test_passes_n_workers_through_to_parallel_runner(self, patches):
         # When
-        evaluate_out_of_sample('study', num_sets=2, start=1.0, end=2.0, n_workers=4)
+        evaluate_out_of_sample('PrecisionTrendStrategy_XXBTZGBP_20250101-20250401',
+                               num_sets=2, start=1.0, end=2.0, n_workers=4)
 
         # Then
         call = patches['run_parallel'].call_args
@@ -569,7 +573,8 @@ class TestEvaluateOutOfSample:
         )
 
         # When
-        evaluate_out_of_sample('study', num_sets=2, start=1.0, end=2.0, n_workers=4)
+        evaluate_out_of_sample('PrecisionTrendStrategy_XXBTZGBP_20250101-20250401',
+                               num_sets=2, start=1.0, end=2.0, n_workers=4)
 
         # Then
         patches['run_serial'].assert_not_called()
@@ -581,7 +586,7 @@ class TestEvaluateOutOfSample:
 
         # When
         evaluate_out_of_sample(
-            'study', num_sets=2, start=1.0, end=2.0, progress_callback=cb,
+            'PrecisionTrendStrategy_XXBTZGBP_20250101-20250401', num_sets=2, start=1.0, end=2.0, progress_callback=cb,
         )
 
         # Then
@@ -596,13 +601,37 @@ class TestEvaluateOutOfSample:
 
         # When
         evaluate_out_of_sample(
-            'study', num_sets=2, start=1.0, end=2.0, n_workers=4, progress_callback=cb,
+            'PrecisionTrendStrategy_XXBTZGBP_20250101-20250401', num_sets=2, start=1.0, end=2.0, n_workers=4, progress_callback=cb,
         )
 
         # Then
         call = patches['run_parallel'].call_args
         passed = call.args[7] if len(call.args) > 7 else call.kwargs.get('progress_callback')
         assert passed is cb
+
+    def test_serial_builds_engine_with_strategy_and_pair_parsed_from_study_name(self, patches):
+        # When
+        evaluate_out_of_sample(
+            'SmaStrategy_XXBTZGBP_20250101-20250401', num_sets=2, start=1.0, end=2.0,
+        )
+
+        # Then — the first two positional args are the pair and strategy_name, derived
+        # from the study name rather than a hardcoded module constant.
+        call = patches['build_engine'].call_args
+        assert call.args[0] == 'XXBTZGBP'
+        assert call.args[1] == 'SmaStrategy'
+
+    def test_parallel_passes_strategy_and_pair_parsed_from_study_name(self, patches):
+        # When
+        evaluate_out_of_sample(
+            'SmaStrategy_XXBTZGBP_20250101-20250401',
+            num_sets=2, start=1.0, end=2.0, n_workers=4,
+        )
+
+        # Then
+        call = patches['run_parallel'].call_args
+        assert call.args[0] == 'XXBTZGBP'
+        assert call.args[1] == 'SmaStrategy'
 
 
 @pytest.mark.backtesting_engine

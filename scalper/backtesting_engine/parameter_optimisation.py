@@ -56,6 +56,23 @@ def create_study_name(strategy_name: str, kraken_pair: str, start_ts: float, end
     return f'{strategy_name}_{kraken_pair}_{start_str}-{end_str}'
 
 
+def parse_study_name(study_name: str) -> tuple[str, str]:
+    '''
+    Inverse of :func:`create_study_name`. Extracts strategy and pair from a
+    canonically-named study so downstream phases (e.g. out-of-sample evaluation)
+    can rebuild the right strategy config and engine without being told twice.
+
+    :return: ``(strategy_name, kraken_pair)``.
+    :raises ValueError: If ``study_name`` doesn't match the canonical
+        ``{strategy}_{pair}_{YYYYMMDD-YYYYMMDD}`` shape.
+    '''
+    parts = study_name.rsplit('_', 2)
+    if len(parts) != 3:
+        raise ValueError(f'Study name does not match canonical format: {study_name!r}')
+    strategy, pair, _date_range = parts
+    return strategy, pair
+
+
 def create_storage() -> optuna.storages.RDBStorage:
     return optuna.storages.RDBStorage(
         url=OptunaConfig.DB_URL,
