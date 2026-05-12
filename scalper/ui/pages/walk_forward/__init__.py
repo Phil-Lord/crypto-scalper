@@ -20,7 +20,7 @@ from data_system import (
 from ui.components import render_header
 from ui.models.walk_forward import StudyDirection, StudySummary
 from ui.services import list_studies_with_summary, start_in_sample
-from ui.services.walk_forward import split_trials
+from ui.services.walk_forward import invalidate_study_cache, split_trials
 from ui.theme import primary_button
 
 from .components import (
@@ -336,7 +336,14 @@ class WalkForwardPage:
                 self._live_timer.deactivate()
         else:
             self._live_timer.deactivate()
+            finished_study = self._running_study_name
             self._running_study_name = None
+            # Drop the cached Study for the just-finished run so the OOS
+            # panel's phase-done re-render reads the trials the worker
+            # subprocesses just persisted. Optuna's _CachedStorage view
+            # held by the cached Study can otherwise lag the database.
+            if finished_study is not None:
+                invalidate_study_cache(finished_study)
             self._refresh_rail()
             self.new_study_button.enable()
 
@@ -346,9 +353,15 @@ class WalkForwardPage:
         (windows + top trials) so trials produced by the in-flight IS run
         surface without a manual refresh. Defensive guard against a stray
         tick after deactivation: only fires while IS is the active phase.
+
+        Invalidates the cached Study for the running run before refreshing
+        so ``get_top_trials_with_oos`` sees the trials the IS workers have
+        persisted since the last tick.
         '''
         if not self.phase_mutex.is_active('is'):
             return
+        if self._running_study_name is not None:
+            invalidate_study_cache(self._running_study_name)
         self.oos_panel.refresh()
 
 
