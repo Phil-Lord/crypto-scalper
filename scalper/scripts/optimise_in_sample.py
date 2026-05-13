@@ -1,4 +1,3 @@
-import json
 import logging
 import sys
 
@@ -6,6 +5,7 @@ import click
 import optuna
 
 from backtesting_engine import BacktestingEngine
+from core import DONE, PROGRESS, emit
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
 from strategy_manager import create_strategy
 from utils import (
@@ -65,7 +65,7 @@ def optimise_in_sample(
     engine = build_engine(pair, strategy_name, start, end, params)
     callback = JsonProgressCallback()
     engine.optimise_parameters(grid, n_trials=n_trials, n_jobs=n_jobs, progress_callback=callback)
-    emit('DONE', {'trials': n_trials})
+    emit(DONE, {'trials': n_trials})
 
 
 def get_strategy_configs(strategy_name: str) -> tuple[dict, dict]:
@@ -98,10 +98,10 @@ class JsonProgressCallback:
 
     def __call__(self, study: optuna.study.Study, trial: optuna.trial.FrozenTrial) -> None:
         best = study.best_value if self._has_completed_trial(study) else None
-        emit('PROGRESS', {
+        emit(PROGRESS, {
             'trial': trial.number,
             'value': trial.value,
-            'best': best,
+            'best': best
         })
 
     def _has_completed_trial(self, study: optuna.study.Study) -> bool:
@@ -109,12 +109,6 @@ class JsonProgressCallback:
         return any(
             t.state == optuna.trial.TrialState.COMPLETE for t in study.get_trials(deepcopy=False)
         )
-
-
-def emit(event: str, payload: dict) -> None:
-    ''' Emit a JSON line to stdout with the given event name and payload. '''
-    sys.stdout.write(f'{event} {json.dumps(payload)}\n')
-    sys.stdout.flush()
 
 
 if __name__ == '__main__':
