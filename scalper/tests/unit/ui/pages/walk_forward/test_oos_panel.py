@@ -2,6 +2,7 @@ import asyncio
 
 import pytest
 
+from core import StreamEvent
 from ui.models.walk_forward import StudyDirection, StudySummary
 from ui.pages.walk_forward.components import oos_panel as oos_panel_module
 from ui.pages.walk_forward.components.oos_panel import (
@@ -361,8 +362,8 @@ class TestOnProgress:
         panel, _ = _make_panel(mocker)
         panel._progress_total = 10
 
-        panel._on_progress({'event': 'PROGRESS', 'payload': {'trial': 1}})
-        panel._on_progress({'event': 'PROGRESS', 'payload': {'trial': 2}})
+        panel._on_progress(StreamEvent(event='PROGRESS', payload={'trial': 1}))
+        panel._on_progress(StreamEvent(event='PROGRESS', payload={'trial': 2}))
 
         assert panel._progress_count == 2
 
@@ -376,7 +377,7 @@ class TestOnProgress:
         panel._progress_total = 5
         panel._progress_count = 3
 
-        panel._on_progress({'event': 'DONE', 'payload': {'trials': 5}})
+        panel._on_progress(StreamEvent(event='DONE', payload={'trials': 5}))
 
         assert panel._progress_count == 5
 
@@ -385,7 +386,7 @@ class TestOnProgress:
         panel._progress_total = 10
         panel._progress_count = 3
 
-        panel._on_progress({'event': 'BOGUS', 'payload': {}})
+        panel._on_progress(StreamEvent(event='BOGUS', payload={}))
 
         assert panel._progress_count == 3
 

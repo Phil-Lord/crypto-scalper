@@ -1,5 +1,6 @@
 import pytest
 
+from core import StreamEvent
 from ui.pages.walk_forward.components.worker_strip import WorkerStrip
 from ui.pages.walk_forward.components.worker_tile import WorkerTileState
 
@@ -75,7 +76,7 @@ class TestOnEvent:
         strip._render.reset_mock()
 
         # When
-        strip.on_event(0, {'event': 'PROGRESS', 'payload': {'trial': 7, 'best': 1.4}})
+        strip.on_event(0, StreamEvent(event='PROGRESS', payload={'trial': 7, 'best': 1.4}))
 
         # Then
         first = strip._states[0]
@@ -86,14 +87,14 @@ class TestOnEvent:
 
     def test_done_flips_status_to_done(self, strip: WorkerStrip):
         strip.show_workers([2])
-        strip.on_event(0, {'event': 'PROGRESS', 'payload': {'trial': 1, 'best': 0.9}})
-        strip.on_event(0, {'event': 'DONE', 'payload': {}})
+        strip.on_event(0, StreamEvent(event='PROGRESS', payload={'trial': 1, 'best': 0.9}))
+        strip.on_event(0, StreamEvent(event='DONE', payload={}))
 
         assert strip._states[0].status == 'done'
 
     def test_progress_only_updates_addressed_worker(self, strip: WorkerStrip):
         strip.show_workers([3, 3])
-        strip.on_event(1, {'event': 'PROGRESS', 'payload': {'trial': 2, 'best': 0.5}})
+        strip.on_event(1, StreamEvent(event='PROGRESS', payload={'trial': 2, 'best': 0.5}))
 
         assert strip._states[0].status == 'pending'
         assert strip._states[1].status == 'running'
@@ -112,7 +113,7 @@ class TestOnEvent:
         strip._render.reset_mock()
 
         strip.on_event(
-            worker_index, {'event': 'PROGRESS', 'payload': {'trial': 0, 'best': 0.1}}
+            worker_index, StreamEvent(event='PROGRESS', payload={'trial': 0, 'best': 0.1}),
         )
 
         assert strip._render.call_count == 0
@@ -123,7 +124,7 @@ class TestOnEvent:
         strip.show_workers([2])
         strip._render.reset_mock()
 
-        strip.on_event(0, {'event': 'BOGUS', 'payload': {}})
+        strip.on_event(0, StreamEvent(event='BOGUS', payload={}))
 
         assert strip._render.call_count == 0
         assert strip._states[0].status == 'pending'
@@ -132,7 +133,7 @@ class TestOnEvent:
         strip.show_workers([2])
         strip._render.reset_mock()
 
-        strip.on_event(0, {'event': 'PROGRESS', 'payload': {'trial': 0, 'best': 0.1}})
+        strip.on_event(0, StreamEvent(event='PROGRESS', payload={'trial': 0, 'best': 0.1}))
         assert strip._render.call_count == 1
 
 
@@ -161,7 +162,7 @@ class TestResetToIdle:
         run's frozen ``done`` tiles.
         '''
         strip.show_workers([1])
-        strip.on_event(0, {'event': 'DONE', 'payload': {}})
+        strip.on_event(0, StreamEvent(event='DONE', payload={}))
         assert strip._states[0].status == 'done'
 
         strip.reset_to_idle()
@@ -179,9 +180,9 @@ class TestStatePersistsAcrossEvents:
         test pins the strip-level integration.
         '''
         strip.show_workers([2])
-        strip.on_event(0, {'event': 'PROGRESS', 'payload': {'trial': 5, 'best': 0.9}})
-        strip.on_event(0, {'event': 'PROGRESS', 'payload': {'trial': 6, 'best': 1.1}})
-        strip.on_event(0, {'event': 'DONE', 'payload': {}})
+        strip.on_event(0, StreamEvent(event='PROGRESS', payload={'trial': 5, 'best': 0.9}))
+        strip.on_event(0, StreamEvent(event='PROGRESS', payload={'trial': 6, 'best': 1.1}))
+        strip.on_event(0, StreamEvent(event='DONE', payload={}))
 
         final = strip._states[0]
         assert isinstance(final, WorkerTileState)
