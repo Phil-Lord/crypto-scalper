@@ -1,13 +1,16 @@
 '''
 Walk-forward UI service.
 
-Parses the shared ``PROGRESS`` / ``DONE`` JSON contract emitted by
-``scripts/optimise_in_sample.py`` and ``scripts/evaluate_out_of_sample.py`` and
-orchestrates subprocess execution via :func:`core.run_subprocess`.
-Each script exposes its own ``build_command`` colocated with the click options.
+Orchestrates the in-sample / out-of-sample subprocesses via
+:func:`core.run_subprocess`, parsing each stdout line through
+:func:`core.parse` into the shared :class:`core.StreamEvent` contract that
+``scripts/optimise_in_sample.py`` and ``scripts/evaluate_out_of_sample.py``
+emit. Each script exposes its own ``build_command`` colocated with the click
+options.
 
-The two phases share a single module because they share both the JSON contract
-and the surrounding lifecycle (``Job`` rows, cancellation, progress streaming).
+The two phases share a single module because they share both the event
+contract and the surrounding lifecycle (``Job`` rows, cancellation, progress
+streaming).
 
 Also exposes read-only helpers the redesigned walk-forward page consumes:
 
