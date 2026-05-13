@@ -17,41 +17,6 @@ from ui.services import walk_forward as svc
 @pytest.mark.ui
 @pytest.mark.ui_services
 @pytest.mark.walk_forward
-class TestParseProgress:
-    def test_parses_progress_line(self):
-        event = svc.parse_progress('PROGRESS {"trial": 3, "value": 1.2, "best": 1.5}')
-        assert event == {
-            'event': 'PROGRESS',
-            'payload': {'trial': 3, 'value': 1.2, 'best': 1.5},
-        }
-
-    def test_parses_done_line(self):
-        event = svc.parse_progress('DONE {"trials": 100}')
-        assert event == {'event': 'DONE', 'payload': {'trials': 100}}
-
-    def test_returns_none_for_blank_line(self):
-        assert svc.parse_progress('') is None
-
-    def test_returns_none_for_unknown_event(self):
-        assert svc.parse_progress('LOG {"foo": 1}') is None
-
-    def test_returns_none_for_malformed_json(self):
-        assert svc.parse_progress('PROGRESS not-json') is None
-
-    def test_returns_none_when_payload_is_not_object(self):
-        assert svc.parse_progress('PROGRESS [1, 2, 3]') is None
-
-    def test_returns_none_when_no_payload(self):
-        assert svc.parse_progress('PROGRESS') is None
-
-    def test_strips_trailing_whitespace(self):
-        event = svc.parse_progress('PROGRESS {"trial": 0}\n')
-        assert event['payload'] == {'trial': 0}
-
-
-@pytest.mark.ui
-@pytest.mark.ui_services
-@pytest.mark.walk_forward
 class TestSplitTrials:
     def test_splits_evenly(self):
         assert svc.split_trials(10, 5) == [2, 2, 2, 2, 2]
@@ -200,7 +165,7 @@ class TestStartInSample:
         # 2 workers × 2 valid lines each, malformed lines dropped.
         assert len(captured) == 4
         assert all(isinstance(i, int) and 0 <= i < 2 for i, _ in captured)
-        assert {e['event'] for _, e in captured} == {'PROGRESS', 'DONE'}
+        assert {e.event for _, e in captured} == {'PROGRESS', 'DONE'}
 
 
 def _make_optuna_summary(

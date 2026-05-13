@@ -13,6 +13,7 @@ wired into this component.
 '''
 from nicegui import ui
 
+from core import DONE, PROGRESS, StreamEvent
 from ui.theme import StatusPill
 
 from .worker_tile import WorkerTile, WorkerTileState, apply_done, apply_progress
@@ -57,23 +58,19 @@ class WorkerStrip:
         ]
         self._render()
 
-    def on_event(self, worker_index: int, event: dict) -> None:
+    def on_event(self, worker_index: int, event: StreamEvent) -> None:
         '''
         Apply one parsed PROGRESS / DONE event from ``start_in_sample``.
 
-        ``event`` matches the contract in ``ui.services.walk_forward``:
-        ``{'event': 'PROGRESS' | 'DONE', 'payload': dict}``. Out-of-range
-        ``worker_index`` values and unknown event kinds are ignored — late
-        events arriving after a reset must not raise.
+        Out-of-range ``worker_index`` values and unknown event kinds are
+        ignored — late events arriving after a reset must not raise.
         '''
         if not 0 <= worker_index < len(self._states):
             return
         state = self._states[worker_index]
-        kind = event.get('event')
-        payload = event.get('payload', {})
-        if kind == 'PROGRESS':
-            self._states[worker_index] = apply_progress(state, payload)
-        elif kind == 'DONE':
+        if event.event == PROGRESS:
+            self._states[worker_index] = apply_progress(state, event.payload)
+        elif event.event == DONE:
             self._states[worker_index] = apply_done(state)
         else:
             return

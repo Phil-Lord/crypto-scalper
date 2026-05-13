@@ -1,10 +1,10 @@
-import json
 import logging
 import sys
 
 import click
 
 from backtesting_engine import evaluate_out_of_sample as run_evaluate_out_of_sample
+from core import DONE, PROGRESS, emit
 from utils import load_env, LOG_FORMAT, get_second_timestamp, parse_datetime
 
 load_env()
@@ -58,7 +58,7 @@ def evaluate_out_of_sample(
         n_workers=n_workers,
         progress_callback=callback,
     )
-    emit('DONE', {'trials': callback.count})
+    emit(DONE, {'trials': callback.count})
 
 
 class JsonProgressCallback:
@@ -72,13 +72,7 @@ class JsonProgressCallback:
 
     def __call__(self) -> None:
         self.count += 1
-        emit('PROGRESS', {'trial': self.count})
-
-
-def emit(event: str, payload: dict) -> None:
-    ''' Emit a JSON line to stdout with the given event name and payload. '''
-    sys.stdout.write(f'{event} {json.dumps(payload)}\n')
-    sys.stdout.flush()
+        emit(PROGRESS, {'trial': self.count})
 
 
 if __name__ == '__main__':
