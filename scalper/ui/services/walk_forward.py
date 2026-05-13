@@ -23,7 +23,6 @@ lets the page drop entries when a phase finishes.
 TODO: Update the wording here once the page is redesigned.
 '''
 import asyncio
-import json
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
@@ -34,7 +33,7 @@ from backtesting_engine import (
     get_top_param_sets,
     load_study as _load_study_from_storage
 )
-from core import run_subprocess
+from core import StreamEvent, parse, run_subprocess
 from data_system import (
     Job,
     JobRepository,
@@ -55,10 +54,6 @@ from utils import OptunaConfig
 
 
 SCALPER_DIR = Path(__file__).resolve().parents[2]
-
-
-# Parsed progress line: ``{'event': 'PROGRESS' | 'DONE', 'payload': dict}``.
-ProgressEvent = dict
 
 
 _study_cache: dict[str, optuna.Study] = {}
@@ -88,31 +83,6 @@ def invalidate_study_cache(study_name: str | None = None) -> None:
         _study_cache.pop(study_name, None)
 
 
-def parse_progress(line: str) -> ProgressEvent | None:
-    '''
-    Parse one stdout line emitted by the walk-forward CLI scripts.
-
-    Both scripts emit lines of the form ``EVENT {json-payload}`` where ``EVENT``
-    is ``PROGRESS`` or ``DONE``. Returns ``None`` for anything else (blank
-    lines, log noise, malformed JSON) so callers can ignore non-contract output.
-    '''
-    if not line:
-        return None
-    parts = line.strip().split(' ', 1)
-    if len(parts) != 2:
-        return None
-    event, raw_payload = parts
-    if event not in ('PROGRESS', 'DONE'):
-        return None
-    try:
-        payload = json.loads(raw_payload)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(payload, dict):
-        return None
-    return {'event': event, 'payload': payload}
-
-
 async def start_in_sample(
     pair: str,
     strategy_name: str,
@@ -121,7 +91,7 @@ async def start_in_sample(
     n_trials: int,
     n_workers: int,
     job_repo: JobRepository,
-    on_progress: Callable[[int, ProgressEvent], None] | None = None,
+    on_progress: Callable[[int, StreamEvent], None] | None = None,
 ) -> list[Job]:
     '''
     Run an in-sample Optuna optimisation as ``n_workers`` parallel subprocesses.
@@ -171,7 +141,7 @@ async def start_out_of_sample(
     end: str,
     n_workers: int,
     job_repo: JobRepository,
-    on_progress: Callable[[ProgressEvent], None] | None = None,
+    on_progress: Callable[[StreamEvent], None] | None = None,
 ) -> Job:
     '''
     Run an out-of-sample evaluation as a single subprocess.
@@ -183,7 +153,7 @@ async def start_out_of_sample(
     cmd = build_out_of_sample_command(study_name, num_sets, start, end, n_workers)
 
     def callback(line: str) -> None:
-        event = parse_progress(line)
+        event = parse(line)
         if event is not None and on_progress is not None:
             on_progress(event)
 
@@ -327,10 +297,10 @@ def split_trials(n_trials: int, n_workers: int) -> list[int]:
 
 def _make_progress_handler(
     index: int,
-    on_progress: Callable[[int, ProgressEvent], None] | None,
+    on_progress: Callable[[int, StreamEvent], None] | None,
 ) -> Callable[[str], None]:
     def handler(line: str) -> None:
-        event = parse_progress(line)
+        event = parse(line)
         if event is not None and on_progress is not None:
             on_progress(index, event)
     return handler

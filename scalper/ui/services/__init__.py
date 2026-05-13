@@ -9,7 +9,6 @@ from .walk_forward import (
     invalidate_study_cache,
     list_oos_windows,
     list_studies_with_summary,
-    parse_progress,
     start_in_sample,
     start_out_of_sample
 )

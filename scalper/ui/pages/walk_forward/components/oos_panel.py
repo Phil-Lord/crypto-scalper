@@ -33,6 +33,7 @@ from typing import Any
 
 from nicegui import ui
 
+from core import DONE, PROGRESS, StreamEvent
 from data_system import (
     JobRepository,
     OosWindowAggregate,
@@ -588,11 +589,10 @@ class OosPanel:
         # Page's phase-done handler re-renders this panel (via _refresh_rail),
         # which reloads windows + trials and rebuilds the sidebar.
 
-    def _on_progress(self, event: dict) -> None:
-        kind = event.get('event')
-        if kind == 'PROGRESS':
+    def _on_progress(self, event: StreamEvent) -> None:
+        if event.event == PROGRESS:
             self._progress_count += 1
-        elif kind == 'DONE':
+        elif event.event == DONE:
             self._progress_count = self._progress_total
         else:
             return
