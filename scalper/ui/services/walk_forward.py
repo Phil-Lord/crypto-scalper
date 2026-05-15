@@ -23,8 +23,6 @@ Also exposes read-only helpers the redesigned walk-forward page consumes:
 ``load_study`` results are cached in-process so the page can rerender
 without paying the Optuna round-trip; :func:`invalidate_study_cache`
 lets the page drop entries when a phase finishes.
-
-TODO: Update the wording here once the page is redesigned.
 '''
 import asyncio
 from collections.abc import Callable, Iterable
