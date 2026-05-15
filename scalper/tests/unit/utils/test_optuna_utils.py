@@ -8,6 +8,7 @@ from utils.optuna_utils import (
     StudySummary,
     get_study_choices,
     list_studies,
+    load_study,
 )
 
 
@@ -171,6 +172,25 @@ class TestGetStudyChoices:
         # Then
         assert [c.value for c in choices] == ['alpha', 'beta']
         assert [c.title for c in choices] == ['alpha 50', 'beta 100']
+
+
+@pytest.mark.utils
+@pytest.mark.optuna_utils
+class TestLoadStudy:
+    @patch('utils.optuna_utils.optuna')
+    def test_loads_study_with_scalper_application_name(self, mock_optuna):
+        mock_optuna.load_study.return_value = 'study-sentinel'
+
+        result = load_study('my-study')
+
+        mock_optuna.storages.RDBStorage.assert_called_once()
+        rdb_kwargs = mock_optuna.storages.RDBStorage.call_args.kwargs
+        assert rdb_kwargs['engine_kwargs']['connect_args']['application_name'] == 'scalper'
+        mock_optuna.load_study.assert_called_once_with(
+            study_name='my-study',
+            storage=mock_optuna.storages.RDBStorage.return_value,
+        )
+        assert result == 'study-sentinel'
 
 
 @pytest.mark.utils
