@@ -1,11 +1,37 @@
+import sys
+
 import pandas as pd
 import pytest
 
 from backtesting_engine.parameter_optimisation import (
+    build_in_sample_command,
     create_study_name,
     create_windows,
     parse_study_name,
 )
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.parameter_optimisation
+class TestBuildInSampleCommand:
+    def test_includes_all_required_flags(self):
+        cmd = build_in_sample_command(
+            'BTCGBP', 'PrecisionTrendStrategy', '2025-1-1-0-0-0', '2025-4-1-0-0-0',
+            n_trials=50,
+        )
+
+        assert cmd[0] == sys.executable
+        assert cmd[1:3] == ['-m', 'scripts.optimise_in_sample']
+        assert cmd[cmd.index('-p') + 1] == 'BTCGBP'
+        assert cmd[cmd.index('-sn') + 1] == 'PrecisionTrendStrategy'
+        assert cmd[cmd.index('-s') + 1] == '2025-1-1-0-0-0'
+        assert cmd[cmd.index('-e') + 1] == '2025-4-1-0-0-0'
+        assert cmd[cmd.index('-n') + 1] == '50'
+        assert cmd[cmd.index('-j') + 1] == '1'
+
+    def test_overrides_n_jobs(self):
+        cmd = build_in_sample_command('BTCGBP', 'SmaStrategy', 's', 'e', n_trials=10, n_jobs=4)
+        assert cmd[cmd.index('-j') + 1] == '4'
 
 
 @pytest.mark.backtesting_engine

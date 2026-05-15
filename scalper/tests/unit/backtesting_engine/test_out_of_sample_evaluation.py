@@ -1,3 +1,5 @@
+import sys
+
 import optuna
 import pandas as pd
 import pytest
@@ -5,6 +7,7 @@ import pytest
 from backtesting_engine.out_of_sample_evaluation import (
     INITIAL_BALANCE,
     _evaluate_chunk_worker,
+    build_out_of_sample_command,
     chunk_param_sets,
     evaluate_out_of_sample,
     get_top_param_sets,
@@ -13,6 +16,31 @@ from backtesting_engine.out_of_sample_evaluation import (
     save_results,
 )
 from data_system.models.out_of_sample_evaluation_model import OutOfSampleEvaluation
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.out_of_sample_evaluation
+class TestBuildOutOfSampleCommand:
+    def test_includes_all_required_flags(self):
+        cmd = build_out_of_sample_command(
+            'PrecisionTrendStrategy_XXBTZGBP_20250101-20250401',
+            num_sets=10,
+            start='2025-4-1-0-0-0',
+            end='2025-7-1-0-0-0',
+            n_workers=2,
+        )
+
+        assert cmd[0] == sys.executable
+        assert cmd[1:3] == ['-m', 'scripts.evaluate_out_of_sample']
+        assert cmd[cmd.index('-sn') + 1] == 'PrecisionTrendStrategy_XXBTZGBP_20250101-20250401'
+        assert cmd[cmd.index('-n') + 1] == '10'
+        assert cmd[cmd.index('-s') + 1] == '2025-4-1-0-0-0'
+        assert cmd[cmd.index('-e') + 1] == '2025-7-1-0-0-0'
+        assert cmd[cmd.index('-w') + 1] == '2'
+
+    def test_defaults_workers_to_one(self):
+        cmd = build_out_of_sample_command('s', 1, 's', 'e')
+        assert cmd[cmd.index('-w') + 1] == '1'
 
 
 def _make_trial(mocker, number: int, value: float, params: dict = None, complete: bool = True):
