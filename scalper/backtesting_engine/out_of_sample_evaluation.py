@@ -1,4 +1,5 @@
 import logging
+import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Callable
 
@@ -32,6 +33,30 @@ This lives here on the domain layer because robustness is a backtesting concept;
 the walk-forward UI just renders the verdict.
 '''
 OOS_OVERFIT_THRESHOLD = 0.5
+
+
+def build_out_of_sample_command(
+    study_name: str,
+    num_sets: int,
+    start: str,
+    end: str,
+    n_workers: int = 1,
+) -> list[str]:
+    '''
+    Build the argv to invoke the out-of-sample evaluation as
+    ``python -m scripts.evaluate_out_of_sample``.
+
+    Colocated with the evaluation entry point so flag changes update one place.
+    Used by ``ui.services.walk_forward`` to spawn the evaluation subprocess.
+    '''
+    return [
+        sys.executable, '-m', 'scripts.evaluate_out_of_sample',
+        '-sn', study_name,
+        '-n', str(num_sets),
+        '-s', start,
+        '-e', end,
+        '-w', str(n_workers),
+    ]
 
 
 def evaluate_out_of_sample(
