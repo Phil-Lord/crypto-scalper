@@ -144,6 +144,33 @@ class TestListStudies:
         assert result[0].strategy == 'My_Custom_Strategy'
         assert result[0].pair == 'BTCGBP'
 
+    @patch('utils.optuna_utils.optuna')
+    def test_preserves_order_returned_by_optuna(self, mock_optuna):
+        ''' The rail relies on creation-order from Optuna, so list_studies
+        must not reorder. '''
+        mock_optuna.study.StudyDirection.MAXIMIZE = optuna.study.StudyDirection.MAXIMIZE
+        mock_optuna.get_all_study_summaries.return_value = [
+            _make_optuna_summary(
+                'SmaStrategy_BTCGBP_20240101-20240601',
+                direction=optuna.study.StudyDirection.MAXIMIZE,
+                n_trials=10, best_value=1.1,
+            ),
+            _make_optuna_summary(
+                'PrecisionTrendStrategy_XXBTZGBP_20240601-20241201',
+                direction=optuna.study.StudyDirection.MINIMIZE,
+                n_trials=20, best_value=0.4,
+            ),
+        ]
+
+        result = list_studies()
+
+        assert [s.name for s in result] == [
+            'SmaStrategy_BTCGBP_20240101-20240601',
+            'PrecisionTrendStrategy_XXBTZGBP_20240601-20241201',
+        ]
+        assert result[0].direction == StudyDirection.MAXIMIZE
+        assert result[1].direction == StudyDirection.MINIMIZE
+
 
 @pytest.mark.utils
 @pytest.mark.optuna_utils
