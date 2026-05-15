@@ -36,7 +36,6 @@ from backtesting_engine import (
     build_out_of_sample_command,
     get_top_param_sets,
     get_top_trials_with_oos as _get_top_trials_with_oos_from_engine,
-    load_study as _load_study_from_storage,
     TrialWithOos
 )
 from core import StreamEvent, parse, run_subprocess
@@ -48,8 +47,11 @@ from data_system import (
     OutOfSampleEvaluation,
     OutOfSampleEvaluationRepository,
 )
-from ui.models.walk_forward import StudyDirection, StudySummary
-from utils import OptunaConfig
+from utils import (
+    list_studies as _list_studies_from_storage,
+    load_study as _load_study_from_storage,
+    StudySummary
+)
 
 
 SCALPER_DIR = Path(__file__).resolve().parents[2]
@@ -160,17 +162,9 @@ async def start_out_of_sample(
     return job
 
 
-def list_studies_with_summary() -> list[StudySummary]:
-    '''
-    Return a summary row for every Optuna study in storage, ordered by name.
-
-    Pair and strategy are parsed from the study name's
-    ``{Strategy}_{pair}_{YYYYMMDD-YYYYMMDD}`` shape; legacy or hand-renamed
-    studies that don't match are returned with empty pair/strategy strings.
-    '''
-    storage = optuna.storages.RDBStorage(url=OptunaConfig.DB_URL)
-    summaries = optuna.get_all_study_summaries(storage)
-    return [_to_study_summary(summary) for summary in summaries]
+def list_studies() -> list[StudySummary]:
+    ''' Return a summary row for every Optuna study in storage, ordered by name. '''
+    return _list_studies_from_storage()
 
 
 def list_oos_windows(
@@ -287,26 +281,3 @@ def _make_progress_handler(
         if event is not None and on_progress is not None:
             on_progress(index, event)
     return handler
-
-
-def _to_study_summary(summary: optuna.study.StudySummary) -> StudySummary:
-    # Extract details from study name (Strategy_pair_yyymmdd-yyymmdd)
-    name_parts = summary.study_name.rsplit('_', 2)
-    strategy = name_parts[0] if len(name_parts) == 3 else ''
-    pair = name_parts[1] if len(name_parts) == 3 else ''
-
-    direction = (
-        StudyDirection.MAXIMIZE
-        if summary.direction == optuna.study.StudyDirection.MAXIMIZE
-        else StudyDirection.MINIMIZE
-    )
-    best_is = summary.best_trial.value if summary.best_trial is not None else None
-
-    return StudySummary(
-        name=summary.study_name,
-        pair=pair,
-        strategy=strategy,
-        trial_count=summary.n_trials,
-        best_is=best_is,
-        direction=direction,
-    )

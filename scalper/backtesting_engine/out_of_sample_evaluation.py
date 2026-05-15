@@ -16,10 +16,10 @@ from data_system import (
     SQLAlchemyTradeRepository
 )
 from strategy_manager import create_strategy
-from utils import OptunaConfig
+from utils import load_study, parse_study_name
 
 from .backtesting_engine import BacktestingEngine
-from .parameter_optimisation import create_windows, parse_study_name
+from .parameter_optimisation import create_windows
 from .window_evaluation import evaluate_param_set_over_windows
 
 logger = logging.getLogger(__name__)
@@ -123,8 +123,8 @@ def evaluate_out_of_sample(
         parameter set evaluated. Entry points pick presentation; the library
         installs no default progress bar.
     '''
-    strategy_name, pair = parse_study_name(study_name)
-    study = load_study(study_name)
+    parsed = parse_study_name(study_name)
+    study = load_study(study_name, application_name='out_of_sample_evaluation')
 
     client = SQLAlchemyClient()
     eval_repo = SQLAlchemyOutOfSampleEvaluationRepository(client)
@@ -139,29 +139,17 @@ def evaluate_out_of_sample(
     if n_workers <= 1:
         # Seed params are a placeholder; engine.strategy is replaced per param set
         # inside evaluate_param_set_over_windows.
-        engine = build_engine(pair, strategy_name, top_param_sets[0]['params'], start, end)
+        engine = build_engine(
+            parsed.kraken_pair, parsed.strategy, top_param_sets[0]['params'], start, end
+        )
         results = run_evaluation(engine, top_param_sets, windows, progress_callback)
     else:
         results = run_evaluation_parallel(
-            pair, strategy_name, top_param_sets, windows, start, end, n_workers, progress_callback
+            parsed.kraken_pair, parsed.strategy, top_param_sets, windows,
+            start, end, n_workers, progress_callback
         )
 
     save_results(eval_repo, results, study_name, start, end)
-
-
-def load_study(study_name: str) -> optuna.Study:
-    logger.info(f'Loading study: {study_name}')
-    storage = optuna.storages.RDBStorage(
-        url=OptunaConfig.DB_URL,
-        engine_kwargs={
-            'pool_pre_ping': True,
-            'connect_args': {
-                'application_name': 'out_of_sample_evaluation',
-                'keepalives_idle': 30
-            }
-        }
-    )
-    return optuna.load_study(study_name=study_name, storage=storage)
 
 
 def get_top_param_sets(

@@ -3,8 +3,8 @@ from typing import Literal
 
 from nicegui import ui
 
-from ui.models.walk_forward import StudySummary
 from ui.theme import StatusPill
+from utils import StudySummary
 
 
 LastRunState = Literal['running', 'idle']
@@ -25,7 +25,7 @@ def StudyRailRow(
 
     Clicking the row selects the study.
 
-    :param study: Summary returned from ``list_studies_with_summary``.
+    :param study: Summary returned from ``utils.list_studies``.
     :param active: ``True`` if this row is the currently selected study —
         renders with a left accent bar and a slightly brighter background.
     :param last_run_state: ``'running'`` while a phase is mid-flight against

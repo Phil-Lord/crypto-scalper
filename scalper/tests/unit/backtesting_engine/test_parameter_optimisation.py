@@ -3,12 +3,7 @@ import sys
 import pandas as pd
 import pytest
 
-from backtesting_engine.parameter_optimisation import (
-    build_in_sample_command,
-    create_study_name,
-    create_windows,
-    parse_study_name,
-)
+from backtesting_engine.parameter_optimisation import build_in_sample_command, create_windows
 
 
 @pytest.mark.backtesting_engine
@@ -310,29 +305,3 @@ class TestCreateWindows:
             pd.Timestamp('2023-11-30 00:00:01.325'),
             pd.Timestamp('2024-02-29 00:00:00.325')
         )
-
-
-@pytest.mark.backtesting_engine
-@pytest.mark.parameter_optimisation
-class TestParseStudyName:
-    def test_returns_strategy_and_pair_from_canonical_name(self):
-        strategy, pair = parse_study_name('PrecisionTrendStrategy_XXBTZGBP_20250101-20250401')
-        assert strategy == 'PrecisionTrendStrategy'
-        assert pair == 'XXBTZGBP'
-
-    def test_roundtrips_create_study_name(self):
-        # Given
-        start = pd.Timestamp('2025-01-01').timestamp()
-        end = pd.Timestamp('2025-04-01').timestamp()
-        name = create_study_name('SmaStrategy', 'XXBTZGBP', start, end)
-
-        # When
-        strategy, pair = parse_study_name(name)
-
-        # Then
-        assert strategy == 'SmaStrategy'
-        assert pair == 'XXBTZGBP'
-
-    def test_raises_on_non_canonical_name(self):
-        with pytest.raises(ValueError, match='canonical format'):
-            parse_study_name('not-a-study-name')

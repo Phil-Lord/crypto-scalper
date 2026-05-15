@@ -1,7 +1,7 @@
 import pytest
 
-from ui.models.walk_forward import StudyDirection, StudySummary
 from ui.pages.walk_forward.components.study_rail_row import StudyRailRow
+from utils import StudyDirection, StudySummary
 
 
 def _summary() -> StudySummary:

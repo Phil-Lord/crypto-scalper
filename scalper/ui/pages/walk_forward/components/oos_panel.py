@@ -41,7 +41,6 @@ from data_system import (
     OutOfSampleEvaluationRepository,
 )
 from ui.components import confirm_dialog
-from ui.models.walk_forward import StudySummary
 from ui.services.walk_forward import (
     get_top_trials_with_oos,
     get_trial_params,
@@ -51,7 +50,7 @@ from ui.services.walk_forward import (
     start_out_of_sample,
 )
 from ui.theme import SectionTitle, StatusPill, primary_button, sidebar_input
-from utils import get_second_timestamp, parse_datetime
+from utils import get_second_timestamp, parse_datetime, StudySummary
 
 from ..phase_mutex import PhaseMutex
 from .window_tabs import (

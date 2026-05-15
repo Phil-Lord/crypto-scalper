@@ -1,12 +1,11 @@
 import asyncio
 from unittest.mock import MagicMock
 
-import optuna
 import pytest
 
 from data_system.models.oos_window_aggregate_model import OosWindowAggregate
-from ui.models.walk_forward import StudyDirection, StudySummary
 from ui.services import walk_forward as svc
+from utils import StudyDirection, StudySummary
 
 
 @pytest.mark.ui
@@ -163,147 +162,27 @@ class TestStartInSample:
         assert {e.event for _, e in captured} == {'PROGRESS', 'DONE'}
 
 
-def _make_optuna_summary(
-    name: str,
-    direction: optuna.study.StudyDirection,
-    n_trials: int,
-    best_value: float | None,
-) -> MagicMock:
-    summary = MagicMock(spec=optuna.study.StudySummary)
-    summary.study_name = name
-    summary.direction = direction
-    summary.n_trials = n_trials
-    if best_value is None:
-        summary.best_trial = None
-    else:
-        best_trial = MagicMock()
-        best_trial.value = best_value
-        summary.best_trial = best_trial
-    return summary
-
-
 @pytest.mark.ui
 @pytest.mark.ui_services
 @pytest.mark.walk_forward
-class TestListStudiesWithSummary:
-    def test_parses_pair_and_strategy_from_study_name(self, mocker):
-        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
-        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[
-            _make_optuna_summary(
-                'PrecisionTrendStrategy_XXBTZGBP_20240101-20240601',
-                optuna.study.StudyDirection.MAXIMIZE,
-                n_trials=42,
-                best_value=1.7,
-            ),
-        ])
-
-        result = svc.list_studies_with_summary()
-
-        assert result == [StudySummary(
-            name='PrecisionTrendStrategy_XXBTZGBP_20240101-20240601',
-            pair='XXBTZGBP',
-            strategy='PrecisionTrendStrategy',
-            trial_count=42,
-            best_is=1.7,
+class TestListStudies:
+    def test_delegates_to_utils_list_studies(self, mocker):
+        sentinel = [StudySummary(
+            name='SmaStrategy_BTCGBP_20240101-20240601',
+            pair='BTCGBP',
+            strategy='SmaStrategy',
+            trial_count=10,
+            best_is=1.1,
             direction=StudyDirection.MAXIMIZE,
         )]
+        loader = mocker.patch.object(
+            svc, '_list_studies_from_storage', return_value=sentinel,
+        )
 
-    def test_handles_missing_best_trial(self, mocker):
-        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
-        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[
-            _make_optuna_summary(
-                'SmaStrategy_BTCGBP_20240101-20240601',
-                optuna.study.StudyDirection.MAXIMIZE,
-                n_trials=0,
-                best_value=None,
-            ),
-        ])
+        result = svc.list_studies()
 
-        result = svc.list_studies_with_summary()
-
-        assert result[0].best_is is None
-        assert result[0].trial_count == 0
-
-    def test_translates_minimise_direction(self, mocker):
-        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
-        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[
-            _make_optuna_summary(
-                'SmaStrategy_BTCGBP_20240101-20240601',
-                optuna.study.StudyDirection.MINIMIZE,
-                n_trials=10,
-                best_value=0.2,
-            ),
-        ])
-
-        result = svc.list_studies_with_summary()
-
-        assert result[0].direction == StudyDirection.MINIMIZE
-
-    def test_returns_empty_pair_and_strategy_for_non_conforming_name(self, mocker):
-        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
-        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[
-            _make_optuna_summary(
-                'legacy-study-name',
-                optuna.study.StudyDirection.MAXIMIZE,
-                n_trials=5,
-                best_value=1.0,
-            ),
-        ])
-
-        result = svc.list_studies_with_summary()
-
-        assert result[0].pair == ''
-        assert result[0].strategy == ''
-        assert result[0].name == 'legacy-study-name'
-
-    def test_returns_empty_when_no_studies(self, mocker):
-        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
-        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[])
-
-        assert svc.list_studies_with_summary() == []
-
-    def test_returns_one_summary_per_study_in_order(self, mocker):
-        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
-        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[
-            _make_optuna_summary(
-                'SmaStrategy_BTCGBP_20240101-20240601',
-                optuna.study.StudyDirection.MAXIMIZE,
-                n_trials=10, best_value=1.1,
-            ),
-            _make_optuna_summary(
-                'PrecisionTrendStrategy_XXBTZGBP_20240601-20241201',
-                optuna.study.StudyDirection.MINIMIZE,
-                n_trials=20, best_value=0.4,
-            ),
-        ])
-
-        result = svc.list_studies_with_summary()
-
-        assert [s.name for s in result] == [
-            'SmaStrategy_BTCGBP_20240101-20240601',
-            'PrecisionTrendStrategy_XXBTZGBP_20240601-20241201',
-        ]
-        assert result[0].direction == StudyDirection.MAXIMIZE
-        assert result[1].direction == StudyDirection.MINIMIZE
-
-    def test_handles_strategy_name_containing_underscores(self, mocker):
-        '''
-        ``rsplit('_', 2)`` splits on the *last* two underscores so a strategy
-        name with internal underscores still parses cleanly.
-        '''
-        mocker.patch.object(svc.optuna.storages, 'RDBStorage')
-        mocker.patch.object(svc.optuna, 'get_all_study_summaries', return_value=[
-            _make_optuna_summary(
-                'My_Custom_Strategy_BTCGBP_20240101-20240601',
-                optuna.study.StudyDirection.MAXIMIZE,
-                n_trials=1, best_value=1.0,
-            ),
-        ])
-
-        result = svc.list_studies_with_summary()
-
-        assert result[0].strategy == 'My_Custom_Strategy'
-        assert result[0].pair == 'BTCGBP'
+        assert result is sentinel
+        loader.assert_called_once_with()
 
 
 @pytest.mark.ui
