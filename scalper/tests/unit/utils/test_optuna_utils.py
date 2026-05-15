@@ -1,14 +1,19 @@
 from unittest.mock import MagicMock, patch
 
 import optuna
+import pandas as pd
 import pytest
 
 from utils.optuna_utils import (
+    ParsedStudyName,
+    STUDY_NAME_FORMAT,
     StudyDirection,
     StudySummary,
+    create_study_name,
     get_study_choices,
     list_studies,
     load_study,
+    parse_study_name
 )
 
 
@@ -191,6 +196,74 @@ class TestLoadStudy:
             storage=mock_optuna.storages.RDBStorage.return_value,
         )
         assert result == 'study-sentinel'
+
+
+@pytest.mark.utils
+@pytest.mark.optuna_utils
+class TestCreateStudyName:
+    def test_emits_canonical_format(self):
+        name = create_study_name(
+            'SmaStrategy',
+            'XXBTZGBP',
+            pd.Timestamp('2025-01-01').timestamp(),
+            pd.Timestamp('2025-04-01').timestamp(),
+        )
+
+        assert name == 'SmaStrategy_XXBTZGBP_20250101-20250401'
+
+
+@pytest.mark.utils
+@pytest.mark.optuna_utils
+class TestParseStudyName:
+    def test_returns_all_four_fields_from_canonical_name(self):
+        parsed = parse_study_name('PrecisionTrendStrategy_XXBTZGBP_20250101-20250401')
+
+        assert parsed.strategy == 'PrecisionTrendStrategy'
+        assert parsed.kraken_pair == 'XXBTZGBP'
+        assert parsed.start_ts == pd.Timestamp('2025-01-01').timestamp()
+        assert parsed.end_ts == pd.Timestamp('2025-04-01').timestamp()
+
+    def test_roundtrips_create_study_name(self):
+        start = pd.Timestamp('2025-01-01').timestamp()
+        end = pd.Timestamp('2025-04-01').timestamp()
+        name = create_study_name('SmaStrategy', 'XXBTZGBP', start, end)
+
+        parsed = parse_study_name(name)
+
+        assert parsed.strategy == 'SmaStrategy'
+        assert parsed.kraken_pair == 'XXBTZGBP'
+        assert parsed.start_ts == start
+        assert parsed.end_ts == end
+
+    def test_returned_dataclass_is_frozen(self):
+        parsed = parse_study_name('SmaStrategy_XXBTZGBP_20250101-20250401')
+
+        with pytest.raises(AttributeError):
+            parsed.strategy = 'OtherStrategy'
+
+    def test_handles_strategy_name_containing_underscores(self):
+        '''
+        ``rsplit('_', 2)`` splits on the *last* two underscores so a strategy
+        name with internal underscores still parses cleanly.
+        '''
+        parsed = parse_study_name('My_Custom_Strategy_BTCGBP_20240101-20240601')
+
+        assert parsed.strategy == 'My_Custom_Strategy'
+        assert parsed.kraken_pair == 'BTCGBP'
+
+    def test_raises_on_non_canonical_name(self):
+        with pytest.raises(ValueError, match='canonical format'):
+            parse_study_name('not-a-study-name')
+
+    def test_raises_on_unparseable_date_window(self):
+        with pytest.raises(ValueError, match='canonical format'):
+            parse_study_name('SmaStrategy_XXBTZGBP_notadate-20250401')
+
+    def test_error_message_quotes_canonical_format(self):
+        with pytest.raises(ValueError) as exc:
+            parse_study_name('not-a-study-name')
+
+        assert STUDY_NAME_FORMAT in str(exc.value)
 
 
 @pytest.mark.utils

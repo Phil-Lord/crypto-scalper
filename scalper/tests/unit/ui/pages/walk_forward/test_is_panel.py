@@ -59,11 +59,10 @@ class TestDeriveRunInputs:
     def test_round_trips_with_create_study_name(self):
         '''
         The decoded inputs must reconstruct the same study name when fed
-        back through ``backtesting_engine.create_study_name`` — that's how
+        back through ``utils.create_study_name`` — that's how
         ``start_in_sample`` resolves which study to extend.
         '''
-        from backtesting_engine import create_study_name
-        from utils import get_kraken_pair, get_second_timestamp, parse_datetime
+        from utils import create_study_name, get_kraken_pair, get_second_timestamp, parse_datetime
 
         original = 'PrecisionTrendStrategy_XXBTZGBP_20240315-20240920'
         inputs = derive_run_inputs(_summary(original))
