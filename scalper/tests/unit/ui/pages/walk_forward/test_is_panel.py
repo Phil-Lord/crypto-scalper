@@ -3,7 +3,6 @@ import asyncio
 import pytest
 
 from ui.pages.walk_forward.components import is_panel as is_panel_module
-from utils import StudyDirection, StudySummary
 from ui.pages.walk_forward.components.is_panel import (
     IsPanel,
     IsRunInputs,
@@ -11,6 +10,14 @@ from ui.pages.walk_forward.components.is_panel import (
     validate_is_form,
 )
 from ui.pages.walk_forward.phase_mutex import PhaseMutex
+from utils import (
+    create_study_name,
+    get_kraken_pair,
+    get_second_timestamp,
+    parse_datetime,
+    StudyDirection,
+    StudySummary
+)
 
 
 def _summary(name: str) -> StudySummary:
@@ -62,8 +69,6 @@ class TestDeriveRunInputs:
         back through ``utils.create_study_name`` — that's how
         ``start_in_sample`` resolves which study to extend.
         '''
-        from utils import create_study_name, get_kraken_pair, get_second_timestamp, parse_datetime
-
         original = 'PrecisionTrendStrategy_XXBTZGBP_20240315-20240920'
         inputs = derive_run_inputs(_summary(original))
         assert inputs is not None
