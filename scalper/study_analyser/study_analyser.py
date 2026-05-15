@@ -11,7 +11,7 @@ from .study_plotter import StudyPlotter
 class StudyAnalyser:
     def __init__(self, study_name: str):
         self.study_name = study_name
-        self.study = load_study(study_name)
+        self.study = load_study(study_name, application_name='study_analyser')
 
     def describe(self) -> None:
         pruned_count = len([trial for trial in self.study.trials if trial.state ==

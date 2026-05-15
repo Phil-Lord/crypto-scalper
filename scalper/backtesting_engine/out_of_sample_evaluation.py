@@ -124,8 +124,7 @@ def evaluate_out_of_sample(
         installs no default progress bar.
     '''
     parsed = parse_study_name(study_name)
-    strategy_name, pair = parsed.strategy, parsed.kraken_pair
-    study = load_study(study_name)
+    study = load_study(study_name, application_name='out_of_sample_evaluation')
 
     client = SQLAlchemyClient()
     eval_repo = SQLAlchemyOutOfSampleEvaluationRepository(client)
@@ -140,11 +139,14 @@ def evaluate_out_of_sample(
     if n_workers <= 1:
         # Seed params are a placeholder; engine.strategy is replaced per param set
         # inside evaluate_param_set_over_windows.
-        engine = build_engine(pair, strategy_name, top_param_sets[0]['params'], start, end)
+        engine = build_engine(
+            parsed.kraken_pair, parsed.strategy, top_param_sets[0]['params'], start, end
+        )
         results = run_evaluation(engine, top_param_sets, windows, progress_callback)
     else:
         results = run_evaluation_parallel(
-            pair, strategy_name, top_param_sets, windows, start, end, n_workers, progress_callback
+            parsed.kraken_pair, parsed.strategy, top_param_sets, windows,
+            start, end, n_workers, progress_callback
         )
 
     save_results(eval_repo, results, study_name, start, end)

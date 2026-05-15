@@ -210,7 +210,7 @@ class TestGetStudyChoices:
 @pytest.mark.optuna_utils
 class TestLoadStudy:
     @patch('utils.optuna_utils.optuna')
-    def test_loads_study_with_scalper_application_name(self, mock_optuna):
+    def test_loads_study_with_default_scalper_application_name(self, mock_optuna):
         mock_optuna.load_study.return_value = 'study-sentinel'
 
         result = load_study('my-study')
@@ -223,6 +223,18 @@ class TestLoadStudy:
             storage=mock_optuna.storages.RDBStorage.return_value,
         )
         assert result == 'study-sentinel'
+
+    @patch('utils.optuna_utils.optuna')
+    def test_caller_can_override_application_name(self, mock_optuna):
+        ''' Tag the Postgres connection per call site so log readers can
+        distinguish OOS-eval vs study-analyser vs UI traffic. '''
+        load_study('my-study', application_name='out_of_sample_evaluation')
+
+        rdb_kwargs = mock_optuna.storages.RDBStorage.call_args.kwargs
+        assert (
+            rdb_kwargs['engine_kwargs']['connect_args']['application_name']
+            == 'out_of_sample_evaluation'
+        )
 
 
 @pytest.mark.utils

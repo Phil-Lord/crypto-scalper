@@ -120,14 +120,17 @@ def parse_study_name(study_name: str) -> ParsedStudyName:
     )
 
 
-def load_study(study_name: str) -> optuna.Study:
+def load_study(study_name: str, application_name: str = 'scalper') -> optuna.Study:
     '''
     Load an Optuna study from the project's configured RDB storage.
 
-    - Sets ``application_name`` to ``scalper`` so Postgres connection logs
-        can distinguish this app's traffic.
+    - Tags the Postgres connection with ``application_name`` so call sites
+        remain distinguishable in ``pg_stat_activity``.
     - Enables ``keepalives`` / ``pool_pre_ping`` to survive idle/dropped
         connections under long-running UI sessions.
+
+    :param application_name: Postgres ``application_name`` to tag the
+        connection with. Defaults to ``'scalper'``.
     '''
     logger.info(f'Loading study: {study_name}')
     storage = optuna.storages.RDBStorage(
@@ -135,10 +138,10 @@ def load_study(study_name: str) -> optuna.Study:
         engine_kwargs={
             'pool_pre_ping': True,
             'connect_args': {
-                'application_name': 'scalper',
-                'keepalives_idle': 30,
-            },
-        },
+                'application_name': application_name,
+                'keepalives_idle': 30
+            }
+        }
     )
     return optuna.load_study(study_name=study_name, storage=storage)
 
