@@ -3,27 +3,15 @@ import json
 import optuna
 import pandas as pd
 
+from utils import load_study
+
 from .study_plotter import StudyPlotter
-from utils import OptunaConfig
 
 
 class StudyAnalyser:
     def __init__(self, study_name: str):
         self.study_name = study_name
-        self.study = self._load_study()
-
-    def _load_study(self) -> optuna.Study:
-        storage = optuna.storages.RDBStorage(
-            url=OptunaConfig.DB_URL,
-            engine_kwargs={
-                'pool_pre_ping': True,
-                'connect_args': {
-                    'application_name': 'study_analyser',
-                    'keepalives_idle': 30
-                }
-            }
-        )
-        return optuna.load_study(study_name=self.study_name, storage=storage)
+        self.study = load_study(study_name)
 
     def describe(self) -> None:
         pruned_count = len([trial for trial in self.study.trials if trial.state ==
