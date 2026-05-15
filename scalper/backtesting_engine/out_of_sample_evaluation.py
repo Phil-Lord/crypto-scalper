@@ -16,7 +16,7 @@ from data_system import (
     SQLAlchemyTradeRepository
 )
 from strategy_manager import create_strategy
-from utils import OptunaConfig
+from utils import load_study
 
 from .backtesting_engine import BacktestingEngine
 from .parameter_optimisation import create_windows, parse_study_name
@@ -147,21 +147,6 @@ def evaluate_out_of_sample(
         )
 
     save_results(eval_repo, results, study_name, start, end)
-
-
-def load_study(study_name: str) -> optuna.Study:
-    logger.info(f'Loading study: {study_name}')
-    storage = optuna.storages.RDBStorage(
-        url=OptunaConfig.DB_URL,
-        engine_kwargs={
-            'pool_pre_ping': True,
-            'connect_args': {
-                'application_name': 'out_of_sample_evaluation',
-                'keepalives_idle': 30
-            }
-        }
-    )
-    return optuna.load_study(study_name=study_name, storage=storage)
 
 
 def get_top_param_sets(

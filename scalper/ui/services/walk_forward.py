@@ -36,7 +36,6 @@ from backtesting_engine import (
     build_out_of_sample_command,
     get_top_param_sets,
     get_top_trials_with_oos as _get_top_trials_with_oos_from_engine,
-    load_study as _load_study_from_storage,
     TrialWithOos
 )
 from core import StreamEvent, parse, run_subprocess
@@ -48,7 +47,11 @@ from data_system import (
     OutOfSampleEvaluation,
     OutOfSampleEvaluationRepository,
 )
-from utils import list_studies as _list_studies_from_storage, StudySummary
+from utils import (
+    list_studies as _list_studies_from_storage,
+    load_study as _load_study_from_storage,
+    StudySummary
+)
 
 
 SCALPER_DIR = Path(__file__).resolve().parents[2]

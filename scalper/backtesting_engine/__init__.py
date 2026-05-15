@@ -7,6 +7,5 @@ from .out_of_sample_evaluation import (
     evaluate_out_of_sample,
     get_top_param_sets,
     get_top_trials_with_oos,
-    load_study,
 )
 from .parameter_optimisation import build_in_sample_command, create_study_name, parse_study_name

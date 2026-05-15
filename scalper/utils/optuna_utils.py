@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from enum import Enum
 
@@ -5,6 +6,9 @@ import optuna
 from questionary import Choice
 
 from utils import OptunaConfig
+
+
+logger = logging.getLogger(__name__)
 
 
 class StudyDirection(str, Enum):
@@ -35,6 +39,29 @@ class StudySummary:
     trial_count: int
     best_is: float | None
     direction: StudyDirection
+
+
+def load_study(study_name: str) -> optuna.Study:
+    '''
+    Load an Optuna study from the project's configured RDB storage.
+
+    - Sets ``application_name`` to ``scalper`` so Postgres connection logs
+        can distinguish this app's traffic.
+    - Enables ``keepalives`` / ``pool_pre_ping`` to survive idle/dropped
+        connections under long-running UI sessions.
+    '''
+    logger.info(f'Loading study: {study_name}')
+    storage = optuna.storages.RDBStorage(
+        url=OptunaConfig.DB_URL,
+        engine_kwargs={
+            'pool_pre_ping': True,
+            'connect_args': {
+                'application_name': 'scalper',
+                'keepalives_idle': 30,
+            },
+        },
+    )
+    return optuna.load_study(study_name=study_name, storage=storage)
 
 
 def list_studies() -> list[StudySummary]:
