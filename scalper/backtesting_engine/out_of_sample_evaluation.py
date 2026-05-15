@@ -16,10 +16,10 @@ from data_system import (
     SQLAlchemyTradeRepository
 )
 from strategy_manager import create_strategy
-from utils import load_study
+from utils import load_study, parse_study_name
 
 from .backtesting_engine import BacktestingEngine
-from .parameter_optimisation import create_windows, parse_study_name
+from .parameter_optimisation import create_windows
 from .window_evaluation import evaluate_param_set_over_windows
 
 logger = logging.getLogger(__name__)
@@ -123,7 +123,8 @@ def evaluate_out_of_sample(
         parameter set evaluated. Entry points pick presentation; the library
         installs no default progress bar.
     '''
-    strategy_name, pair = parse_study_name(study_name)
+    parsed = parse_study_name(study_name)
+    strategy_name, pair = parsed.strategy, parsed.kraken_pair
     study = load_study(study_name)
 
     client = SQLAlchemyClient()

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 import optuna
+import pandas as pd
 from questionary import Choice
 
 from utils import OptunaConfig
@@ -11,10 +12,39 @@ from utils import OptunaConfig
 logger = logging.getLogger(__name__)
 
 
+STUDY_NAME_FORMAT = '{Strategy}_{KrakenPair}_{YYYYMMDD-YYYYMMDD}'
+
+
 class StudyDirection(str, Enum):
     ''' Optimisation direction for an Optuna study. '''
     MAXIMIZE = 'maximize'
     MINIMIZE = 'minimize'
+
+
+@dataclass(frozen=True)
+class ParsedStudyName:
+    '''
+    Decoded fields of a canonical Optuna study name.
+
+    See :data:`STUDY_NAME_FORMAT` for the encoded shape and
+    :func:`create_study_name` / :func:`parse_study_name` for the conversion.
+
+    Attributes:
+        strategy (str): Strategy class name, e.g. ``'SmaStrategy'``.
+        kraken_pair (str): Kraken-format pair, e.g. ``'XXBTZGBP'``.
+        start_ts (float): In-sample window start as a Unix second timestamp.
+        end_ts (float): In-sample window end as a Unix second timestamp.
+
+    Note:
+        The format encodes dates at day resolution (``YYYYMMDD``), so the
+        timestamps round to midnight UTC. Round-tripping a non-midnight
+        timestamp through ``create_study_name`` and back loses the
+        time-of-day component.
+    '''
+    strategy: str
+    kraken_pair: str
+    start_ts: float
+    end_ts: float
 
 
 @dataclass(frozen=True)
@@ -57,6 +87,39 @@ def create_study_name(strategy_name: str, kraken_pair: str, start_ts: float, end
     return f'{strategy_name}_{kraken_pair}_{start_str}-{end_str}'
 
 
+def parse_study_name(study_name: str) -> ParsedStudyName:
+    '''
+    Inverse of :func:`create_study_name`. Extracts strategy, Kraken pair, and
+    the encoded date window so downstream consumers don't have to ask twice.
+
+    :return: A :class:`ParsedStudyName` with the four encoded fields.
+    :raises ValueError: If ``study_name`` doesn't match :data:`STUDY_NAME_FORMAT`.
+    '''
+    parts = study_name.rsplit('_', 2)
+    if len(parts) != 3:
+        raise ValueError(
+            f'Study name does not match canonical format '
+            f'{STUDY_NAME_FORMAT}: {study_name!r}'
+        )
+    strategy, kraken_pair, date_range = parts
+
+    try:
+        start_str, end_str = date_range.split('-', 1)
+        start_ts = pd.to_datetime(start_str, format='%Y%m%d').timestamp()
+        end_ts = pd.to_datetime(end_str, format='%Y%m%d').timestamp()
+    except (ValueError, TypeError) as e:
+        raise ValueError(
+            f'Study name does not match canonical format '
+            f'{STUDY_NAME_FORMAT}: {study_name!r}'
+        ) from e
+    return ParsedStudyName(
+        strategy=strategy,
+        kraken_pair=kraken_pair,
+        start_ts=start_ts,
+        end_ts=end_ts,
+    )
+
+
 def load_study(study_name: str) -> optuna.Study:
     '''
     Load an Optuna study from the project's configured RDB storage.
@@ -84,9 +147,9 @@ def list_studies() -> list[StudySummary]:
     '''
     Return a :class:`StudySummary` for every Optuna study in storage.
 
-    Pair and strategy are parsed from the study name's
-    ``{Strategy}_{pair}_{YYYYMMDD-YYYYMMDD}`` shape; legacy or hand-renamed
-    studies that don't match are returned with empty pair/strategy strings.
+    Pair and strategy are parsed from the study name via :func:`parse_study_name`;
+    studies that don't match :data:`STUDY_NAME_FORMAT` are returned with
+    empty pair/strategy strings.
     '''
     storage = optuna.storages.RDBStorage(url=OptunaConfig.DB_URL)
     summaries = optuna.get_all_study_summaries(storage)
@@ -102,10 +165,13 @@ def get_study_choices() -> list[Choice]:
 
 
 def _to_study_summary(summary: optuna.study.StudySummary) -> StudySummary:
-    # Extract details from study name (Strategy_pair_yyymmdd-yyymmdd)
-    name_parts = summary.study_name.rsplit('_', 2)
-    strategy = name_parts[0] if len(name_parts) == 3 else ''
-    pair = name_parts[1] if len(name_parts) == 3 else ''
+    try:
+        parsed = parse_study_name(summary.study_name)
+        strategy = parsed.strategy
+        pair = parsed.kraken_pair
+    except ValueError:
+        strategy = ''
+        pair = ''
 
     direction = (
         StudyDirection.MAXIMIZE

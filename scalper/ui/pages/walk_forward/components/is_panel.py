@@ -32,7 +32,7 @@ from data_system import JobRepository
 from ui.components import confirm_dialog
 from ui.services.walk_forward import split_trials, start_in_sample
 from ui.theme import SectionTitle, primary_button, sidebar_input
-from utils import get_raw_pair, StudySummary
+from utils import get_raw_pair, parse_study_name, STUDY_NAME_FORMAT, StudySummary
 
 from ..phase_mutex import PhaseMutex
 from .worker_strip import WorkerStrip
@@ -63,8 +63,8 @@ def derive_run_inputs(study: StudySummary) -> IsRunInputs | None:
     '''
     Decode the inputs needed to extend ``study`` from its name.
 
-    Study names follow ``Strategy_KrakenPair_YYYYMMDD-YYYYMMDD`` (see
-    ``backtesting_engine.create_study_name``). Returns ``None`` for legacy or
+    Study names follow :data:`utils.STUDY_NAME_FORMAT` (see
+    :func:`utils.create_study_name`). Returns ``None`` for legacy or
     hand-renamed studies that don't match, or whose pair isn't in the project
     registry — callers can show a notify error rather than crashing.
 
@@ -72,23 +72,19 @@ def derive_run_inputs(study: StudySummary) -> IsRunInputs | None:
     ``start_in_sample`` rebuilds the same study name from these inputs and the
     encoded YYYYMMDD has no time-of-day component.
     '''
-    parts = study.name.rsplit('_', 2)
-    if len(parts) != 3:
-        return None
-    strategy_part, kraken_pair, window = parts
     try:
-        start_str, end_str = window.split('-', 1)
-        start_dt = pd.to_datetime(start_str, format='%Y%m%d')
-        end_dt = pd.to_datetime(end_str, format='%Y%m%d')
-        raw_pair = get_raw_pair(kraken_pair)
+        parsed = parse_study_name(study.name)
+        raw_pair = get_raw_pair(parsed.kraken_pair)
     except (ValueError, KeyError):
         return None
 
+    start_dt = pd.to_datetime(parsed.start_ts, unit='s')
+    end_dt = pd.to_datetime(parsed.end_ts, unit='s')
     return IsRunInputs(
         raw_pair=raw_pair,
-        strategy=strategy_part,
+        strategy=parsed.strategy,
         start=f'{start_dt.year}-{start_dt.month}-{start_dt.day}-0-0-0',
-        end=f'{end_dt.year}-{end_dt.month}-{end_dt.day}-0-0-0',
+        end=f'{end_dt.year}-{end_dt.month}-{end_dt.day}-0-0-0'
     )
 
 
@@ -229,7 +225,7 @@ class IsPanel:
         if inputs is None:
             ui.notify(
                 f'Cannot extend {study.name!r}: study name does not match '
-                f'the canonical Strategy_Pair_YYYYMMDD-YYYYMMDD format.',
+                f'the canonical {STUDY_NAME_FORMAT} format.',
                 type='negative',
             )
             return
