@@ -2,8 +2,8 @@ import asyncio
 
 import pytest
 
-from ui.models.walk_forward import StudyDirection, StudySummary
 from ui.pages.walk_forward.components import is_panel as is_panel_module
+from utils import StudyDirection, StudySummary
 from ui.pages.walk_forward.components.is_panel import (
     IsPanel,
     IsRunInputs,

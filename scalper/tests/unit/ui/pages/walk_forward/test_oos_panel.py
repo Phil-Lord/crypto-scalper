@@ -3,8 +3,8 @@ import asyncio
 import pytest
 
 from core import StreamEvent
-from ui.models.walk_forward import StudyDirection, StudySummary
 from ui.pages.walk_forward.components import oos_panel as oos_panel_module
+from utils import StudyDirection, StudySummary
 from ui.pages.walk_forward.components.oos_panel import (
     OosPanel,
     OosRunInputs,
