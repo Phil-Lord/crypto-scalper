@@ -118,6 +118,28 @@ class TestListStudies:
         assert result[0].name == 'legacy-study-name'
 
     @patch('utils.optuna_utils.optuna')
+    def test_returns_empty_pair_and_strategy_when_date_window_is_unparseable(
+        self, mock_optuna
+    ):
+        ''' Underscore-arity OK but the date range fails to parse — still falls
+        back to empty fields rather than propagating the ValueError. '''
+        mock_optuna.study.StudyDirection.MAXIMIZE = optuna.study.StudyDirection.MAXIMIZE
+        mock_optuna.get_all_study_summaries.return_value = [
+            _make_optuna_summary(
+                'SmaStrategy_BTCGBP_notadate-20240601',
+                direction=optuna.study.StudyDirection.MAXIMIZE,
+                n_trials=3,
+                best_value=0.9,
+            ),
+        ]
+
+        result = list_studies()
+
+        assert result[0].pair == ''
+        assert result[0].strategy == ''
+        assert result[0].name == 'SmaStrategy_BTCGBP_notadate-20240601'
+
+    @patch('utils.optuna_utils.optuna')
     def test_returns_empty_when_no_studies(self, mock_optuna):
         mock_optuna.get_all_study_summaries.return_value = []
 
