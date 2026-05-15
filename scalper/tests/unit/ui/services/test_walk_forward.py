@@ -5,12 +5,7 @@ import optuna
 import pytest
 
 from data_system.models.oos_window_aggregate_model import OosWindowAggregate
-from ui.models.walk_forward import (
-    StudyDirection,
-    StudySummary,
-    TrialVerdict,
-    TrialWithOos,
-)
+from ui.models.walk_forward import StudyDirection, StudySummary
 from ui.services import walk_forward as svc
 
 
@@ -343,176 +338,21 @@ class TestListOosWindows:
 @pytest.mark.ui_services
 @pytest.mark.walk_forward
 class TestGetTopTrialsWithOos:
-    def test_left_merges_oos_scores_and_computes_verdicts(self, mocker):
-        study = object()
-        mocker.patch.object(svc, 'load_study', return_value=study)
-        mocker.patch.object(svc, 'get_top_param_sets', return_value=[
-            {'trial_number': 1, 'value': 1.5, 'params': {'a': 1}},
-            {'trial_number': 2, 'value': 1.2, 'params': {'a': 2}},
-            {'trial_number': 3, 'value': 0.8, 'params': {'a': 3}},
-        ])
-        repo = MagicMock()
-        repo.get.return_value = [
-            _make_oos_eval(trial_number=1, geo_mean_return=0.9),
-            _make_oos_eval(trial_number=2, geo_mean_return=0.3),
-            # trial 3 has no OOS row → pending
-        ]
-
-        result = svc.get_top_trials_with_oos(
-            'study-x', (10.0, 20.0), n_trials=3, oos_repo=repo,
+    def test_delegates_to_engine_with_cached_study(self, mocker):
+        ''' The service is a thin wrapper that injects the cached study. '''
+        study_sentinel = object()
+        result_sentinel = [object()]
+        load = mocker.patch.object(svc, 'load_study', return_value=study_sentinel)
+        engine_fn = mocker.patch.object(
+            svc, '_get_top_trials_with_oos_from_engine', return_value=result_sentinel,
         )
-
-        assert result == [
-            TrialWithOos(
-                trial_number=1, is_value=1.5, oos_score=0.9,
-                delta=pytest.approx(-0.6), verdict=TrialVerdict.GENERALISES,
-                params={'a': 1},
-            ),
-            TrialWithOos(
-                trial_number=2, is_value=1.2, oos_score=0.3,
-                delta=pytest.approx(-0.9), verdict=TrialVerdict.OVERFIT,
-                params={'a': 2},
-            ),
-            TrialWithOos(
-                trial_number=3, is_value=0.8, oos_score=None, delta=None,
-                verdict=TrialVerdict.PENDING, params={'a': 3},
-            ),
-        ]
-        repo.get.assert_called_once_with('study-x', 10.0, 20.0)
-
-    def test_oos_exactly_at_threshold_generalises(self, mocker):
-        mocker.patch.object(svc, 'load_study')
-        mocker.patch.object(svc, 'get_top_param_sets', return_value=[
-            {'trial_number': 1, 'value': 1.0, 'params': {}},
-        ])
-        repo = MagicMock()
-        repo.get.return_value = [
-            _make_oos_eval(trial_number=1, geo_mean_return=svc.OOS_OVERFIT_THRESHOLD),
-        ]
-
-        result = svc.get_top_trials_with_oos(
-            's', (0.0, 1.0), n_trials=1, oos_repo=repo,
-        )
-
-        assert result[0].verdict == TrialVerdict.GENERALISES
-
-    def test_window_none_marks_all_pending_and_skips_repo(self, mocker):
-        mocker.patch.object(svc, 'load_study')
-        mocker.patch.object(svc, 'get_top_param_sets', return_value=[
-            {'trial_number': 1, 'value': 1.5, 'params': {}},
-            {'trial_number': 2, 'value': 0.9, 'params': {}},
-        ])
         repo = MagicMock()
 
-        result = svc.get_top_trials_with_oos(
-            's', None, n_trials=2, oos_repo=repo,
-        )
+        result = svc.get_top_trials_with_oos('study-x', (10.0, 20.0), n_trials=5, oos_repo=repo)
 
-        repo.get.assert_not_called()
-        assert all(t.verdict == TrialVerdict.PENDING for t in result)
-        assert all(t.oos_score is None and t.delta is None for t in result)
-
-    def test_respects_minimise_direction(self, mocker):
-        '''
-        Direction-awareness lives in ``get_top_param_sets``. This test pins
-        that the service forwards the study unchanged so direction is honoured.
-        '''
-        study = MagicMock()
-        load = mocker.patch.object(svc, 'load_study', return_value=study)
-        get_top = mocker.patch.object(svc, 'get_top_param_sets', return_value=[])
-        repo = MagicMock(get=MagicMock(return_value=[]))
-
-        svc.get_top_trials_with_oos('s', (0.0, 1.0), n_trials=5, oos_repo=repo)
-
-        load.assert_called_once_with('s')
-        get_top.assert_called_once_with(study, 5)
-
-    def test_returns_empty_when_no_top_trials(self, mocker):
-        mocker.patch.object(svc, 'load_study')
-        mocker.patch.object(svc, 'get_top_param_sets', return_value=[])
-        repo = MagicMock()
-        repo.get.return_value = []
-
-        result = svc.get_top_trials_with_oos(
-            's', (0.0, 1.0), n_trials=10, oos_repo=repo,
-        )
-
-        assert result == []
-
-    def test_oos_just_below_threshold_marks_as_overfit(self, mocker):
-        '''
-        Pin the strict-greater-or-equal contract on ``OOS_OVERFIT_THRESHOLD``:
-        a trial just under the threshold must be classed as overfit.
-        '''
-        mocker.patch.object(svc, 'load_study')
-        mocker.patch.object(svc, 'get_top_param_sets', return_value=[
-            {'trial_number': 1, 'value': 1.0, 'params': {}},
-        ])
-        repo = MagicMock()
-        repo.get.return_value = [
-            _make_oos_eval(
-                trial_number=1,
-                geo_mean_return=svc.OOS_OVERFIT_THRESHOLD - 1e-9,
-            ),
-        ]
-
-        result = svc.get_top_trials_with_oos(
-            's', (0.0, 1.0), n_trials=1, oos_repo=repo,
-        )
-
-        assert result[0].verdict == TrialVerdict.OVERFIT
-
-    def test_oos_for_trial_outside_top_n_is_ignored(self, mocker):
-        '''
-        OOS rows for trials that aren't in the top-N selection are silently
-        dropped — the service joins onto top-trials, not the other way around.
-        '''
-        mocker.patch.object(svc, 'load_study')
-        mocker.patch.object(svc, 'get_top_param_sets', return_value=[
-            {'trial_number': 1, 'value': 1.5, 'params': {}},
-        ])
-        repo = MagicMock()
-        repo.get.return_value = [
-            _make_oos_eval(trial_number=1, geo_mean_return=0.9),
-            _make_oos_eval(trial_number=99, geo_mean_return=0.95),
-        ]
-
-        result = svc.get_top_trials_with_oos(
-            's', (0.0, 1.0), n_trials=1, oos_repo=repo,
-        )
-
-        assert len(result) == 1
-        assert result[0].trial_number == 1
-        assert result[0].oos_score == 0.9
-
-    def test_window_with_no_oos_rows_marks_all_pending(self, mocker):
-        '''
-        Distinct from ``window=None``: a real window is provided (so the repo
-        is queried), but the repo returns nothing — all trials should still
-        come back as pending rather than overfit.
-        '''
-        mocker.patch.object(svc, 'load_study')
-        mocker.patch.object(svc, 'get_top_param_sets', return_value=[
-            {'trial_number': 1, 'value': 1.5, 'params': {}},
-            {'trial_number': 2, 'value': 1.2, 'params': {}},
-        ])
-        repo = MagicMock()
-        repo.get.return_value = []
-
-        result = svc.get_top_trials_with_oos(
-            's', (10.0, 20.0), n_trials=2, oos_repo=repo,
-        )
-
-        repo.get.assert_called_once_with('s', 10.0, 20.0)
-        assert all(t.verdict == TrialVerdict.PENDING for t in result)
-        assert all(t.oos_score is None and t.delta is None for t in result)
-
-
-def _make_oos_eval(trial_number: int, geo_mean_return: float):
-    eval_obj = MagicMock()
-    eval_obj.trial_number = trial_number
-    eval_obj.geo_mean_return = geo_mean_return
-    return eval_obj
+        load.assert_called_once_with('study-x')
+        engine_fn.assert_called_once_with(study_sentinel, (10.0, 20.0), 5, repo)
+        assert result is result_sentinel
 
 
 @pytest.mark.ui

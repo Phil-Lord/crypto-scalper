@@ -1,4 +1,5 @@
 import sys
+from unittest.mock import MagicMock
 
 import optuna
 import pandas as pd
@@ -6,11 +7,15 @@ import pytest
 
 from backtesting_engine.out_of_sample_evaluation import (
     INITIAL_BALANCE,
+    OOS_OVERFIT_THRESHOLD,
+    TrialVerdict,
+    TrialWithOos,
     _evaluate_chunk_worker,
     build_out_of_sample_command,
     chunk_param_sets,
     evaluate_out_of_sample,
     get_top_param_sets,
+    get_top_trials_with_oos,
     run_evaluation,
     run_evaluation_parallel,
     save_results,
@@ -769,3 +774,239 @@ class TestSerialParallelParity:
         serial_by_trial = {r['trial_number']: r['geo_mean_return'] for r in serial_results}
         worker_by_trial = {r['trial_number']: r['geo_mean_return'] for r in worker_results}
         assert serial_by_trial == worker_by_trial
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.out_of_sample_evaluation
+class TestTrialVerdict:
+    def test_values_use_british_spelling(self):
+        assert TrialVerdict.PENDING.value == 'pending'
+        assert TrialVerdict.GENERALISES.value == 'generalises'
+        assert TrialVerdict.OVERFIT.value == 'overfit'
+
+    def test_is_string_compatible(self):
+        assert TrialVerdict.PENDING == 'pending'
+        assert TrialVerdict.GENERALISES == 'generalises'
+        assert TrialVerdict.OVERFIT == 'overfit'
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.out_of_sample_evaluation
+class TestTrialWithOos:
+    @pytest.fixture
+    def sample_trial_data(self):
+        return {
+            'trial_number': 7,
+            'is_value': 1.5,
+            'oos_score': 0.9,
+            'delta': -0.6,
+            'verdict': TrialVerdict.GENERALISES,
+            'params': {'sma_period': 20},
+        }
+
+    def test_creates_trial_with_all_fields(self, sample_trial_data):
+        trial = TrialWithOos(**sample_trial_data)
+
+        assert trial.trial_number == 7
+        assert trial.is_value == 1.5
+        assert trial.oos_score == 0.9
+        assert trial.delta == -0.6
+        assert trial.verdict == TrialVerdict.GENERALISES
+        assert trial.params == {'sma_period': 20}
+
+    def test_oos_score_and_delta_can_be_none(self, sample_trial_data):
+        sample_trial_data['oos_score'] = None
+        sample_trial_data['delta'] = None
+        sample_trial_data['verdict'] = TrialVerdict.PENDING
+
+        trial = TrialWithOos(**sample_trial_data)
+
+        assert trial.oos_score is None
+        assert trial.delta is None
+        assert trial.verdict == TrialVerdict.PENDING
+
+    def test_trial_is_frozen(self, sample_trial_data):
+        trial = TrialWithOos(**sample_trial_data)
+        with pytest.raises(AttributeError):
+            trial.oos_score = 0.99
+
+    def test_supports_empty_params(self, sample_trial_data):
+        sample_trial_data['params'] = {}
+        trial = TrialWithOos(**sample_trial_data)
+        assert trial.params == {}
+
+
+def _make_oos_eval(trial_number: int, geo_mean_return: float):
+    eval_obj = MagicMock()
+    eval_obj.trial_number = trial_number
+    eval_obj.geo_mean_return = geo_mean_return
+    return eval_obj
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.out_of_sample_evaluation
+class TestGetTopTrialsWithOos:
+    def test_left_merges_oos_scores_and_computes_verdicts(self, mocker):
+        study = MagicMock(study_name='study-x')
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
+            return_value=[
+                {'trial_number': 1, 'value': 1.5, 'params': {'a': 1}},
+                {'trial_number': 2, 'value': 1.2, 'params': {'a': 2}},
+                {'trial_number': 3, 'value': 0.8, 'params': {'a': 3}},
+            ],
+        )
+        repo = MagicMock()
+        repo.get.return_value = [
+            _make_oos_eval(trial_number=1, geo_mean_return=0.9),
+            _make_oos_eval(trial_number=2, geo_mean_return=0.3),
+            # trial 3 has no OOS row -> pending
+        ]
+
+        result = get_top_trials_with_oos(study, (10.0, 20.0), n_trials=3, oos_repo=repo)
+
+        assert result == [
+            TrialWithOos(
+                trial_number=1, is_value=1.5, oos_score=0.9,
+                delta=pytest.approx(-0.6), verdict=TrialVerdict.GENERALISES,
+                params={'a': 1},
+            ),
+            TrialWithOos(
+                trial_number=2, is_value=1.2, oos_score=0.3,
+                delta=pytest.approx(-0.9), verdict=TrialVerdict.OVERFIT,
+                params={'a': 2},
+            ),
+            TrialWithOos(
+                trial_number=3, is_value=0.8, oos_score=None, delta=None,
+                verdict=TrialVerdict.PENDING, params={'a': 3},
+            ),
+        ]
+        repo.get.assert_called_once_with('study-x', 10.0, 20.0)
+
+    def test_oos_exactly_at_threshold_generalises(self, mocker):
+        study = MagicMock(study_name='s')
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
+            return_value=[{'trial_number': 1, 'value': 1.0, 'params': {}}],
+        )
+        repo = MagicMock()
+        repo.get.return_value = [
+            _make_oos_eval(trial_number=1, geo_mean_return=OOS_OVERFIT_THRESHOLD),
+        ]
+
+        result = get_top_trials_with_oos(study, (0.0, 1.0), n_trials=1, oos_repo=repo)
+
+        assert result[0].verdict == TrialVerdict.GENERALISES
+
+    def test_window_none_marks_all_pending_and_skips_repo(self, mocker):
+        study = MagicMock(study_name='s')
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
+            return_value=[
+                {'trial_number': 1, 'value': 1.5, 'params': {}},
+                {'trial_number': 2, 'value': 0.9, 'params': {}},
+            ],
+        )
+        repo = MagicMock()
+
+        result = get_top_trials_with_oos(study, None, n_trials=2, oos_repo=repo)
+
+        repo.get.assert_not_called()
+        assert all(t.verdict == TrialVerdict.PENDING for t in result)
+        assert all(t.oos_score is None and t.delta is None for t in result)
+
+    def test_respects_minimise_direction(self, mocker):
+        '''
+        Direction-awareness lives in ``get_top_param_sets``. This test pins
+        that the study is forwarded unchanged so direction is honoured.
+        '''
+        study = MagicMock(study_name='s')
+        get_top = mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
+            return_value=[],
+        )
+        repo = MagicMock(get=MagicMock(return_value=[]))
+
+        get_top_trials_with_oos(study, (0.0, 1.0), n_trials=5, oos_repo=repo)
+
+        get_top.assert_called_once_with(study, 5)
+
+    def test_returns_empty_when_no_top_trials(self, mocker):
+        study = MagicMock(study_name='s')
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
+            return_value=[],
+        )
+        repo = MagicMock()
+        repo.get.return_value = []
+
+        result = get_top_trials_with_oos(study, (0.0, 1.0), n_trials=10, oos_repo=repo)
+
+        assert result == []
+
+    def test_oos_just_below_threshold_marks_as_overfit(self, mocker):
+        '''
+        Pin the strict-greater-or-equal contract on ``OOS_OVERFIT_THRESHOLD``:
+        a trial just under the threshold must be classed as overfit.
+        '''
+        study = MagicMock(study_name='s')
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
+            return_value=[{'trial_number': 1, 'value': 1.0, 'params': {}}],
+        )
+        repo = MagicMock()
+        repo.get.return_value = [
+            _make_oos_eval(
+                trial_number=1,
+                geo_mean_return=OOS_OVERFIT_THRESHOLD - 1e-9,
+            ),
+        ]
+
+        result = get_top_trials_with_oos(study, (0.0, 1.0), n_trials=1, oos_repo=repo)
+
+        assert result[0].verdict == TrialVerdict.OVERFIT
+
+    def test_oos_for_trial_outside_top_n_is_ignored(self, mocker):
+        '''
+        OOS rows for trials that aren't in the top-N selection are silently
+        dropped — the function joins onto top-trials, not the other way around.
+        '''
+        study = MagicMock(study_name='s')
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
+            return_value=[{'trial_number': 1, 'value': 1.5, 'params': {}}],
+        )
+        repo = MagicMock()
+        repo.get.return_value = [
+            _make_oos_eval(trial_number=1, geo_mean_return=0.9),
+            _make_oos_eval(trial_number=99, geo_mean_return=0.95),
+        ]
+
+        result = get_top_trials_with_oos(study, (0.0, 1.0), n_trials=1, oos_repo=repo)
+
+        assert len(result) == 1
+        assert result[0].trial_number == 1
+        assert result[0].oos_score == 0.9
+
+    def test_window_with_no_oos_rows_marks_all_pending(self, mocker):
+        '''
+        Distinct from ``window=None``: a real window is provided (so the repo
+        is queried), but the repo returns nothing — all trials should still
+        come back as pending rather than overfit.
+        '''
+        study = MagicMock(study_name='s')
+        mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
+            return_value=[
+                {'trial_number': 1, 'value': 1.5, 'params': {}},
+                {'trial_number': 2, 'value': 1.2, 'params': {}},
+            ],
+        )
+        repo = MagicMock()
+        repo.get.return_value = []
+
+        result = get_top_trials_with_oos(study, (10.0, 20.0), n_trials=2, oos_repo=repo)
+
+        repo.get.assert_called_once_with('s', 10.0, 20.0)
+        assert all(t.verdict == TrialVerdict.PENDING for t in result)
+        assert all(t.oos_score is None and t.delta is None for t in result)
