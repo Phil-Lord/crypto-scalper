@@ -8,7 +8,7 @@ from optuna.exceptions import ExperimentalWarning
 import pandas as pd
 
 from .objective import get_objective
-from utils import OptunaConfig
+from utils import create_study_name, OptunaConfig
 
 
 OptunaCallback = Callable[[optuna.study.Study, optuna.trial.FrozenTrial], None]
@@ -67,20 +67,6 @@ def optimise_parameters(
     study = create_study(storage, study_name, n_trials)
     validate_search_space(study, param_grid)
     optimise(n_trials, study, engine, windows, param_grid, n_jobs, progress_callback)
-
-
-def create_study_name(strategy_name: str, kraken_pair: str, start_ts: float, end_ts: float) -> str:
-    '''
-    Build the canonical Optuna study name for a backtest configuration.
-
-    :param strategy_name: Strategy class name, e.g. ``'SmaStrategy'``.
-    :param kraken_pair: Kraken-format pair, e.g. ``'XXBTZGBP'``.
-    :param start_ts: In-sample window start as a Unix second timestamp.
-    :param end_ts: In-sample window end as a Unix second timestamp.
-    '''
-    start_str = pd.to_datetime(start_ts, unit='s').strftime('%Y%m%d')
-    end_str = pd.to_datetime(end_ts, unit='s').strftime('%Y%m%d')
-    return f'{strategy_name}_{kraken_pair}_{start_str}-{end_str}'
 
 
 def parse_study_name(study_name: str) -> tuple[str, str]:

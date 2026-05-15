@@ -8,4 +8,4 @@ from .out_of_sample_evaluation import (
     get_top_param_sets,
     get_top_trials_with_oos,
 )
-from .parameter_optimisation import build_in_sample_command, create_study_name, parse_study_name
+from .parameter_optimisation import build_in_sample_command, parse_study_name

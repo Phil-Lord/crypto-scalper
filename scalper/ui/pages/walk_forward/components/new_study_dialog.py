@@ -14,10 +14,15 @@ from dataclasses import dataclass
 
 from nicegui import ui
 
-from backtesting_engine import create_study_name
 from strategy_manager import STRATEGIES
 from ui.theme import primary_button, sidebar_input, sidebar_select
-from utils import get_kraken_pair, get_second_timestamp, parse_datetime, raw_to_kraken_pairs
+from utils import (
+    create_study_name,
+    get_kraken_pair,
+    get_second_timestamp,
+    parse_datetime,
+    raw_to_kraken_pairs
+)
 
 
 @dataclass(frozen=True)
@@ -109,7 +114,7 @@ def validate_new_study_form(
 
 def derive_study_name(form: NewStudyForm) -> str:
     '''
-    UI-side adapter around ``backtesting_engine.create_study_name`` — converts
+    UI-side adapter around :func:`utils.create_study_name` — converts
     the form's raw pair / text-format datetimes into the engine's expected
     types (kraken pair + second timestamps) and delegates.
 
