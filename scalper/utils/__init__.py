@@ -2,7 +2,7 @@ from .constants import LOG_FORMAT, ROOT_DIR
 from .data_visualisation import plot_position_profits, plot_results, plot_trade_data_from_db
 from .env_vars import load_env
 from .optuna_config import OptunaConfig
-from .optuna_utils import get_study_choices, list_studies, StudySummary
+from .optuna_utils import get_study_choices, list_studies, StudyDirection, StudySummary
 from .pair_config import (
     get_kraken_pair,
     get_kraken_pair_symbols,

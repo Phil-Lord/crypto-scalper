@@ -1,49 +1,81 @@
 from dataclasses import dataclass
+from enum import Enum
 
-from sqlalchemy import text
 import optuna
 from questionary import Choice
 
 from utils import OptunaConfig
 
 
+class StudyDirection(str, Enum):
+    ''' Optimisation direction for an Optuna study. '''
+    MAXIMIZE = 'maximize'
+    MINIMIZE = 'minimize'
+
+
 @dataclass(frozen=True)
 class StudySummary:
     '''
-    Summary of an Optuna study, suitable for non-interactive listing.
+    Summary row for an Optuna study.
 
     Attributes:
-        study_name (str): The Optuna study name (unique within the storage).
-        n_trials (int): Total number of trials recorded against the study.
+        name (str): Optuna study name (unique within the storage).
+        pair (str): Trading pair parsed from the study name. Empty for legacy
+            or hand-renamed studies that don't match the canonical shape.
+        strategy (str): Strategy class name parsed from the study name.
+            Empty for non-conforming names.
+        trial_count (int): Total trials recorded against the study.
+        best_is (float | None): Best in-sample objective value, or ``None`` if
+            the study has no completed trial yet.
+        direction (StudyDirection): Optimisation direction.
     '''
-    study_name: str
-    n_trials: int
+    name: str
+    pair: str
+    strategy: str
+    trial_count: int
+    best_is: float | None
+    direction: StudyDirection
 
 
 def list_studies() -> list[StudySummary]:
-    ''' Retrieve all studies from the Optuna storage as plain summaries. '''
+    '''
+    Return a :class:`StudySummary` for every Optuna study in storage.
+
+    Pair and strategy are parsed from the study name's
+    ``{Strategy}_{pair}_{YYYYMMDD-YYYYMMDD}`` shape; legacy or hand-renamed
+    studies that don't match are returned with empty pair/strategy strings.
+    '''
     storage = optuna.storages.RDBStorage(url=OptunaConfig.DB_URL)
-    engine = storage.engine
-
-    query = text(
-        """
-        SELECT s.study_name, COUNT(t.trial_id) AS n_trials
-        FROM studies s
-        LEFT JOIN trials t ON s.study_id = t.study_id
-        GROUP BY s.study_name
-        ORDER BY n_trials
-        """
-    )
-
-    with engine.connect() as connection:
-        result = connection.execute(query).fetchall()
-
-    return [StudySummary(study_name=name, n_trials=n) for name, n in result]
+    summaries = optuna.get_all_study_summaries(storage)
+    return [_to_study_summary(summary) for summary in summaries]
 
 
 def get_study_choices() -> list[Choice]:
     ''' Wrap :func:`list_studies` for interactive Questionary CLI prompts. '''
     return [
-        Choice(title=f'{summary.study_name} {summary.n_trials}', value=summary.study_name)
+        Choice(title=f'{summary.name} {summary.trial_count}', value=summary.name)
         for summary in list_studies()
     ]
+
+
+def _to_study_summary(summary: optuna.study.StudySummary) -> StudySummary:
+    # Extract details from study name (Strategy_pair_yyymmdd-yyymmdd)
+    name_parts = summary.study_name.rsplit('_', 2)
+    strategy = name_parts[0] if len(name_parts) == 3 else ''
+    pair = name_parts[1] if len(name_parts) == 3 else ''
+
+    direction = (
+        StudyDirection.MAXIMIZE
+        if summary.direction == optuna.study.StudyDirection.MAXIMIZE
+        else StudyDirection.MINIMIZE
+    )
+    best_is = summary.best_trial.value if summary.best_trial is not None else None
+
+    return StudySummary(
+        name=summary.study_name,
+        pair=pair,
+        strategy=strategy,
+        trial_count=summary.n_trials,
+        best_is=best_is,
+        direction=direction,
+    )
