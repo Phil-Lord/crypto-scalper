@@ -5,8 +5,9 @@ Orchestrates the in-sample / out-of-sample subprocesses via
 :func:`core.run_subprocess`, parsing each stdout line through
 :func:`core.parse` into the shared :class:`core.StreamEvent` contract that
 ``scripts/optimise_in_sample.py`` and ``scripts/evaluate_out_of_sample.py``
-emit. Each script exposes its own ``build_command`` colocated with the click
-options.
+emit. argv for each subprocess is built by ``build_in_sample_command`` /
+``build_out_of_sample_command`` colocated with the optimisation entry points
+in :mod:`backtesting_engine`.
 
 The two phases share a single module because they share both the event
 contract and the surrounding lifecycle (``Job`` rows, cancellation, progress
@@ -22,8 +23,6 @@ Also exposes read-only helpers the redesigned walk-forward page consumes:
 ``load_study`` results are cached in-process so the page can rerender
 without paying the Optuna round-trip; :func:`invalidate_study_cache`
 lets the page drop entries when a phase finishes.
-
-TODO: Update the wording here once the page is redesigned.
 '''
 import asyncio
 from collections.abc import Callable, Iterable
@@ -33,8 +32,12 @@ import optuna
 
 from backtesting_engine import (
     OOS_OVERFIT_THRESHOLD,
+    build_in_sample_command,
+    build_out_of_sample_command,
     get_top_param_sets,
-    load_study as _load_study_from_storage
+    get_top_trials_with_oos as _get_top_trials_with_oos_from_engine,
+    load_study as _load_study_from_storage,
+    TrialWithOos
 )
 from core import StreamEvent, parse, run_subprocess
 from data_system import (
@@ -45,14 +48,7 @@ from data_system import (
     OutOfSampleEvaluation,
     OutOfSampleEvaluationRepository,
 )
-from scripts.evaluate_out_of_sample import build_command as build_out_of_sample_command
-from scripts.optimise_in_sample import build_command as build_in_sample_command
-from ui.models.walk_forward import (
-    StudyDirection,
-    StudySummary,
-    TrialVerdict,
-    TrialWithOos,
-)
+from ui.models.walk_forward import StudyDirection, StudySummary
 from utils import OptunaConfig
 
 
@@ -211,29 +207,13 @@ def get_top_trials_with_oos(
     oos_repo: OutOfSampleEvaluationRepository,
 ) -> list[TrialWithOos]:
     '''
-    Top ``n_trials`` trials for a study, left-joined with OOS scores from ``window``.
-
-    Trials are picked by Optuna direction (max vs min); the OOS join adds a
-    ``delta`` (``oos - is``) and ``verdict`` per row. ``window=None`` returns
-    the top trials with every row marked ``PENDING`` — used by the page when
-    no OOS window has been selected yet.
-
-    :param window: ``(start, end)`` Unix seconds matching one of
-        :func:`list_oos_windows`'s rows, or ``None``.
+    Thin wrapper around :func:`backtesting_engine.get_top_trials_with_oos` that
+    injects the in-process cached study so repeated page renders don't pay the
+    Optuna round-trip.
     '''
-    study = load_study(study_name)
-    top_trials = get_top_param_sets(study, n_trials)
-
-    if window is None:
-        oos_by_trial: dict[int, float] = {}
-    else:
-        evaluations = oos_repo.get(study_name, window[0], window[1])
-        oos_by_trial = {e.trial_number: e.geo_mean_return for e in evaluations}
-
-    return [
-        _to_trial_with_oos(trial, oos_by_trial.get(trial['trial_number']))
-        for trial in top_trials
-    ]
+    return _get_top_trials_with_oos_from_engine(
+        load_study(study_name), window, n_trials, oos_repo,
+    )
 
 
 def get_trial_params(study_name: str, trial_number: int) -> dict:
@@ -329,34 +309,4 @@ def _to_study_summary(summary: optuna.study.StudySummary) -> StudySummary:
         trial_count=summary.n_trials,
         best_is=best_is,
         direction=direction,
-    )
-
-
-def _to_trial_with_oos(trial: dict, oos_score: float | None) -> TrialWithOos:
-    '''
-    Join a trial dict with its OOS score to produce a TrialWithOos for the UI.
-
-    :param trial: Dict with keys ``trial_number``, ``value``, and ``params``.
-    :param oos_score: Geo-mean return for the trial in the selected OOS window, or
-        ``None`` if the trial has not been evaluated in that window yet.
-    '''
-    is_value = trial['value']
-    if oos_score is None:
-        delta = None
-        verdict = TrialVerdict.PENDING
-    else:
-        delta = oos_score - is_value
-        verdict = (
-            TrialVerdict.GENERALISES
-            if oos_score >= OOS_OVERFIT_THRESHOLD
-            else TrialVerdict.OVERFIT
-        )
-
-    return TrialWithOos(
-        trial_number=trial['trial_number'],
-        is_value=is_value,
-        oos_score=oos_score,
-        delta=delta,
-        verdict=verdict,
-        params=trial['params']
     )

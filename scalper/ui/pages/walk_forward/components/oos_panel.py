@@ -33,6 +33,7 @@ from typing import Any
 
 from nicegui import ui
 
+from backtesting_engine import TrialVerdict, TrialWithOos
 from core import DONE, PROGRESS, StreamEvent
 from data_system import (
     JobRepository,
@@ -40,7 +41,7 @@ from data_system import (
     OutOfSampleEvaluationRepository,
 )
 from ui.components import confirm_dialog
-from ui.models.walk_forward import StudySummary, TrialVerdict, TrialWithOos
+from ui.models.walk_forward import StudySummary
 from ui.services.walk_forward import (
     get_top_trials_with_oos,
     get_trial_params,

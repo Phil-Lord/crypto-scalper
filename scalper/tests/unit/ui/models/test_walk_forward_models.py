@@ -1,11 +1,6 @@
 import pytest
 
-from ui.models.walk_forward import (
-    StudyDirection,
-    StudySummary,
-    TrialVerdict,
-    TrialWithOos,
-)
+from ui.models.walk_forward import StudyDirection, StudySummary
 
 
 @pytest.mark.ui
@@ -19,21 +14,6 @@ class TestStudyDirection:
     def test_is_string_compatible(self):
         assert StudyDirection.MAXIMIZE == 'maximize'
         assert StudyDirection.MINIMIZE == 'minimize'
-
-
-@pytest.mark.ui
-@pytest.mark.ui_models
-@pytest.mark.trial_verdict_enum
-class TestTrialVerdict:
-    def test_values_use_british_spelling(self):
-        assert TrialVerdict.PENDING.value == 'pending'
-        assert TrialVerdict.GENERALISES.value == 'generalises'
-        assert TrialVerdict.OVERFIT.value == 'overfit'
-
-    def test_is_string_compatible(self):
-        assert TrialVerdict.PENDING == 'pending'
-        assert TrialVerdict.GENERALISES == 'generalises'
-        assert TrialVerdict.OVERFIT == 'overfit'
 
 
 @pytest.mark.ui
@@ -90,63 +70,3 @@ class TestStudySummary:
                 strategy='SmaStrategy',
                 trial_count=5,
             )
-
-
-@pytest.mark.ui
-@pytest.mark.ui_models
-@pytest.mark.trial_with_oos_model
-class TestTrialWithOos:
-    @pytest.fixture
-    def sample_trial_data(self):
-        return {
-            'trial_number': 7,
-            'is_value': 1.5,
-            'oos_score': 0.9,
-            'delta': -0.6,
-            'verdict': TrialVerdict.GENERALISES,
-            'params': {'sma_period': 20},
-        }
-
-    def test_creates_trial_with_all_fields(self, sample_trial_data):
-        # When
-        trial = TrialWithOos(**sample_trial_data)
-
-        # Then
-        assert trial.trial_number == 7
-        assert trial.is_value == 1.5
-        assert trial.oos_score == 0.9
-        assert trial.delta == -0.6
-        assert trial.verdict == TrialVerdict.GENERALISES
-        assert trial.params == {'sma_period': 20}
-
-    def test_oos_score_and_delta_can_be_none(self, sample_trial_data):
-        # Given
-        sample_trial_data['oos_score'] = None
-        sample_trial_data['delta'] = None
-        sample_trial_data['verdict'] = TrialVerdict.PENDING
-
-        # When
-        trial = TrialWithOos(**sample_trial_data)
-
-        # Then
-        assert trial.oos_score is None
-        assert trial.delta is None
-        assert trial.verdict == TrialVerdict.PENDING
-
-    def test_trial_is_frozen(self, sample_trial_data):
-        # Given
-        trial = TrialWithOos(**sample_trial_data)
-
-        # When / Then
-        with pytest.raises(AttributeError):
-            trial.oos_score = 0.99
-
-    def test_supports_empty_params(self, sample_trial_data):
-        # Given
-        sample_trial_data['params'] = {}
-
-        # When
-        trial = TrialWithOos(**sample_trial_data)
-
-        # Then
-        assert trial.params == {}

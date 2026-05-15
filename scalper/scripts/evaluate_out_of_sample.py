@@ -11,29 +11,6 @@ load_env()
 logging.basicConfig(level=logging.WARNING, format=LOG_FORMAT, stream=sys.stderr)
 
 
-def build_command(
-    study_name: str,
-    num_sets: int,
-    start: str,
-    end: str,
-    n_workers: int = 1,
-) -> list[str]:
-    '''
-    Build the argv to invoke this script as ``python -m scripts.evaluate_out_of_sample``.
-
-    Colocated with the click options so flag changes update one place. Used by
-    ``ui.services.walk_forward`` to spawn the evaluation subprocess.
-    '''
-    return [
-        sys.executable, '-m', 'scripts.evaluate_out_of_sample',
-        '-sn', study_name,
-        '-n', str(num_sets),
-        '-s', start,
-        '-e', end,
-        '-w', str(n_workers),
-    ]
-
-
 @click.command()
 @click.option('--study_name', '-sn', required=True, help='Optuna study name.')
 @click.option('--num_sets', '-n', required=True, type=int,

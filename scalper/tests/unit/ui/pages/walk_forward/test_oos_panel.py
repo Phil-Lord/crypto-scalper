@@ -437,7 +437,7 @@ class TestParamsCache:
         run_javascript = mocker.patch.object(oos_panel_module.ui, 'run_javascript')
         mocker.patch.object(oos_panel_module.ui, 'notify')
 
-        from ui.models.walk_forward import TrialVerdict, TrialWithOos
+        from backtesting_engine import TrialVerdict, TrialWithOos
         trial = TrialWithOos(
             trial_number=7, is_value=1.0, oos_score=None,
             delta=None, verdict=TrialVerdict.PENDING, params={},
@@ -461,7 +461,7 @@ class TestParamsCache:
         run_javascript = mocker.patch.object(oos_panel_module.ui, 'run_javascript')
         mocker.patch.object(oos_panel_module.ui, 'notify')
 
-        from ui.models.walk_forward import TrialVerdict, TrialWithOos
+        from backtesting_engine import TrialVerdict, TrialWithOos
         trial = TrialWithOos(
             trial_number=42, is_value=1.0, oos_score=None,
             delta=None, verdict=TrialVerdict.PENDING, params={},
@@ -481,7 +481,7 @@ class TestParamsCache:
         run_javascript = mocker.patch.object(oos_panel_module.ui, 'run_javascript')
         notify = mocker.patch.object(oos_panel_module.ui, 'notify')
 
-        from ui.models.walk_forward import TrialVerdict, TrialWithOos
+        from backtesting_engine import TrialVerdict, TrialWithOos
         trial = TrialWithOos(
             trial_number=1, is_value=1.0, oos_score=None,
             delta=None, verdict=TrialVerdict.PENDING, params={},
@@ -499,7 +499,7 @@ class TestParamsCache:
         re-querying Optuna.
         '''
         panel, _ = _make_panel(mocker)
-        from ui.models.walk_forward import TrialVerdict, TrialWithOos
+        from backtesting_engine import TrialVerdict, TrialWithOos
         panel._trials = [
             TrialWithOos(
                 trial_number=1, is_value=1.0, oos_score=None,
@@ -529,7 +529,7 @@ class TestParamsCache:
         rather than wedging on a stale entry.
         '''
         panel, _ = _make_panel(mocker)
-        from ui.models.walk_forward import TrialVerdict, TrialWithOos
+        from backtesting_engine import TrialVerdict, TrialWithOos
         panel._trials = [
             TrialWithOos(
                 trial_number=1, is_value=1.0, oos_score=None,

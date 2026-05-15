@@ -1,5 +1,8 @@
 import logging
+import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass
+from enum import Enum
 from typing import Callable
 
 import optuna
@@ -32,6 +35,66 @@ This lives here on the domain layer because robustness is a backtesting concept;
 the walk-forward UI just renders the verdict.
 '''
 OOS_OVERFIT_THRESHOLD = 0.5
+
+
+class TrialVerdict(str, Enum):
+    '''
+    Generalisation verdict for a trial against an OOS window.
+
+    ``PENDING`` — trial has no OOS evaluation in the chosen window yet.
+    ``GENERALISES`` — OOS geo-mean return at or above ``OOS_OVERFIT_THRESHOLD``.
+    ``OVERFIT`` — OOS geo-mean return below ``OOS_OVERFIT_THRESHOLD``.
+    '''
+    PENDING = 'pending'
+    GENERALISES = 'generalises'
+    OVERFIT = 'overfit'
+
+
+@dataclass(frozen=True)
+class TrialWithOos:
+    '''
+    Top-trial row joined with its OOS score for a selected window.
+
+    Attributes:
+        trial_number (int): Optuna trial number.
+        is_value (float): In-sample objective value.
+        oos_score (float | None): OOS geo-mean return for the chosen window, or
+            ``None`` if the trial has not been evaluated in that window yet.
+        delta (float | None): ``oos_score - is_value``;
+            ``None`` when ``oos_score`` is ``None``.
+        verdict (TrialVerdict): Pending / generalises / overfit.
+        params (dict): Trial parameter dict (same shape as ``trial.params``).
+    '''
+    trial_number: int
+    is_value: float
+    oos_score: float | None
+    delta: float | None
+    verdict: TrialVerdict
+    params: dict
+
+
+def build_out_of_sample_command(
+    study_name: str,
+    num_sets: int,
+    start: str,
+    end: str,
+    n_workers: int = 1,
+) -> list[str]:
+    '''
+    Build the argv to invoke the out-of-sample evaluation as
+    ``python -m scripts.evaluate_out_of_sample``.
+
+    Colocated with the evaluation entry point so flag changes update one place.
+    Used by ``ui.services.walk_forward`` to spawn the evaluation subprocess.
+    '''
+    return [
+        sys.executable, '-m', 'scripts.evaluate_out_of_sample',
+        '-sn', study_name,
+        '-n', str(num_sets),
+        '-s', start,
+        '-e', end,
+        '-w', str(n_workers),
+    ]
 
 
 def evaluate_out_of_sample(
@@ -124,6 +187,61 @@ def get_top_param_sets(
         {'trial_number': t.number, 'value': t.value, 'params': t.params}
         for t in top_trials
     ]
+
+
+def get_top_trials_with_oos(
+    study: optuna.Study,
+    window: tuple[float, float] | None,
+    n_trials: int,
+    oos_repo: OutOfSampleEvaluationRepository,
+) -> list[TrialWithOos]:
+    '''
+    Top ``n_trials`` trials of ``study``, left-joined with OOS scores from ``window``.
+
+    Trials are picked by Optuna direction (max vs min); the OOS join adds a
+    ``delta`` (``oos - is``) and ``verdict`` per row. ``window=None`` returns
+    the top trials with every row marked ``PENDING`` — used by callers that
+    want a preview before an OOS window has been selected.
+
+    :param window: ``(start, end)`` Unix seconds matching one of the rows
+        returned by :meth:`OutOfSampleEvaluationRepository.aggregate_windows`,
+        or ``None``.
+    '''
+    top_trials = get_top_param_sets(study, n_trials)
+
+    if window is None:
+        oos_by_trial: dict[int, float] = {}
+    else:
+        evaluations = oos_repo.get(study.study_name, window[0], window[1])
+        oos_by_trial = {e.trial_number: e.geo_mean_return for e in evaluations}
+
+    return [
+        _to_trial_with_oos(trial, oos_by_trial.get(trial['trial_number']))
+        for trial in top_trials
+    ]
+
+
+def _to_trial_with_oos(trial: dict, oos_score: float | None) -> TrialWithOos:
+    is_value = trial['value']
+    if oos_score is None:
+        delta = None
+        verdict = TrialVerdict.PENDING
+    else:
+        delta = oos_score - is_value
+        verdict = (
+            TrialVerdict.GENERALISES
+            if oos_score >= OOS_OVERFIT_THRESHOLD
+            else TrialVerdict.OVERFIT
+        )
+
+    return TrialWithOos(
+        trial_number=trial['trial_number'],
+        is_value=is_value,
+        oos_score=oos_score,
+        delta=delta,
+        verdict=verdict,
+        params=trial['params']
+    )
 
 
 def build_engine(

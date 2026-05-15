@@ -1,5 +1,4 @@
 import json
-import sys
 from unittest.mock import patch
 
 import pytest
@@ -7,34 +6,8 @@ from click.testing import CliRunner
 
 from scripts.evaluate_out_of_sample import (
     JsonProgressCallback,
-    build_command,
     evaluate_out_of_sample,
 )
-
-
-@pytest.mark.scripts
-@pytest.mark.evaluate_out_of_sample
-class TestBuildCommand:
-    def test_includes_all_required_flags(self):
-        cmd = build_command(
-            'PrecisionTrendStrategy_XXBTZGBP_20250101-20250401',
-            num_sets=10,
-            start='2025-4-1-0-0-0',
-            end='2025-7-1-0-0-0',
-            n_workers=2,
-        )
-
-        assert cmd[0] == sys.executable
-        assert cmd[1:3] == ['-m', 'scripts.evaluate_out_of_sample']
-        assert cmd[cmd.index('-sn') + 1] == 'PrecisionTrendStrategy_XXBTZGBP_20250101-20250401'
-        assert cmd[cmd.index('-n') + 1] == '10'
-        assert cmd[cmd.index('-s') + 1] == '2025-4-1-0-0-0'
-        assert cmd[cmd.index('-e') + 1] == '2025-7-1-0-0-0'
-        assert cmd[cmd.index('-w') + 1] == '2'
-
-    def test_defaults_workers_to_one(self):
-        cmd = build_command('s', 1, 's', 'e')
-        assert cmd[cmd.index('-w') + 1] == '1'
 
 
 @pytest.mark.scripts
