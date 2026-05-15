@@ -5,8 +5,9 @@ Orchestrates the in-sample / out-of-sample subprocesses via
 :func:`core.run_subprocess`, parsing each stdout line through
 :func:`core.parse` into the shared :class:`core.StreamEvent` contract that
 ``scripts/optimise_in_sample.py`` and ``scripts/evaluate_out_of_sample.py``
-emit. Each script exposes its own ``build_command`` colocated with the click
-options.
+emit. argv for each subprocess is built by ``build_in_sample_command`` /
+``build_out_of_sample_command`` colocated with the optimisation entry points
+in :mod:`backtesting_engine`.
 
 The two phases share a single module because they share both the event
 contract and the surrounding lifecycle (``Job`` rows, cancellation, progress
@@ -33,6 +34,8 @@ import optuna
 
 from backtesting_engine import (
     OOS_OVERFIT_THRESHOLD,
+    build_in_sample_command,
+    build_out_of_sample_command,
     get_top_param_sets,
     load_study as _load_study_from_storage
 )
@@ -45,8 +48,6 @@ from data_system import (
     OutOfSampleEvaluation,
     OutOfSampleEvaluationRepository,
 )
-from scripts.evaluate_out_of_sample import build_command as build_out_of_sample_command
-from scripts.optimise_in_sample import build_command as build_in_sample_command
 from ui.models.walk_forward import (
     StudyDirection,
     StudySummary,
