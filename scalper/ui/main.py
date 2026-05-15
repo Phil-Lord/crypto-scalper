@@ -1,6 +1,6 @@
 from nicegui import app, ui
 
-from .pages import backtesting_engine, walk_forward
+from .pages import backtesting, walk_forward
 
 
 def main() -> None:

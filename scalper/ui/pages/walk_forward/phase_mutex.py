@@ -6,7 +6,7 @@ page. The page owns the mutex and the running task; panels read its state to
 decide CTA labels and disabled-ness, but never store their own task.
 
 Generalises the single-flag ``_set_loading`` helper from
-``pages/backtesting_engine.py`` into a two-way mutex with subscriber
+``pages/backtesting.py`` into a two-way mutex with subscriber
 notifications so dependent UI fragments can re-render on phase change.
 '''
 from __future__ import annotations

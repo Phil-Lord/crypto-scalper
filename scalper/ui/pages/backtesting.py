@@ -16,7 +16,7 @@ from ui.services import fetch_trades, get_trades, plot_backtest_results, plot_tr
 from ui.theme import primary_button, sidebar_input, sidebar_select
 
 
-class BacktestingEnginePage:
+class BacktestingPage:
     def __init__(self):
         ui.dark_mode().enable()
         ui.query('.nicegui-content').classes('p-0 gap-0')  # Remove padding/gap from main content
@@ -131,5 +131,5 @@ class BacktestingEnginePage:
 
 
 @ui.page('/')
-def backtesting_engine():
-    BacktestingEnginePage()
+def backtesting():
+    BacktestingPage()
