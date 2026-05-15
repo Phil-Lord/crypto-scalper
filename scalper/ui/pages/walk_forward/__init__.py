@@ -18,8 +18,8 @@ from data_system import (
     SQLAlchemyOutOfSampleEvaluationRepository,
 )
 from ui.components import render_header
-from ui.models.walk_forward import StudyDirection, StudySummary
-from ui.services import list_studies_with_summary, start_in_sample
+from ui.services import list_studies, start_in_sample
+from utils import StudyDirection, StudySummary
 from ui.services.walk_forward import invalidate_study_cache, split_trials
 from ui.theme import primary_button
 
@@ -91,7 +91,7 @@ class WalkForwardPage:
         so the default selection sits at the top of the rail.
         '''
         try:
-            return list(reversed(list_studies_with_summary()))
+            return list(reversed(list_studies()))
         except Exception as e:
             ui.notify(f'Could not list studies: {e}', type='negative')
             return []

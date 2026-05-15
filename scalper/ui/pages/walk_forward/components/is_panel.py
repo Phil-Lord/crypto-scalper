@@ -30,10 +30,9 @@ from nicegui import ui
 
 from data_system import JobRepository
 from ui.components import confirm_dialog
-from ui.models.walk_forward import StudySummary
 from ui.services.walk_forward import split_trials, start_in_sample
 from ui.theme import SectionTitle, primary_button, sidebar_input
-from utils import get_raw_pair
+from utils import get_raw_pair, StudySummary
 
 from ..phase_mutex import PhaseMutex
 from .worker_strip import WorkerStrip

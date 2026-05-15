@@ -8,7 +8,7 @@ from .walk_forward import (
     get_trial_params_bulk,
     invalidate_study_cache,
     list_oos_windows,
-    list_studies_with_summary,
+    list_studies,
     start_in_sample,
     start_out_of_sample
 )
