@@ -24,31 +24,6 @@ load_env()
 logging.basicConfig(level=logging.WARNING, format=LOG_FORMAT, stream=sys.stderr)
 
 
-def build_command(
-    pair: str,
-    strategy_name: str,
-    start: str,
-    end: str,
-    n_trials: int,
-    n_jobs: int = 1,
-) -> list[str]:
-    '''
-    Build the argv to invoke this script as ``python -m scripts.optimise_in_sample``.
-
-    Colocated with the click options so flag changes update one place. Used by
-    ``ui.services.walk_forward`` to spawn worker subprocesses.
-    '''
-    return [
-        sys.executable, '-m', 'scripts.optimise_in_sample',
-        '-p', pair,
-        '-sn', strategy_name,
-        '-s', start,
-        '-e', end,
-        '-n', str(n_trials),
-        '-j', str(n_jobs),
-    ]
-
-
 @click.command()
 @click.option('--pair', '-p', required=True, help='Trading pair (e.g. BTCGBP).')
 @click.option('--strategy_name', '-sn', required=True, help='Strategy name (e.g. SmaStrategy).')
