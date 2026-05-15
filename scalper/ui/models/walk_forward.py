@@ -8,19 +8,6 @@ class StudyDirection(str, Enum):
     MINIMIZE = 'minimize'
 
 
-class TrialVerdict(str, Enum):
-    '''
-    Generalisation verdict for a trial against an OOS window.
-
-    ``PENDING`` — trial has no OOS evaluation in the chosen window yet.
-    ``GENERALISES`` — OOS geo-mean return at or above ``OOS_OVERFIT_THRESHOLD``.
-    ``OVERFIT`` — OOS geo-mean return below ``OOS_OVERFIT_THRESHOLD``.
-    '''
-    PENDING = 'pending'
-    GENERALISES = 'generalises'
-    OVERFIT = 'overfit'
-
-
 @dataclass(frozen=True)
 class StudySummary:
     '''
@@ -45,26 +32,3 @@ class StudySummary:
     trial_count: int
     best_is: float | None
     direction: StudyDirection
-
-
-@dataclass(frozen=True)
-class TrialWithOos:
-    '''
-    Top-trial row joined with its OOS score for the selected window.
-
-    Attributes:
-        trial_number (int): Optuna trial number.
-        is_value (float): In-sample objective value.
-        oos_score (float | None): OOS geo-mean return for the chosen window, or
-            ``None`` if the trial has not been evaluated in that window yet.
-        delta (float | None): ``oos_score - is_value``;
-            ``None`` when ``oos_score`` is ``None``.
-        verdict (TrialVerdict): Pending / generalises / overfit.
-        params (dict): Trial parameter dict (same shape as ``trial.params``).
-    '''
-    trial_number: int
-    is_value: float
-    oos_score: float | None
-    delta: float | None
-    verdict: TrialVerdict
-    params: dict
