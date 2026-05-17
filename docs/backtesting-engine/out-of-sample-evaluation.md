@@ -45,11 +45,13 @@ evaluate_out_of_sample(
 Results are saved to the `out_of_sample_evaluation` table with the following metrics:
 
 - `trial_number`: Link back to the original optimisation trial
-- `geo_mean_return`: Geometric mean of per-window return ratios across the same rolling windows
-  used during optimisation
+- `geo_mean_balance_ratio`: Geometric mean of per-window balance ratios
+  (`final_balance / initial_balance`) across the same rolling windows used during optimisation.
+  `1.0` is break-even, `1.1` is +10%, `0.5` is half capital lost.
 
-The geometric mean return uses the identical window construction (rolling 3-month / 1-month
-step) as in-sample optimisation, so OOS scores are directly comparable to study trial values.
+The geometric mean balance ratio uses the identical window construction (rolling 3-month /
+1-month step) as in-sample optimisation, so OOS scores are directly comparable to study trial
+values.
 
 > **No whole-period balance column.** Earlier versions also stored a `final_balance` from a
 > redundant full-period run. It was dropped — see the

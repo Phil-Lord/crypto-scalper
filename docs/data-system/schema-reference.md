@@ -94,13 +94,13 @@ Historical trade data fetched from Kraken API.
 
 Stores out-of-sample evaluation results for Optuna trials.
 
-| Column            | Type           | Description                                                    |
-| ----------------- | -------------- | -------------------------------------------------------------- |
-| `study_name`      | TEXT (CPK)     | Optuna study name                                              |
-| `trial_number`    | INTEGER (CPK)  | Trial number within the study                                  |
-| `start_timestamp` | FLOAT (CPK)    | Evaluation period start (Unix seconds)                         |
-| `end_timestamp`   | FLOAT (CPK)    | Evaluation period end (Unix seconds)                           |
-| `geo_mean_return` | FLOAT NOT NULL | Geometric mean of per-window return ratios over the OOS period |
+| Column                   | Type           | Description                                                                                                                              |
+| ------------------------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `study_name`             | TEXT (CPK)     | Optuna study name                                                                                                                        |
+| `trial_number`           | INTEGER (CPK)  | Trial number within the study                                                                                                            |
+| `start_timestamp`        | FLOAT (CPK)    | Evaluation period start (Unix seconds)                                                                                                   |
+| `end_timestamp`          | FLOAT (CPK)    | Evaluation period end (Unix seconds)                                                                                                     |
+| `geo_mean_balance_ratio` | FLOAT NOT NULL | Geometric mean of per-window balance ratios (`final_balance / initial_balance`) over the OOS period. `1.0` is break-even, `1.1` is +10%. |
 
 ### `jobs`
 

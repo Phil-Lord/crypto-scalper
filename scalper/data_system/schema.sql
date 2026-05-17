@@ -114,7 +114,7 @@ CREATE TABLE out_of_sample_evaluation (
     trial_number INTEGER NOT NULL,      -- Matches OutOfSampleEvaluation.trial_number
     start_timestamp REAL NOT NULL,      -- Matches OutOfSampleEvaluation.start_timestamp
     end_timestamp REAL NOT NULL,        -- Matches OutOfSampleEvaluation.end_timestamp
-    geo_mean_return REAL NOT NULL,      -- Matches OutOfSampleEvaluation.geo_mean_return
+    geo_mean_balance_ratio REAL NOT NULL,   -- Matches OutOfSampleEvaluation.geo_mean_balance_ratio
 
     PRIMARY KEY (study_name, trial_number, start_timestamp, end_timestamp)
 );

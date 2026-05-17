@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 INITIAL_BALANCE = 1000
 
 '''
-Geometric mean OOS return cutoff: a trial generalises when
-``oos_geo_mean_return >= OOS_OVERFIT_THRESHOLD``, otherwise it is overfit.
+Geometric mean OOS balance-ratio cutoff: a trial generalises when
+``oos_geo_mean_balance_ratio >= OOS_OVERFIT_THRESHOLD``, otherwise it is overfit.
 
 This lives here on the domain layer because robustness is a backtesting concept;
 the walk-forward UI just renders the verdict.
@@ -201,7 +201,7 @@ def get_top_trials_with_oos(
         oos_by_trial: dict[int, float] = {}
     else:
         evaluations = oos_repo.get(study.study_name, window[0], window[1])
-        oos_by_trial = {e.trial_number: e.geo_mean_return for e in evaluations}
+        oos_by_trial = {e.trial_number: e.geo_mean_balance_ratio for e in evaluations}
 
     return [
         _to_trial_with_oos(trial, oos_by_trial.get(trial['trial_number']))
@@ -279,7 +279,7 @@ def evaluate_param_set(
     geometric_mean_ratio = float(geometric_mean / INITIAL_BALANCE)
     return {
         'trial_number': param_set['trial_number'],
-        'geo_mean_return': geometric_mean_ratio,
+        'geo_mean_balance_ratio': geometric_mean_ratio,
     }
 
 
@@ -364,7 +364,7 @@ def save_results(
             trial_number=result['trial_number'],
             start_timestamp=start,
             end_timestamp=end,
-            geo_mean_return=result['geo_mean_return']
+            geo_mean_balance_ratio=result['geo_mean_balance_ratio']
         )
         for result in results
     ]
