@@ -45,13 +45,41 @@ evaluate_out_of_sample(
 Results are saved to the `out_of_sample_evaluation` table with the following metrics:
 
 - `trial_number`: Link back to the original optimisation trial
-- `geo_mean_balance_ratio`: Geometric mean of per-window balance ratios
+- `is_value`: The Optuna objective value for this trial, captured at evaluation time so the
+  verdict is computable without joining back to Optuna storage
+- `oos_balance_ratio`: Geometric mean of per-window balance ratios
   (`final_balance / initial_balance`) across the same rolling windows used during optimisation.
   `1.0` is break-even, `1.1` is +10%, `0.5` is half capital lost.
 
 The geometric mean balance ratio uses the identical window construction (rolling 3-month /
 1-month step) as in-sample optimisation, so OOS scores are directly comparable to study trial
 values.
+
+---
+
+## Verdict Rule
+
+Each trial is classified as **PENDING**, **GENERALISES**, or **OVERFIT** against an OOS window
+using a combined floor + drawdown rule:
+
+```
+overfit  ⇔  oos < OOS_FLOOR  OR  (is_value - oos) > OOS_DRAWDOWN_LIMIT
+```
+
+- **`OOS_FLOOR`** (default `1.0`) — absolute minimum OOS balance ratio. Catches trials that
+  simply failed to make money out-of-sample.
+- **`OOS_DRAWDOWN_LIMIT`** (default `0.5`) — maximum IS→OOS gap. Catches trials that looked
+  great in-sample but didn't transfer (e.g. `3.0 IS / 1.1 OOS` passes the floor but fails the
+  drawdown).
+
+Both thresholds live in `backtesting_engine.out_of_sample_evaluation`. The classification is
+implemented in `classify_verdict(is_value, oos_score)` and is re-applied identically in both
+Python (UI `TrialWithOos` rows) and SQL (`aggregate_windows` per-window counts).
+
+> **IS and OOS aren't strictly symmetric.** IS applies a logistic activity penalty (range
+> `[0, 1]`) that OOS doesn't, so `is_value` is slightly suppressed for under-trading strategies
+> while `oos` is not. The drawdown side of the verdict therefore biases conservative — it
+> under-flags rather than over-flags. The floor side is unaffected.
 
 > **No whole-period balance column.** Earlier versions also stored a `final_balance` from a
 > redundant full-period run. It was dropped — see the
