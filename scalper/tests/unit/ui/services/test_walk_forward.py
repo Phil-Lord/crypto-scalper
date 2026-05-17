@@ -203,7 +203,7 @@ class TestListOosWindows:
 
         assert result == aggregates
         repo.aggregate_windows.assert_called_once_with(
-            'study-x', svc.OOS_OVERFIT_THRESHOLD
+            'study-x', svc.OOS_FLOOR, svc.OOS_DRAWDOWN_LIMIT
         )
 
     def test_returns_empty_when_repo_returns_no_rows(self):

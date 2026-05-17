@@ -7,12 +7,14 @@ import pytest
 
 from backtesting_engine.out_of_sample_evaluation import (
     INITIAL_BALANCE,
-    OOS_OVERFIT_THRESHOLD,
+    OOS_DRAWDOWN_LIMIT,
+    OOS_FLOOR,
     TrialVerdict,
     TrialWithOos,
     _evaluate_chunk_worker,
     build_out_of_sample_command,
     chunk_param_sets,
+    classify_verdict,
     evaluate_out_of_sample,
     get_top_param_sets,
     get_top_trials_with_oos,
@@ -227,8 +229,9 @@ class TestRunEvaluation:
 
         # Then
         assert len(results) == 1
-        assert set(results[0].keys()) == {'trial_number', 'geo_mean_balance_ratio'}
+        assert set(results[0].keys()) == {'trial_number', 'is_value', 'oos_balance_ratio'}
         assert results[0]['trial_number'] == 0
+        assert results[0]['is_value'] == 1.5
 
     def test_calculates_geometric_mean_correctly(self, mocker, mock_engine, sample_param_sets):
         # Given
@@ -245,7 +248,7 @@ class TestRunEvaluation:
         # Then
         expected_geo_mean = (1200.0 * 1050.0) ** 0.5
         expected_ratio = expected_geo_mean / INITIAL_BALANCE
-        assert results[0]['geo_mean_balance_ratio'] == pytest.approx(expected_ratio)
+        assert results[0]['oos_balance_ratio'] == pytest.approx(expected_ratio)
 
     def test_resets_strategy_between_windows(self, mocker, mock_engine, sample_param_sets):
         # Given
@@ -305,7 +308,7 @@ class TestSaveResults:
     def test_calls_repository_add_once(self, mocker):
         # Given
         repository = mocker.Mock()
-        results = [{'trial_number': 0, 'geo_mean_balance_ratio': 1.05}]
+        results = [{'trial_number': 0, 'is_value': 1.5, 'oos_balance_ratio': 1.05}]
 
         # When
         save_results(repository, results, 'TestStudy', 1609459200.0, 1617235200.0)
@@ -317,8 +320,8 @@ class TestSaveResults:
         # Given
         repository = mocker.Mock()
         results = [
-            {'trial_number': 0, 'geo_mean_balance_ratio': 1.05},
-            {'trial_number': 1, 'geo_mean_balance_ratio': 0.97},
+            {'trial_number': 0, 'is_value': 1.5, 'oos_balance_ratio': 1.05},
+            {'trial_number': 1, 'is_value': 1.2, 'oos_balance_ratio': 0.97},
         ]
 
         # When
@@ -331,7 +334,7 @@ class TestSaveResults:
     def test_evaluation_fields_are_correct(self, mocker):
         # Given
         repository = mocker.Mock()
-        results = [{'trial_number': 7, 'geo_mean_balance_ratio': 1.1}]
+        results = [{'trial_number': 7, 'is_value': 1.4, 'oos_balance_ratio': 1.1}]
         study_name = 'TestStudy_XXBTZGBP_20210101-20210401'
         start = 1609459200.0
         end = 1617235200.0
@@ -347,14 +350,15 @@ class TestSaveResults:
         assert ev.trial_number == 7
         assert ev.start_timestamp == start
         assert ev.end_timestamp == end
-        assert ev.geo_mean_balance_ratio == pytest.approx(1.1)
+        assert ev.is_value == pytest.approx(1.4)
+        assert ev.oos_balance_ratio == pytest.approx(1.1)
 
     def test_all_evaluations_share_study_name_and_period(self, mocker):
         # Given
         repository = mocker.Mock()
         results = [
-            {'trial_number': 0, 'geo_mean_balance_ratio': 1.05},
-            {'trial_number': 1, 'geo_mean_balance_ratio': 0.97},
+            {'trial_number': 0, 'is_value': 1.5, 'oos_balance_ratio': 1.05},
+            {'trial_number': 1, 'is_value': 1.2, 'oos_balance_ratio': 0.97},
         ]
         study_name = 'SharedStudy'
         start = 1609459200.0
@@ -464,9 +468,9 @@ class TestRunEvaluationParallel:
         executor = mocker.MagicMock()
         executor.__enter__.return_value = executor
         worker_outputs = [
-            [{'trial_number': 0, 'geo_mean_balance_ratio': 1.05}],
-            [{'trial_number': 1, 'geo_mean_balance_ratio': 0.97}],
-            [{'trial_number': 2, 'geo_mean_balance_ratio': 1.10}],
+            [{'trial_number': 0, 'oos_balance_ratio': 1.05}],
+            [{'trial_number': 1, 'oos_balance_ratio': 0.97}],
+            [{'trial_number': 2, 'oos_balance_ratio': 1.10}],
         ]
         futures = []
         for output in worker_outputs:
@@ -708,9 +712,9 @@ class TestProgressCallbackInvocation:
         executor = mocker.MagicMock()
         executor.__enter__.return_value = executor
         worker_outputs = [
-            [{'trial_number': 0, 'geo_mean_balance_ratio': 1.05},
-             {'trial_number': 1, 'geo_mean_balance_ratio': 0.95}],
-            [{'trial_number': 2, 'geo_mean_balance_ratio': 1.10}],
+            [{'trial_number': 0, 'oos_balance_ratio': 1.05},
+             {'trial_number': 1, 'oos_balance_ratio': 0.95}],
+            [{'trial_number': 2, 'oos_balance_ratio': 1.10}],
         ]
         futures = []
         for output in worker_outputs:
@@ -771,8 +775,8 @@ class TestSerialParallelParity:
         )
 
         # Then
-        serial_by_trial = {r['trial_number']: r['geo_mean_balance_ratio'] for r in serial_results}
-        worker_by_trial = {r['trial_number']: r['geo_mean_balance_ratio'] for r in worker_results}
+        serial_by_trial = {r['trial_number']: r['oos_balance_ratio'] for r in serial_results}
+        worker_by_trial = {r['trial_number']: r['oos_balance_ratio'] for r in worker_results}
         assert serial_by_trial == worker_by_trial
 
 
@@ -836,11 +840,59 @@ class TestTrialWithOos:
         assert trial.params == {}
 
 
-def _make_oos_eval(trial_number: int, geo_mean_balance_ratio: float):
+def _make_oos_eval(trial_number: int, oos_balance_ratio: float):
     eval_obj = MagicMock()
     eval_obj.trial_number = trial_number
-    eval_obj.geo_mean_balance_ratio = geo_mean_balance_ratio
+    eval_obj.oos_balance_ratio = oos_balance_ratio
     return eval_obj
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.out_of_sample_evaluation
+class TestClassifyVerdict:
+    def test_returns_pending_when_oos_is_none(self):
+        assert classify_verdict(is_value=1.5, oos_score=None) == TrialVerdict.PENDING
+
+    def test_passes_both_floor_and_drawdown(self):
+        # OOS at floor + small drawdown -> generalises
+        assert classify_verdict(is_value=1.2, oos_score=1.1) == TrialVerdict.GENERALISES
+
+    def test_fails_floor_only(self):
+        # Drawdown is fine (0.15 <= 0.5) but oos below the 1.0 floor.
+        assert classify_verdict(is_value=1.05, oos_score=0.9) == TrialVerdict.OVERFIT
+
+    def test_fails_drawdown_only(self):
+        # OOS above floor (1.1 >= 1.0) but is - oos = 0.9 > 0.5 drawdown limit.
+        assert classify_verdict(is_value=2.0, oos_score=1.1) == TrialVerdict.OVERFIT
+
+    def test_fails_both(self):
+        assert classify_verdict(is_value=1.5, oos_score=0.4) == TrialVerdict.OVERFIT
+
+    def test_oos_exactly_at_floor_generalises(self):
+        # Floor check is >=, so an exactly-at value passes.
+        assert classify_verdict(is_value=OOS_FLOOR, oos_score=OOS_FLOOR) == TrialVerdict.GENERALISES
+
+    def test_oos_just_below_floor_overfits(self):
+        assert (
+            classify_verdict(is_value=OOS_FLOOR, oos_score=OOS_FLOOR - 1e-9)
+            == TrialVerdict.OVERFIT
+        )
+
+    def test_drawdown_exactly_at_limit_generalises(self):
+        # Drawdown check is <=, so an exactly-at delta passes.
+        assert (
+            classify_verdict(is_value=OOS_FLOOR + OOS_DRAWDOWN_LIMIT, oos_score=OOS_FLOOR)
+            == TrialVerdict.GENERALISES
+        )
+
+    def test_drawdown_just_above_limit_overfits(self):
+        assert (
+            classify_verdict(
+                is_value=OOS_FLOOR + OOS_DRAWDOWN_LIMIT + 1e-9,
+                oos_score=OOS_FLOOR,
+            )
+            == TrialVerdict.OVERFIT
+        )
 
 
 @pytest.mark.backtesting_engine
@@ -851,15 +903,15 @@ class TestGetTopTrialsWithOos:
         mocker.patch(
             'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
             return_value=[
-                {'trial_number': 1, 'value': 1.5, 'params': {'a': 1}},
-                {'trial_number': 2, 'value': 1.2, 'params': {'a': 2}},
+                {'trial_number': 1, 'value': 1.2, 'params': {'a': 1}},
+                {'trial_number': 2, 'value': 1.5, 'params': {'a': 2}},
                 {'trial_number': 3, 'value': 0.8, 'params': {'a': 3}},
             ],
         )
         repo = MagicMock()
         repo.get.return_value = [
-            _make_oos_eval(trial_number=1, geo_mean_balance_ratio=0.9),
-            _make_oos_eval(trial_number=2, geo_mean_balance_ratio=0.3),
+            _make_oos_eval(trial_number=1, oos_balance_ratio=1.1),  # passes both
+            _make_oos_eval(trial_number=2, oos_balance_ratio=0.3),  # fails floor
             # trial 3 has no OOS row -> pending
         ]
 
@@ -867,13 +919,13 @@ class TestGetTopTrialsWithOos:
 
         assert result == [
             TrialWithOos(
-                trial_number=1, is_value=1.5, oos_score=0.9,
-                delta=pytest.approx(-0.6), verdict=TrialVerdict.GENERALISES,
+                trial_number=1, is_value=1.2, oos_score=1.1,
+                delta=pytest.approx(-0.1), verdict=TrialVerdict.GENERALISES,
                 params={'a': 1},
             ),
             TrialWithOos(
-                trial_number=2, is_value=1.2, oos_score=0.3,
-                delta=pytest.approx(-0.9), verdict=TrialVerdict.OVERFIT,
+                trial_number=2, is_value=1.5, oos_score=0.3,
+                delta=pytest.approx(-1.2), verdict=TrialVerdict.OVERFIT,
                 params={'a': 2},
             ),
             TrialWithOos(
@@ -882,21 +934,6 @@ class TestGetTopTrialsWithOos:
             ),
         ]
         repo.get.assert_called_once_with('study-x', 10.0, 20.0)
-
-    def test_oos_exactly_at_threshold_generalises(self, mocker):
-        study = MagicMock(study_name='s')
-        mocker.patch(
-            'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
-            return_value=[{'trial_number': 1, 'value': 1.0, 'params': {}}],
-        )
-        repo = MagicMock()
-        repo.get.return_value = [
-            _make_oos_eval(trial_number=1, geo_mean_balance_ratio=OOS_OVERFIT_THRESHOLD),
-        ]
-
-        result = get_top_trials_with_oos(study, (0.0, 1.0), n_trials=1, oos_repo=repo)
-
-        assert result[0].verdict == TrialVerdict.GENERALISES
 
     def test_window_none_marks_all_pending_and_skips_repo(self, mocker):
         study = MagicMock(study_name='s')
@@ -944,28 +981,6 @@ class TestGetTopTrialsWithOos:
 
         assert result == []
 
-    def test_oos_just_below_threshold_marks_as_overfit(self, mocker):
-        '''
-        Pin the strict-greater-or-equal contract on ``OOS_OVERFIT_THRESHOLD``:
-        a trial just under the threshold must be classed as overfit.
-        '''
-        study = MagicMock(study_name='s')
-        mocker.patch(
-            'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
-            return_value=[{'trial_number': 1, 'value': 1.0, 'params': {}}],
-        )
-        repo = MagicMock()
-        repo.get.return_value = [
-            _make_oos_eval(
-                trial_number=1,
-                geo_mean_balance_ratio=OOS_OVERFIT_THRESHOLD - 1e-9,
-            ),
-        ]
-
-        result = get_top_trials_with_oos(study, (0.0, 1.0), n_trials=1, oos_repo=repo)
-
-        assert result[0].verdict == TrialVerdict.OVERFIT
-
     def test_oos_for_trial_outside_top_n_is_ignored(self, mocker):
         '''
         OOS rows for trials that aren't in the top-N selection are silently
@@ -978,8 +993,8 @@ class TestGetTopTrialsWithOos:
         )
         repo = MagicMock()
         repo.get.return_value = [
-            _make_oos_eval(trial_number=1, geo_mean_balance_ratio=0.9),
-            _make_oos_eval(trial_number=99, geo_mean_balance_ratio=0.95),
+            _make_oos_eval(trial_number=1, oos_balance_ratio=0.9),
+            _make_oos_eval(trial_number=99, oos_balance_ratio=0.95),
         ]
 
         result = get_top_trials_with_oos(study, (0.0, 1.0), n_trials=1, oos_repo=repo)
