@@ -31,7 +31,8 @@ from pathlib import Path
 import optuna
 
 from backtesting_engine import (
-    OOS_OVERFIT_THRESHOLD,
+    OOS_DRAWDOWN_LIMIT,
+    OOS_FLOOR,
     build_in_sample_command,
     build_out_of_sample_command,
     get_top_param_sets,
@@ -173,13 +174,13 @@ def list_oos_windows(
 ) -> list[OosWindowAggregate]:
     '''
     Aggregate the OOS evaluation table by ``(start_timestamp, end_timestamp)``
-    for a single study, applying ``OOS_OVERFIT_THRESHOLD`` to split each
-    window's trials into generalised vs overfit counts.
+    for a single study, applying ``OOS_FLOOR`` and ``OOS_DRAWDOWN_LIMIT`` to
+    split each window's trials into generalised vs overfit counts.
 
     :return: One aggregate per evaluated window, ordered by start timestamp.
         Empty if the study has no OOS evaluations yet.
     '''
-    return oos_repo.aggregate_windows(study_name, OOS_OVERFIT_THRESHOLD)
+    return oos_repo.aggregate_windows(study_name, OOS_FLOOR, OOS_DRAWDOWN_LIMIT)
 
 
 def get_top_trials(study_name: str, n: int) -> list[dict]:
