@@ -37,7 +37,7 @@ class TestSQLAlchemyOutOfSampleEvaluationRepository:
             trial_number=1,
             start_timestamp=1704067200.0,
             end_timestamp=1704153600.0,
-            geo_mean_return=1.0025
+            geo_mean_balance_ratio=1.0025
         )
 
     def test_add_with_empty_list_does_nothing(self, mocker):
@@ -83,7 +83,7 @@ class TestSQLAlchemyOutOfSampleEvaluationRepository:
                 trial_number=i,
                 start_timestamp=1704067200.0,
                 end_timestamp=1704153600.0,
-                geo_mean_return=1.0025 + i * 0.001
+                geo_mean_balance_ratio=1.0025 + i * 0.001
             )
             for i in range(3)
         ]

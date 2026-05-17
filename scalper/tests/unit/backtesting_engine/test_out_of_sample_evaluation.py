@@ -227,7 +227,7 @@ class TestRunEvaluation:
 
         # Then
         assert len(results) == 1
-        assert set(results[0].keys()) == {'trial_number', 'geo_mean_return'}
+        assert set(results[0].keys()) == {'trial_number', 'geo_mean_balance_ratio'}
         assert results[0]['trial_number'] == 0
 
     def test_calculates_geometric_mean_correctly(self, mocker, mock_engine, sample_param_sets):
@@ -245,7 +245,7 @@ class TestRunEvaluation:
         # Then
         expected_geo_mean = (1200.0 * 1050.0) ** 0.5
         expected_ratio = expected_geo_mean / INITIAL_BALANCE
-        assert results[0]['geo_mean_return'] == pytest.approx(expected_ratio)
+        assert results[0]['geo_mean_balance_ratio'] == pytest.approx(expected_ratio)
 
     def test_resets_strategy_between_windows(self, mocker, mock_engine, sample_param_sets):
         # Given
@@ -305,7 +305,7 @@ class TestSaveResults:
     def test_calls_repository_add_once(self, mocker):
         # Given
         repository = mocker.Mock()
-        results = [{'trial_number': 0, 'geo_mean_return': 1.05}]
+        results = [{'trial_number': 0, 'geo_mean_balance_ratio': 1.05}]
 
         # When
         save_results(repository, results, 'TestStudy', 1609459200.0, 1617235200.0)
@@ -317,8 +317,8 @@ class TestSaveResults:
         # Given
         repository = mocker.Mock()
         results = [
-            {'trial_number': 0, 'geo_mean_return': 1.05},
-            {'trial_number': 1, 'geo_mean_return': 0.97},
+            {'trial_number': 0, 'geo_mean_balance_ratio': 1.05},
+            {'trial_number': 1, 'geo_mean_balance_ratio': 0.97},
         ]
 
         # When
@@ -331,7 +331,7 @@ class TestSaveResults:
     def test_evaluation_fields_are_correct(self, mocker):
         # Given
         repository = mocker.Mock()
-        results = [{'trial_number': 7, 'geo_mean_return': 1.1}]
+        results = [{'trial_number': 7, 'geo_mean_balance_ratio': 1.1}]
         study_name = 'TestStudy_XXBTZGBP_20210101-20210401'
         start = 1609459200.0
         end = 1617235200.0
@@ -347,14 +347,14 @@ class TestSaveResults:
         assert ev.trial_number == 7
         assert ev.start_timestamp == start
         assert ev.end_timestamp == end
-        assert ev.geo_mean_return == pytest.approx(1.1)
+        assert ev.geo_mean_balance_ratio == pytest.approx(1.1)
 
     def test_all_evaluations_share_study_name_and_period(self, mocker):
         # Given
         repository = mocker.Mock()
         results = [
-            {'trial_number': 0, 'geo_mean_return': 1.05},
-            {'trial_number': 1, 'geo_mean_return': 0.97},
+            {'trial_number': 0, 'geo_mean_balance_ratio': 1.05},
+            {'trial_number': 1, 'geo_mean_balance_ratio': 0.97},
         ]
         study_name = 'SharedStudy'
         start = 1609459200.0
@@ -464,9 +464,9 @@ class TestRunEvaluationParallel:
         executor = mocker.MagicMock()
         executor.__enter__.return_value = executor
         worker_outputs = [
-            [{'trial_number': 0, 'geo_mean_return': 1.05}],
-            [{'trial_number': 1, 'geo_mean_return': 0.97}],
-            [{'trial_number': 2, 'geo_mean_return': 1.10}],
+            [{'trial_number': 0, 'geo_mean_balance_ratio': 1.05}],
+            [{'trial_number': 1, 'geo_mean_balance_ratio': 0.97}],
+            [{'trial_number': 2, 'geo_mean_balance_ratio': 1.10}],
         ]
         futures = []
         for output in worker_outputs:
@@ -708,9 +708,9 @@ class TestProgressCallbackInvocation:
         executor = mocker.MagicMock()
         executor.__enter__.return_value = executor
         worker_outputs = [
-            [{'trial_number': 0, 'geo_mean_return': 1.05},
-             {'trial_number': 1, 'geo_mean_return': 0.95}],
-            [{'trial_number': 2, 'geo_mean_return': 1.10}],
+            [{'trial_number': 0, 'geo_mean_balance_ratio': 1.05},
+             {'trial_number': 1, 'geo_mean_balance_ratio': 0.95}],
+            [{'trial_number': 2, 'geo_mean_balance_ratio': 1.10}],
         ]
         futures = []
         for output in worker_outputs:
@@ -771,8 +771,8 @@ class TestSerialParallelParity:
         )
 
         # Then
-        serial_by_trial = {r['trial_number']: r['geo_mean_return'] for r in serial_results}
-        worker_by_trial = {r['trial_number']: r['geo_mean_return'] for r in worker_results}
+        serial_by_trial = {r['trial_number']: r['geo_mean_balance_ratio'] for r in serial_results}
+        worker_by_trial = {r['trial_number']: r['geo_mean_balance_ratio'] for r in worker_results}
         assert serial_by_trial == worker_by_trial
 
 
@@ -836,10 +836,10 @@ class TestTrialWithOos:
         assert trial.params == {}
 
 
-def _make_oos_eval(trial_number: int, geo_mean_return: float):
+def _make_oos_eval(trial_number: int, geo_mean_balance_ratio: float):
     eval_obj = MagicMock()
     eval_obj.trial_number = trial_number
-    eval_obj.geo_mean_return = geo_mean_return
+    eval_obj.geo_mean_balance_ratio = geo_mean_balance_ratio
     return eval_obj
 
 
@@ -858,8 +858,8 @@ class TestGetTopTrialsWithOos:
         )
         repo = MagicMock()
         repo.get.return_value = [
-            _make_oos_eval(trial_number=1, geo_mean_return=0.9),
-            _make_oos_eval(trial_number=2, geo_mean_return=0.3),
+            _make_oos_eval(trial_number=1, geo_mean_balance_ratio=0.9),
+            _make_oos_eval(trial_number=2, geo_mean_balance_ratio=0.3),
             # trial 3 has no OOS row -> pending
         ]
 
@@ -891,7 +891,7 @@ class TestGetTopTrialsWithOos:
         )
         repo = MagicMock()
         repo.get.return_value = [
-            _make_oos_eval(trial_number=1, geo_mean_return=OOS_OVERFIT_THRESHOLD),
+            _make_oos_eval(trial_number=1, geo_mean_balance_ratio=OOS_OVERFIT_THRESHOLD),
         ]
 
         result = get_top_trials_with_oos(study, (0.0, 1.0), n_trials=1, oos_repo=repo)
@@ -958,7 +958,7 @@ class TestGetTopTrialsWithOos:
         repo.get.return_value = [
             _make_oos_eval(
                 trial_number=1,
-                geo_mean_return=OOS_OVERFIT_THRESHOLD - 1e-9,
+                geo_mean_balance_ratio=OOS_OVERFIT_THRESHOLD - 1e-9,
             ),
         ]
 
@@ -978,8 +978,8 @@ class TestGetTopTrialsWithOos:
         )
         repo = MagicMock()
         repo.get.return_value = [
-            _make_oos_eval(trial_number=1, geo_mean_return=0.9),
-            _make_oos_eval(trial_number=99, geo_mean_return=0.95),
+            _make_oos_eval(trial_number=1, geo_mean_balance_ratio=0.9),
+            _make_oos_eval(trial_number=99, geo_mean_balance_ratio=0.95),
         ]
 
         result = get_top_trials_with_oos(study, (0.0, 1.0), n_trials=1, oos_repo=repo)

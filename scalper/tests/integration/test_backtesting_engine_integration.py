@@ -463,11 +463,11 @@ class TestBacktestingEngineIntegration:
         # Then
         assert len(results) == 1
         assert 'trial_number' in results[0]
-        assert 'geo_mean_return' in results[0]
+        assert 'geo_mean_balance_ratio' in results[0]
 
         assert results[0]['trial_number'] == 1
-        assert isinstance(results[0]['geo_mean_return'], float)
-        assert results[0]['geo_mean_return'] > 0
+        assert isinstance(results[0]['geo_mean_balance_ratio'], float)
+        assert results[0]['geo_mean_balance_ratio'] > 0
 
     def test_save_results_transforms_to_domain_objects(self):
         '''
@@ -492,7 +492,7 @@ class TestBacktestingEngineIntegration:
                 results = [
                     {
                         'trial_number': 1,
-                        'geo_mean_return': 1.05
+                        'geo_mean_balance_ratio': 1.05
                     }
                 ]
 
@@ -519,7 +519,7 @@ class TestBacktestingEngineIntegration:
         assert len(records) == 1
         assert records[0]['study_name'] == 'SmaStrategy_XXBTZGBP_20240101-20240701'
         assert records[0]['trial_number'] == 1
-        assert records[0]['geo_mean_return'] == 1.05
+        assert records[0]['geo_mean_balance_ratio'] == 1.05
 
         mock_session.commit.assert_called_once()
         mock_session.close.assert_called_once()
