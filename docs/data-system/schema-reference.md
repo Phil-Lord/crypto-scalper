@@ -94,13 +94,14 @@ Historical trade data fetched from Kraken API.
 
 Stores out-of-sample evaluation results for Optuna trials.
 
-| Column                   | Type           | Description                                                                                                                              |
-| ------------------------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `study_name`             | TEXT (CPK)     | Optuna study name                                                                                                                        |
-| `trial_number`           | INTEGER (CPK)  | Trial number within the study                                                                                                            |
-| `start_timestamp`        | FLOAT (CPK)    | Evaluation period start (Unix seconds)                                                                                                   |
-| `end_timestamp`          | FLOAT (CPK)    | Evaluation period end (Unix seconds)                                                                                                     |
-| `geo_mean_balance_ratio` | FLOAT NOT NULL | Geometric mean of per-window balance ratios (`final_balance / initial_balance`) over the OOS period. `1.0` is break-even, `1.1` is +10%. |
+| Column              | Type           | Description                                                                                                                                                                |
+| ------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `study_name`        | TEXT (CPK)     | Optuna study name                                                                                                                                                          |
+| `trial_number`      | INTEGER (CPK)  | Trial number within the study                                                                                                                                              |
+| `start_timestamp`   | FLOAT (CPK)    | Evaluation period start (Unix seconds)                                                                                                                                     |
+| `end_timestamp`     | FLOAT (CPK)    | Evaluation period end (Unix seconds)                                                                                                                                       |
+| `is_value`          | FLOAT NOT NULL | Optuna objective value for this trial, captured at evaluation time. Stored alongside the OOS result so the verdict can be computed without joining back to Optuna storage. |
+| `oos_balance_ratio` | FLOAT NOT NULL | Geometric mean of per-window balance ratios (`final_balance / initial_balance`) over the OOS period. `1.0` is break-even, `1.1` is +10%.                                   |
 
 ### `jobs`
 
