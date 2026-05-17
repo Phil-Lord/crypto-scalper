@@ -71,16 +71,22 @@ class SQLAlchemyOutOfSampleEvaluationRepository(OutOfSampleEvaluationRepository)
             ]
 
     def aggregate_windows(
-        self, study_name: str, generalisation_threshold: float
+        self, study_name: str, floor: float, drawdown_limit: float
     ) -> list[OosWindowAggregate]:
         with self.client.session() as session:
             query = text("""
                 SELECT
                     start_timestamp,
                     end_timestamp,
-                    MAX(geo_mean_balance_ratio) AS best_oos,
-                    SUM(CASE WHEN geo_mean_balance_ratio >= :threshold THEN 1 ELSE 0 END) AS generalised,
-                    SUM(CASE WHEN geo_mean_balance_ratio < :threshold THEN 1 ELSE 0 END) AS overfit
+                    MAX(oos_balance_ratio) AS best_oos,
+                    SUM(CASE
+                        WHEN oos_balance_ratio >= :floor
+                         AND (is_value - oos_balance_ratio) <= :drawdown_limit
+                        THEN 1 ELSE 0 END) AS generalised,
+                    SUM(CASE
+                        WHEN oos_balance_ratio < :floor
+                          OR (is_value - oos_balance_ratio) > :drawdown_limit
+                        THEN 1 ELSE 0 END) AS overfit
                 FROM out_of_sample_evaluation
                 WHERE study_name = :study_name
                 GROUP BY start_timestamp, end_timestamp
@@ -88,7 +94,8 @@ class SQLAlchemyOutOfSampleEvaluationRepository(OutOfSampleEvaluationRepository)
             """)
             rows = session.execute(query, {
                 'study_name': study_name,
-                'threshold': generalisation_threshold,
+                'floor': floor,
+                'drawdown_limit': drawdown_limit,
             }).fetchall()
             return [
                 OosWindowAggregate(
