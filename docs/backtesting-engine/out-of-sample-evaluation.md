@@ -78,8 +78,9 @@ Python (UI `TrialWithOos` rows) and SQL (`aggregate_windows` per-window counts).
 
 > **IS and OOS aren't strictly symmetric.** IS applies a logistic activity penalty (range
 > `[0, 1]`) that OOS doesn't, so `is_value` is slightly suppressed for under-trading strategies
-> while `oos` is not. The drawdown side of the verdict therefore biases conservative — it
-> under-flags rather than over-flags. The floor side is unaffected.
+> while `oos` is not. This shrinks the `is - oos` gap, so the drawdown side **under-flags**
+> overfitting — i.e. it biases toward `GENERALISES` and may let some brittle strategies
+> through. The floor side is unaffected.
 
 > **No whole-period balance column.** Earlier versions also stored a `final_balance` from a
 > redundant full-period run. It was dropped — see the
