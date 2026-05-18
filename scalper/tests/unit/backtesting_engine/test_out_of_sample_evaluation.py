@@ -468,9 +468,9 @@ class TestRunEvaluationParallel:
         executor = mocker.MagicMock()
         executor.__enter__.return_value = executor
         worker_outputs = [
-            [{'trial_number': 0, 'oos_balance_ratio': 1.05}],
-            [{'trial_number': 1, 'oos_balance_ratio': 0.97}],
-            [{'trial_number': 2, 'oos_balance_ratio': 1.10}],
+            [{'trial_number': 0, 'is_value': 1.5, 'oos_balance_ratio': 1.05}],
+            [{'trial_number': 1, 'is_value': 1.2, 'oos_balance_ratio': 0.97}],
+            [{'trial_number': 2, 'is_value': 1.4, 'oos_balance_ratio': 1.10}],
         ]
         futures = []
         for output in worker_outputs:
@@ -712,9 +712,9 @@ class TestProgressCallbackInvocation:
         executor = mocker.MagicMock()
         executor.__enter__.return_value = executor
         worker_outputs = [
-            [{'trial_number': 0, 'oos_balance_ratio': 1.05},
-             {'trial_number': 1, 'oos_balance_ratio': 0.95}],
-            [{'trial_number': 2, 'oos_balance_ratio': 1.10}],
+            [{'trial_number': 0, 'is_value': 1.5, 'oos_balance_ratio': 1.05},
+             {'trial_number': 1, 'is_value': 1.2, 'oos_balance_ratio': 0.95}],
+            [{'trial_number': 2, 'is_value': 1.4, 'oos_balance_ratio': 1.10}],
         ]
         futures = []
         for output in worker_outputs:
