@@ -39,18 +39,21 @@ class OutOfSampleEvaluationRepository(ABC):
 
     @abstractmethod
     def aggregate_windows(
-        self, study_name: str, generalisation_threshold: float
+        self, study_name: str, floor: float, drawdown_limit: float
     ) -> list[OosWindowAggregate]:
         '''
         Aggregates evaluation rows for a study by ``(start_timestamp, end_timestamp)``.
 
-        For each window, returns the best geo-mean return alongside counts of
-        trials whose geo-mean return is at or above the supplied threshold
-        (``generalised_count``) and below it (``overfit_count``).
+        For each window, returns the best OOS balance ratio alongside counts of
+        trials that generalised vs overfit. A trial overfits when its OOS
+        balance ratio is below ``floor`` OR when ``is_value - oos > drawdown_limit``.
 
         :param study_name: Name of the Optuna study.
-        :param generalisation_threshold: Geo-mean return at or above which a
-            trial is considered to have generalised.
+        :param floor: Minimum OOS balance ratio a trial must reach to be
+            considered generalising (e.g. ``1.0`` = must end at or above
+            starting capital).
+        :param drawdown_limit: Maximum allowed gap ``is_value - oos``. Caps how
+            much performance is permitted to "drop" between IS and OOS.
         :return: One aggregate per evaluated window, ordered by start timestamp.
             Empty if the study has no OOS evaluations yet.
         '''

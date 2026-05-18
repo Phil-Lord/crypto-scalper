@@ -28,13 +28,22 @@ logger = logging.getLogger(__name__)
 INITIAL_BALANCE = 1000
 
 '''
-Geometric mean OOS return cutoff: a trial generalises when
-``oos_geo_mean_return >= OOS_OVERFIT_THRESHOLD``, otherwise it is overfit.
+OOS verdict thresholds. A trial is overfit when either:
 
-This lives here on the domain layer because robustness is a backtesting concept;
+- its OOS balance ratio is below ``OOS_FLOOR`` (absolute failure — ended the
+  OOS period with less than the floor's worth of starting capital), or
+- the gap between its IS value and OOS balance ratio exceeds
+  ``OOS_DRAWDOWN_LIMIT`` (relative failure — performance didn't transfer).
+
+Both numbers are in balance-ratio units (``1.0`` = break-even).
+IS and OOS are not strictly symmetric — IS applies a logistic activity penalty
+that OOS doesn't, so the drawdown side biases conservative.
+
+These live on the domain layer because robustness is a backtesting concept;
 the walk-forward UI just renders the verdict.
 '''
-OOS_OVERFIT_THRESHOLD = 0.5
+OOS_FLOOR = 1.0
+OOS_DRAWDOWN_LIMIT = 0.5
 
 
 class TrialVerdict(str, Enum):
@@ -42,12 +51,29 @@ class TrialVerdict(str, Enum):
     Generalisation verdict for a trial against an OOS window.
 
     ``PENDING`` — trial has no OOS evaluation in the chosen window yet.
-    ``GENERALISES`` — OOS geo-mean return at or above ``OOS_OVERFIT_THRESHOLD``.
-    ``OVERFIT`` — OOS geo-mean return below ``OOS_OVERFIT_THRESHOLD``.
+    ``GENERALISES`` — passes both the OOS floor and the IS→OOS drawdown limit.
+    ``OVERFIT`` — fails either check (see :func:`classify_verdict`).
     '''
     PENDING = 'pending'
     GENERALISES = 'generalises'
     OVERFIT = 'overfit'
+
+
+def classify_verdict(is_value: float, oos_score: float | None) -> TrialVerdict:
+    '''
+    Apply the OOS verdict rule to a single (IS, OOS) pair.
+
+    :param is_value: In-sample objective value (balance-ratio units, with activity penalty).
+    :param oos_score: OOS geometric-mean balance ratio, or ``None`` if the trial
+        has not been evaluated in the relevant window.
+    :return: ``PENDING`` when ``oos_score`` is ``None``, otherwise ``OVERFIT``
+        if either the floor or drawdown check fails, ``GENERALISES`` otherwise.
+    '''
+    if oos_score is None:
+        return TrialVerdict.PENDING
+    if oos_score < OOS_FLOOR or (is_value - oos_score) > OOS_DRAWDOWN_LIMIT:
+        return TrialVerdict.OVERFIT
+    return TrialVerdict.GENERALISES
 
 
 @dataclass(frozen=True)
@@ -201,7 +227,7 @@ def get_top_trials_with_oos(
         oos_by_trial: dict[int, float] = {}
     else:
         evaluations = oos_repo.get(study.study_name, window[0], window[1])
-        oos_by_trial = {e.trial_number: e.geo_mean_return for e in evaluations}
+        oos_by_trial = {e.trial_number: e.oos_balance_ratio for e in evaluations}
 
     return [
         _to_trial_with_oos(trial, oos_by_trial.get(trial['trial_number']))
@@ -211,23 +237,13 @@ def get_top_trials_with_oos(
 
 def _to_trial_with_oos(trial: dict, oos_score: float | None) -> TrialWithOos:
     is_value = trial['value']
-    if oos_score is None:
-        delta = None
-        verdict = TrialVerdict.PENDING
-    else:
-        delta = oos_score - is_value
-        verdict = (
-            TrialVerdict.GENERALISES
-            if oos_score >= OOS_OVERFIT_THRESHOLD
-            else TrialVerdict.OVERFIT
-        )
-
+    delta = None if oos_score is None else oos_score - is_value
     return TrialWithOos(
         trial_number=trial['trial_number'],
         is_value=is_value,
         oos_score=oos_score,
         delta=delta,
-        verdict=verdict,
+        verdict=classify_verdict(is_value, oos_score),
         params=trial['params']
     )
 
@@ -279,7 +295,8 @@ def evaluate_param_set(
     geometric_mean_ratio = float(geometric_mean / INITIAL_BALANCE)
     return {
         'trial_number': param_set['trial_number'],
-        'geo_mean_return': geometric_mean_ratio,
+        'is_value': param_set['value'],
+        'oos_balance_ratio': geometric_mean_ratio,
     }
 
 
@@ -364,7 +381,8 @@ def save_results(
             trial_number=result['trial_number'],
             start_timestamp=start,
             end_timestamp=end,
-            geo_mean_return=result['geo_mean_return']
+            is_value=result['is_value'],
+            oos_balance_ratio=result['oos_balance_ratio']
         )
         for result in results
     ]

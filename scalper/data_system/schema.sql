@@ -110,11 +110,12 @@ CREATE INDEX ix_trades_pair ON trades (pair);
 -- Table: out_of_sample_evaluation
 -- Stores results of evaluating Optuna trial parameters across time windows.
 CREATE TABLE out_of_sample_evaluation (
-    study_name TEXT NOT NULL,           -- Matches OutOfSampleEvaluation.study_name
-    trial_number INTEGER NOT NULL,      -- Matches OutOfSampleEvaluation.trial_number
-    start_timestamp REAL NOT NULL,      -- Matches OutOfSampleEvaluation.start_timestamp
-    end_timestamp REAL NOT NULL,        -- Matches OutOfSampleEvaluation.end_timestamp
-    geo_mean_return REAL NOT NULL,      -- Matches OutOfSampleEvaluation.geo_mean_return
+    study_name TEXT NOT NULL,               -- Matches OutOfSampleEvaluation.study_name
+    trial_number INTEGER NOT NULL,          -- Matches OutOfSampleEvaluation.trial_number
+    start_timestamp REAL NOT NULL,          -- Matches OutOfSampleEvaluation.start_timestamp
+    end_timestamp REAL NOT NULL,            -- Matches OutOfSampleEvaluation.end_timestamp
+    is_value REAL NOT NULL,                 -- Matches OutOfSampleEvaluation.is_value (Optuna objective value at evaluation time)
+    oos_balance_ratio REAL NOT NULL,        -- Matches OutOfSampleEvaluation.oos_balance_ratio
 
     PRIMARY KEY (study_name, trial_number, start_timestamp, end_timestamp)
 );

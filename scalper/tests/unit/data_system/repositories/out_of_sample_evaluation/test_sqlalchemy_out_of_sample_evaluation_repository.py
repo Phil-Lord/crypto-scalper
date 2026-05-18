@@ -37,7 +37,8 @@ class TestSQLAlchemyOutOfSampleEvaluationRepository:
             trial_number=1,
             start_timestamp=1704067200.0,
             end_timestamp=1704153600.0,
-            geo_mean_return=1.0025
+            is_value=1.15,
+            oos_balance_ratio=1.0025
         )
 
     def test_add_with_empty_list_does_nothing(self, mocker):
@@ -83,7 +84,8 @@ class TestSQLAlchemyOutOfSampleEvaluationRepository:
                 trial_number=i,
                 start_timestamp=1704067200.0,
                 end_timestamp=1704153600.0,
-                geo_mean_return=1.0025 + i * 0.001
+                is_value=1.15 + i * 0.01,
+                oos_balance_ratio=1.0025 + i * 0.001
             )
             for i in range(3)
         ]
@@ -162,7 +164,7 @@ class TestSQLAlchemyOutOfSampleEvaluationRepository:
         repository = SQLAlchemyOutOfSampleEvaluationRepository(mock_client)
 
         # When
-        result = repository.aggregate_windows('test_study', generalisation_threshold=0.5)
+        result = repository.aggregate_windows('test_study', floor=1.0, drawdown_limit=0.5)
 
         # Then
         assert result == []
@@ -171,24 +173,24 @@ class TestSQLAlchemyOutOfSampleEvaluationRepository:
         # Given
         mock_result = MagicMock()
         mock_result.fetchall.return_value = [
-            (1.0, 2.0, 0.9, 3, 1),
+            (1.0, 2.0, 1.2, 3, 1),
             (3.0, 4.0, 0.4, 0, 2),
         ]
         mock_session.execute.return_value = mock_result
         repository = SQLAlchemyOutOfSampleEvaluationRepository(mock_client)
 
         # When
-        result = repository.aggregate_windows('study-x', generalisation_threshold=0.5)
+        result = repository.aggregate_windows('study-x', floor=1.0, drawdown_limit=0.5)
 
         # Then
         assert result == [
-            OosWindowAggregate(start=1.0, end=2.0, best_oos=0.9,
+            OosWindowAggregate(start=1.0, end=2.0, best_oos=1.2,
                                generalised_count=3, overfit_count=1),
             OosWindowAggregate(start=3.0, end=4.0, best_oos=0.4,
                                generalised_count=0, overfit_count=2),
         ]
 
-    def test_aggregate_windows_passes_threshold_and_study_name(self, mock_client, mock_session):
+    def test_aggregate_windows_passes_thresholds_and_study_name(self, mock_client, mock_session):
         # Given
         mock_result = MagicMock()
         mock_result.fetchall.return_value = []
@@ -196,9 +198,10 @@ class TestSQLAlchemyOutOfSampleEvaluationRepository:
         repository = SQLAlchemyOutOfSampleEvaluationRepository(mock_client)
 
         # When
-        repository.aggregate_windows('study-x', generalisation_threshold=0.75)
+        repository.aggregate_windows('study-x', floor=1.1, drawdown_limit=0.75)
 
         # Then
         params = mock_session.execute.call_args[0][1]
         assert params['study_name'] == 'study-x'
-        assert params['threshold'] == 0.75
+        assert params['floor'] == 1.1
+        assert params['drawdown_limit'] == 0.75

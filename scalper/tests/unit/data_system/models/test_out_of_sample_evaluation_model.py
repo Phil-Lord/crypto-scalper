@@ -14,7 +14,8 @@ class TestOutOfSampleEvaluation:
             'trial_number': 1,
             'start_timestamp': 1704067200.0,  # 2024-01-01 00:00:00 UTC
             'end_timestamp': 1704153600.0,    # 2024-01-02 00:00:00 UTC
-            'geo_mean_return': 1.0025
+            'is_value': 1.15,
+            'oos_balance_ratio': 1.0025
         }
 
     def test_creates_evaluation_with_all_fields(self, sample_evaluation_data):
@@ -26,9 +27,10 @@ class TestOutOfSampleEvaluation:
         assert evaluation.trial_number == sample_evaluation_data['trial_number']
         assert evaluation.start_timestamp == sample_evaluation_data['start_timestamp']
         assert evaluation.end_timestamp == sample_evaluation_data['end_timestamp']
-        assert evaluation.geo_mean_return == sample_evaluation_data['geo_mean_return']
+        assert evaluation.is_value == sample_evaluation_data['is_value']
+        assert evaluation.oos_balance_ratio == sample_evaluation_data['oos_balance_ratio']
 
-    def test_requires_geo_mean_return(self):
+    def test_requires_oos_balance_ratio(self):
         # When / Then
         with pytest.raises(TypeError):
             OutOfSampleEvaluation(
@@ -36,6 +38,18 @@ class TestOutOfSampleEvaluation:
                 trial_number=1,
                 start_timestamp=1704067200.0,
                 end_timestamp=1704153600.0,
+                is_value=1.15,
+            )
+
+    def test_requires_is_value(self):
+        # When / Then
+        with pytest.raises(TypeError):
+            OutOfSampleEvaluation(
+                study_name='test_study',
+                trial_number=1,
+                start_timestamp=1704067200.0,
+                end_timestamp=1704153600.0,
+                oos_balance_ratio=1.0025,
             )
 
     def test_out_of_sample_evaluation_is_frozen(self, sample_evaluation_data):
