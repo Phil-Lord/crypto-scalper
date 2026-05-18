@@ -115,7 +115,7 @@ CREATE TABLE out_of_sample_evaluation (
     start_timestamp REAL NOT NULL,          -- Matches OutOfSampleEvaluation.start_timestamp
     end_timestamp REAL NOT NULL,            -- Matches OutOfSampleEvaluation.end_timestamp
     is_value REAL NOT NULL,                 -- Matches OutOfSampleEvaluation.is_value (Optuna objective value at evaluation time)
-    oos_balance_ratio REAL NOT NULL,   -- Matches OutOfSampleEvaluation.oos_balance_ratio
+    oos_balance_ratio REAL NOT NULL,        -- Matches OutOfSampleEvaluation.oos_balance_ratio
 
     PRIMARY KEY (study_name, trial_number, start_timestamp, end_timestamp)
 );
