@@ -31,7 +31,7 @@ from nicegui import ui
 from data_system import JobRepository
 from ui.components import confirm_dialog
 from ui.services.walk_forward import split_trials, start_in_sample
-from ui.theme import CAPTION_CLASSES, SectionTitle, primary_button, sidebar_input
+from ui.theme import CAPTION_CLASSES, SectionTitle, primary_button, sidebar_input, stop_button
 from utils import get_raw_pair, parse_study_name, STUDY_NAME_FORMAT, StudySummary
 
 from ..phase_mutex import PhaseMutex
@@ -204,9 +204,7 @@ class IsPanel:
         running = self._phase_mutex.is_active('is')
         oos_running = self._phase_mutex.is_other_active('is')
         if running:
-            ui.button('■ STOP', on_click=self._on_stop, color='red-9').classes(
-                'w-full text-white'
-            )
+            stop_button(on_click=self._on_stop)
         else:
             button = primary_button('▶ ADD TRIALS', on_click=self._on_start)
             if oos_running or inputs is None:

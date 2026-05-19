@@ -42,6 +42,17 @@ def primary_button(text: str, on_click: callable = None) -> ui.button:
     return ui.button(text, color=GREEN_DARK, on_click=on_click).classes('w-full text-white')
 
 
+def stop_button(on_click: callable = None) -> ui.button:
+    '''
+    Full-width red STOP button used by the IS and OOS panels to cancel an
+    in-flight run. Wired into ``PhaseMutex.cancel`` indirectly via the panel's
+    ``_on_stop`` confirmation flow.
+    '''
+    return ui.button(
+        '■ STOP', color='red-9', on_click=on_click
+    ).classes('w-full text-white')
+
+
 def StatusPill(status: PillStatus, label: str | None = None) -> ui.label:
     '''
     Small status chip used across the walk-forward page

@@ -55,6 +55,7 @@ from ui.theme import (
     StatusPill,
     primary_button,
     sidebar_input,
+    stop_button,
 )
 from utils import get_second_timestamp, parse_datetime, StudySummary
 
@@ -252,9 +253,7 @@ class OosPanel:
             self._workers_input = sidebar_input('Workers', _DEFAULT_WORKERS)
 
         if running:
-            ui.button(
-                '■ STOP', on_click=self._on_stop, color='red-9',
-            ).classes('w-full text-white')
+            stop_button(on_click=self._on_stop)
             self._progress_label = ui.label(
                 self._format_progress()
             ).classes('text-[11px] font-mono text-neutral-400 mt-1')
