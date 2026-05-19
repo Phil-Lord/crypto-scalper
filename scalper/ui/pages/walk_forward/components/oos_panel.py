@@ -585,7 +585,7 @@ class OosPanel:
         finally:
             self._running_window = None
 
-        # Page's phase-done handler re-renders this panel (via _refresh_rail),
+        # Page's phase-done handler re-renders this panel (via rail.refresh_rail),
         # which reloads windows + trials and rebuilds the sidebar.
 
     def _on_progress(self, event: StreamEvent) -> None:
