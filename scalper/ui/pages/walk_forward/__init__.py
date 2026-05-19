@@ -75,12 +75,6 @@ class WalkForwardPage:
         # done) since per-trial counts climb in IsPanel's worker grid.
         self._live_timer = ui.timer(LIVE_REFRESH_INTERVAL_S, self._on_live_tick, active=False)
 
-    async def _on_new_study(self) -> None:
-        await new_study.on_new_study(self)
-
-    def _set_running_study_name(self, name: str | None) -> None:
-        self._running_study_name = name
-
     def _rerender_all(self) -> None:
         '''
         Re-render every page region that depends on the selected study or
@@ -94,6 +88,12 @@ class WalkForwardPage:
         context_strip.render_context_strip(self)
         self.is_panel.render(self._is_row)
         self.oos_panel.render(self._oos_row)
+
+    def _set_running_study_name(self, name: str | None) -> None:
+        self._running_study_name = name
+
+    async def _on_new_study(self) -> None:
+        await new_study.on_new_study(self)
 
     def _on_phase_change(self) -> None:
         '''
