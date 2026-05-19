@@ -81,6 +81,20 @@ class WalkForwardPage:
     def _set_running_study_name(self, name: str | None) -> None:
         self._running_study_name = name
 
+    def _rerender_all(self) -> None:
+        '''
+        Re-render every page region that depends on the selected study or
+        study list — rail rows, context strip, and both panels.
+
+        Called from any flow that mutates ``_studies``, ``_selected_study``,
+        or ``_running_study_name`` (study selection, new-study launch,
+        phase-done rail refresh).
+        '''
+        rail.render_rail_rows(self)
+        context_strip.render_context_strip(self)
+        self.is_panel.render(self._is_row)
+        self.oos_panel.render(self._oos_row)
+
     def _on_phase_change(self) -> None:
         '''
         Re-render fragments that depend on phase state when the mutex

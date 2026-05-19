@@ -32,13 +32,5 @@ def render_detail(page: WalkForwardPage) -> None:
         page._oos_row = ui.column().classes(
             'w-full px-6 py-4 flex-1 min-h-0 gap-2'
         )
-        render_is_panel(page)
-        render_oos_panel(page)
-
-
-def render_is_panel(page: WalkForwardPage) -> None:
-    page.is_panel.render(page._is_row)
-
-
-def render_oos_panel(page: WalkForwardPage) -> None:
-    page.oos_panel.render(page._oos_row)
+        page.is_panel.render(page._is_row)
+        page.oos_panel.render(page._oos_row)

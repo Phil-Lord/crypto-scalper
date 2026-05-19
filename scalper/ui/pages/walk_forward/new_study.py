@@ -15,7 +15,6 @@ from ui.services import start_in_sample
 from ui.services.walk_forward import split_trials
 from utils import StudyDirection, StudySummary
 
-from . import context_strip, detail, rail
 from .components import NewStudyForm, derive_study_name, show_new_study_dialog
 
 if TYPE_CHECKING:
@@ -93,10 +92,7 @@ async def start_in_sample_from_form(page: WalkForwardPage, form: NewStudyForm) -
         ui.notify(str(e), type='negative')
         return
 
-    rail.render_rail_rows(page)
-    context_strip.render_context_strip(page)
-    detail.render_is_panel(page)
-    detail.render_oos_panel(page)
+    page._rerender_all()
     page.is_panel.seed_strip(splits)
 
     try:

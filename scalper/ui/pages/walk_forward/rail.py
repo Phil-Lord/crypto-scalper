@@ -15,7 +15,6 @@ from ui.services import list_studies
 from ui.theme import primary_button
 from utils import StudySummary
 
-from . import context_strip, detail
 from .components import StudyRailRow
 
 if TYPE_CHECKING:
@@ -93,10 +92,7 @@ def select_study(page: WalkForwardPage, study: StudySummary) -> None:
     if page._selected_study is not None and study.name == page._selected_study.name:
         return
     page._selected_study = study
-    render_rail_rows(page)
-    context_strip.render_context_strip(page)
-    detail.render_is_panel(page)
-    detail.render_oos_panel(page)
+    page._rerender_all()
 
 
 def refresh_rail(page: WalkForwardPage, select_name: str | None = None) -> None:
@@ -117,7 +113,4 @@ def refresh_rail(page: WalkForwardPage, select_name: str | None = None) -> None:
     else:
         page._selected_study = page._studies[0] if page._studies else None
 
-    render_rail_rows(page)
-    context_strip.render_context_strip(page)
-    detail.render_is_panel(page)
-    detail.render_oos_panel(page)
+    page._rerender_all()
