@@ -77,12 +77,9 @@ class WalkForwardPage:
 
     def _rerender_all(self) -> None:
         '''
-        Re-render every page region that depends on the selected study or
-        study list — rail rows, context strip, and both panels.
-
-        Called from any flow that mutates ``_studies``, ``_selected_study``,
-        or ``_running_study_name`` (study selection, new-study launch,
-        phase-done rail refresh).
+        Re-render the four regions that read selection or study-list state —
+        rail rows, context strip, IS panel, OOS panel. Called from any flow
+        that mutates ``_studies``, ``_selected_study``, or ``_running_study_name``.
         '''
         rail.render_rail_rows(self)
         context_strip.render_context_strip(self)
