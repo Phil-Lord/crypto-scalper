@@ -31,7 +31,7 @@ from nicegui import ui
 from data_system import JobRepository
 from ui.components import confirm_dialog
 from ui.services.walk_forward import split_trials, start_in_sample
-from ui.theme import SectionTitle, primary_button, sidebar_input
+from ui.theme import CAPTION_CLASSES, SectionTitle, primary_button, sidebar_input
 from utils import get_raw_pair, parse_study_name, STUDY_NAME_FORMAT, StudySummary
 
 from ..phase_mutex import PhaseMutex
@@ -192,9 +192,7 @@ class IsPanel:
 
         inputs = derive_run_inputs(study)
         with ui.column().classes('gap-0.5'):
-            ui.label('Window').classes(
-                'text-[10px] uppercase tracking-wider text-neutral-500'
-            )
+            ui.label('Window').classes(CAPTION_CLASSES)
             ui.label(_format_window(inputs)).classes(
                 'text-[12px] font-mono text-neutral-300'
             )

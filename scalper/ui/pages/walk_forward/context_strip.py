@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 
 from nicegui import ui
 
+from ui.theme import CAPTION_CLASSES
+
 from .components import StatBlock
 
 if TYPE_CHECKING:
@@ -21,9 +23,7 @@ def render_context_strip(page: WalkForwardPage) -> None:
     with page._context_strip:
         study = page._selected_study
         with ui.column().classes('gap-0.5 items-start'):
-            ui.label('Selected study').classes(
-                'text-[10px] uppercase tracking-wider text-neutral-500'
-            )
+            ui.label('Selected study').classes(CAPTION_CLASSES)
             ui.label(study.name if study is not None else '—').classes(
                 'text-[13px] font-mono text-neutral-100'
             )
