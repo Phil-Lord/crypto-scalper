@@ -12,7 +12,7 @@ GREEN_DARK = '#016339'    # buttons
 # labels, sidebar field labels). ``MINOR_HEADER`` is one step up and used for
 # sub-section dividers (e.g. ``OOS WINDOWS``, ``TOP TRIALS``, ``WORKERS``).
 CAPTION_CLASSES = 'text-[10px] uppercase tracking-wider text-neutral-500'
-MINOR_HEADER_CLASSES = ('text-[11px] uppercase tracking-wider text-neutral-400 font-semibold')
+MINOR_HEADER_CLASSES = 'text-[11px] uppercase tracking-wider text-neutral-400 font-semibold'
 
 
 PillStatus = Literal['running', 'pending', 'done', 'error', 'cancelled']
