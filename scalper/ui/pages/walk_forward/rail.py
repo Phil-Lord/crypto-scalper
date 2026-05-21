@@ -84,11 +84,11 @@ def render_rail_rows(page: WalkForwardPage) -> None:
                 study,
                 active=is_selected,
                 last_run_state='running' if is_running else 'idle',
-                on_click=lambda s=study: select_study(page, s),
+                on_click=lambda s=study: _select_study(page, s),
             )
 
 
-def select_study(page: WalkForwardPage, study: StudySummary) -> None:
+def _select_study(page: WalkForwardPage, study: StudySummary) -> None:
     if page._selected_study is not None and study.name == page._selected_study.name:
         return
     page._selected_study = study
