@@ -78,8 +78,12 @@ class WalkForwardPage:
     def _rerender_all(self) -> None:
         '''
         Re-render the four regions that read selection or study-list state —
-        rail rows, context strip, IS panel, OOS panel. Called from any flow
-        that mutates ``_studies``, ``_selected_study``, or ``_running_study_name``.
+        rail rows, context strip, IS panel, OOS panel. Called from selection
+        and study-list mutations (study select, new-study launch, rail refresh).
+
+        Not used by ``_on_phase_change``: a phase transition re-renders only
+        the rail, since rebuilding the IS/OOS panels mid-run would discard
+        live worker-tile and progress state.
         '''
         rail.render_rail_rows(self)
         context_strip.render_context_strip(self)
