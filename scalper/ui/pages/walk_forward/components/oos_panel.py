@@ -49,7 +49,14 @@ from ui.services.walk_forward import (
     list_oos_windows,
     start_out_of_sample,
 )
-from ui.theme import SectionTitle, StatusPill, primary_button, sidebar_input
+from ui.theme import (
+    MINOR_HEADER_CLASSES,
+    SectionTitle,
+    StatusPill,
+    primary_button,
+    sidebar_input,
+    stop_button,
+)
 from utils import get_second_timestamp, parse_datetime, StudySummary
 
 from ..phase_mutex import PhaseMutex
@@ -246,9 +253,7 @@ class OosPanel:
             self._workers_input = sidebar_input('Workers', _DEFAULT_WORKERS)
 
         if running:
-            ui.button(
-                '■ STOP', on_click=self._on_stop, color='red-9',
-            ).classes('w-full text-white')
+            stop_button(on_click=self._on_stop)
             self._progress_label = ui.label(
                 self._format_progress()
             ).classes('text-[11px] font-mono text-neutral-400 mt-1')
@@ -260,10 +265,7 @@ class OosPanel:
 
     def _render_tabs_section(self) -> None:
         with ui.row().classes('w-full items-center gap-2 no-wrap mb-1'):
-            ui.label('OOS WINDOWS').classes(
-                'text-[11px] uppercase tracking-wider '
-                'text-neutral-400 font-semibold'
-            )
+            ui.label('OOS WINDOWS').classes(MINOR_HEADER_CLASSES)
             ui.element('div').classes('flex-1 h-px bg-neutral-800')
         self._tabs_container = ui.column().classes('w-full gap-0')
         self._render_tabs()
@@ -318,10 +320,7 @@ class OosPanel:
 
     def _render_table_section(self) -> None:
         with ui.row().classes('w-full items-center gap-2 no-wrap mt-2 mb-1'):
-            ui.label(self._table_title()).classes(
-                'text-[11px] uppercase tracking-wider '
-                'text-neutral-400 font-semibold'
-            )
+            ui.label(self._table_title()).classes(MINOR_HEADER_CLASSES)
             ui.element('div').classes('flex-1 h-px bg-neutral-800')
             ui.button(
                 icon='refresh', on_click=self.refresh,
@@ -586,7 +585,7 @@ class OosPanel:
         finally:
             self._running_window = None
 
-        # Page's phase-done handler re-renders this panel (via _refresh_rail),
+        # Page's phase-done handler re-renders this panel (via rail.refresh_rail),
         # which reloads windows + trials and rebuilds the sidebar.
 
     def _on_progress(self, event: StreamEvent) -> None:

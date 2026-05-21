@@ -7,6 +7,13 @@ GREEN_LIGHT = '#3ecf8e'   # icons
 GREEN_BRIGHT = '#03c574'  # links
 GREEN_DARK = '#016339'    # buttons
 
+# Compact uppercase label styles used across the walk-forward page. ``CAPTION``
+# is the smallest, dimmest variant (context-strip captions, ``StatBlock``
+# labels, sidebar field labels). ``MINOR_HEADER`` is one step up and used for
+# sub-section dividers (e.g. ``OOS WINDOWS``, ``TOP TRIALS``, ``WORKERS``).
+CAPTION_CLASSES = 'text-[10px] uppercase tracking-wider text-neutral-500'
+MINOR_HEADER_CLASSES = 'text-[11px] uppercase tracking-wider text-neutral-400 font-semibold'
+
 
 PillStatus = Literal['running', 'pending', 'done', 'error', 'cancelled']
 
@@ -33,6 +40,17 @@ def sidebar_select(label: str, options: list, value: str = '') -> ui.select:
 
 def primary_button(text: str, on_click: callable = None) -> ui.button:
     return ui.button(text, color=GREEN_DARK, on_click=on_click).classes('w-full text-white')
+
+
+def stop_button(on_click: callable = None) -> ui.button:
+    '''
+    Full-width red STOP button used by the IS and OOS panels to cancel an
+    in-flight run. Wired into ``PhaseMutex.cancel`` indirectly via the panel's
+    ``_on_stop`` confirmation flow.
+    '''
+    return ui.button(
+        '■ STOP', color='red-9', on_click=on_click
+    ).classes('w-full text-white')
 
 
 def StatusPill(status: PillStatus, label: str | None = None) -> ui.label:
