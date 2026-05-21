@@ -14,7 +14,7 @@ wired into this component.
 from nicegui import ui
 
 from core import DONE, PROGRESS, StreamEvent
-from ui.theme import MINOR_HEADER_CLASSES, StatusPill
+from ui.theme import BORDER, MINOR_HEADER_CLASSES, MUTED_TEXT_CLASSES, StatusPill, separator
 
 from .worker_tile import WorkerTile, WorkerTileState, apply_done, apply_progress
 
@@ -95,14 +95,14 @@ class WorkerStrip:
         with ui.row().classes('w-full items-center gap-2 no-wrap mb-2'):
             count_text = '—' if idle else str(len(self._states))
             ui.label(f'WORKERS · {count_text}').classes(MINOR_HEADER_CLASSES)
-            ui.element('div').classes('flex-1 h-px bg-neutral-800')
+            separator()
             if not idle and any(s.status == 'running' for s in self._states):
                 StatusPill('running', 'LIVE')
 
     def _render_idle_placeholder(self) -> None:
         with ui.element('div').classes(
             'w-full h-20 flex items-center justify-center '
-            'border border-dashed border-neutral-800 rounded text-xs text-neutral-500'
+            f'border border-dashed {BORDER} rounded {MUTED_TEXT_CLASSES}'
         ):
             ui.label('No worker activity — start an in-sample run.')
 

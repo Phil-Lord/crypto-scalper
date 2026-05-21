@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 
 from nicegui import ui
 
+from ui.theme import BORDER
+
 from . import context_strip
 
 if TYPE_CHECKING:
@@ -22,12 +24,12 @@ if TYPE_CHECKING:
 def render_detail(page: WalkForwardPage) -> None:
     with ui.column().classes('flex-1 min-w-0 h-full gap-0'):
         page._context_strip = ui.row().classes(
-            'w-full items-center gap-6 px-6 py-3 border-b border-neutral-800 no-wrap'
+            f'w-full items-center gap-6 px-6 py-3 border-b {BORDER} no-wrap'
         )
         context_strip.render_context_strip(page)
 
         page._is_row = ui.column().classes(
-            'w-full px-6 py-4 border-b border-neutral-800 gap-2'
+            f'w-full px-6 py-4 border-b {BORDER} gap-2'
         )
         page._oos_row = ui.column().classes(
             'w-full px-6 py-4 flex-1 min-h-0 gap-2'

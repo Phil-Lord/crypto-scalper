@@ -1,6 +1,6 @@
 from nicegui import ui
 
-from ui.theme import CAPTION_CLASSES
+from ui.theme import caption
 
 
 def StatBlock(label: str, value: str, highlight: bool = False) -> None:
@@ -14,5 +14,5 @@ def StatBlock(label: str, value: str, highlight: bool = False) -> None:
     '''
     value_color = 'text-emerald-400' if highlight else 'text-neutral-100'
     with ui.column().classes('gap-0.5 items-start'):
-        ui.label(label).classes(CAPTION_CLASSES)
+        caption(label)
         ui.label(value).classes(f'text-sm font-mono {value_color}')

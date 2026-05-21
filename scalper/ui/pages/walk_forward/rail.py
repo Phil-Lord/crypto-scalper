@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from nicegui import ui
 
 from ui.services import list_studies
-from ui.theme import primary_button
+from ui.theme import BORDER, muted, primary_button
 from utils import StudySummary
 
 from .components import StudyRailRow
@@ -40,7 +40,7 @@ def load_studies() -> list[StudySummary]:
 
 def render_rail(page: WalkForwardPage) -> None:
     with ui.column().classes(
-        'h-full border-r border-neutral-800 gap-0 shrink-0'
+        f'h-full border-r {BORDER} gap-0 shrink-0'
     ).style(f'width: {RAIL_WIDTH_PX}px'):
         with ui.row().classes(
             'w-full items-baseline justify-between px-4 pt-4 pb-3 no-wrap'
@@ -58,7 +58,7 @@ def render_rail(page: WalkForwardPage) -> None:
         render_rail_rows(page)
 
         with ui.row().classes(
-            'w-full px-4 py-3 border-t border-neutral-800 no-wrap'
+            f'w-full px-4 py-3 border-t {BORDER} no-wrap'
         ):
             page.new_study_button = primary_button(
                 '+ NEW STUDY', on_click=page._on_new_study
@@ -69,7 +69,7 @@ def render_rail_rows(page: WalkForwardPage) -> None:
     page._rail_list.clear()
     with page._rail_list:
         if not page._studies:
-            ui.label('No studies yet.').classes('px-4 py-3 text-xs text-neutral-500')
+            muted('No studies yet.').classes('px-4 py-3')
             return
         for study in page._studies:
             is_selected = (

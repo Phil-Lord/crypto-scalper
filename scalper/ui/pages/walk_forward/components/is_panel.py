@@ -31,7 +31,14 @@ from nicegui import ui
 from data_system import JobRepository
 from ui.components import confirm_dialog
 from ui.services.walk_forward import split_trials, start_in_sample
-from ui.theme import CAPTION_CLASSES, SectionTitle, primary_button, sidebar_input, stop_button
+from ui.theme import (
+    SectionTitle,
+    caption,
+    muted,
+    primary_button,
+    sidebar_input,
+    stop_button,
+)
 from utils import get_raw_pair, parse_study_name, STUDY_NAME_FORMAT, StudySummary
 
 from ..phase_mutex import PhaseMutex
@@ -185,14 +192,12 @@ class IsPanel:
     def _render_sidebar(self) -> None:
         study = self._get_selected_study()
         if study is None:
-            ui.label('Select or create a study to extend.').classes(
-                'text-xs text-neutral-500'
-            )
+            muted('Select or create a study to extend.')
             return
 
         inputs = derive_run_inputs(study)
         with ui.column().classes('gap-0.5'):
-            ui.label('Window').classes(CAPTION_CLASSES)
+            caption('Window')
             ui.label(_format_window(inputs)).classes(
                 'text-[12px] font-mono text-neutral-300'
             )

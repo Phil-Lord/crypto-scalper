@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from nicegui import ui
 
 from data_system import OosWindowAggregate
-from ui.theme import StatusPill
+from ui.theme import BORDER, StatusPill, muted
 
 
 WindowKey = tuple[float, float]
@@ -94,9 +94,9 @@ def WindowTabs(
         not mounted.
     '''
     if not windows:
-        ui.label('No OOS windows yet — evaluate a new window to populate.').classes(
-            'text-xs text-neutral-500 px-1 py-2'
-        )
+        muted(
+            'No OOS windows yet — evaluate a new window to populate.'
+        ).classes('px-1 py-2')
         return
 
     with ui.row().classes('w-full gap-2 flex-wrap'):
@@ -121,7 +121,7 @@ def _render_tab(
     on_use_as_template: Callable[[WindowKey], None] | None,
 ) -> None:
     bg = 'bg-neutral-800/60' if is_active else 'hover:bg-neutral-900'
-    border = 'border-emerald-500' if is_active else 'border-neutral-800'
+    border = 'border-emerald-500' if is_active else BORDER
     tab = ui.element('div').classes(
         f'min-w-44 px-3 py-2 cursor-pointer border rounded {bg} {border}'
     )

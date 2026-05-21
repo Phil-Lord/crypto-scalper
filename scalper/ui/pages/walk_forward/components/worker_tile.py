@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 
 from nicegui import ui
 
-from ui.theme import PillStatus, StatusPill
+from ui.theme import BORDER, PillStatus, StatusPill
 
 
 @dataclass(frozen=True)
@@ -88,7 +88,7 @@ def WorkerTile(state: WorkerTileState) -> None:
     '''
     pending = state.status == 'pending'
     with ui.column().classes(
-        'shrink-0 w-40 px-3 py-2 gap-1 border border-neutral-800 '
+        f'shrink-0 w-40 px-3 py-2 gap-1 border {BORDER} '
         'rounded bg-neutral-900/40'
     ):
         with ui.row().classes('w-full items-center justify-between gap-2 no-wrap'):

@@ -3,7 +3,7 @@ from typing import Literal
 
 from nicegui import ui
 
-from ui.theme import StatusPill
+from ui.theme import BORDER, StatusPill
 from utils import StudySummary
 
 
@@ -43,7 +43,7 @@ def StudyRailRow(
     bg = 'bg-neutral-800/50' if active else 'hover:bg-neutral-900'
     accent = 'border-emerald-500' if active else 'border-transparent'
     row = ui.element('div').classes(
-        'w-full px-4 py-3 cursor-pointer border-b border-neutral-800 '
+        f'w-full px-4 py-3 cursor-pointer border-b {BORDER} '
         f'border-l-2 {accent} {bg}'
     )
     row.on('click', lambda _e: on_click())
