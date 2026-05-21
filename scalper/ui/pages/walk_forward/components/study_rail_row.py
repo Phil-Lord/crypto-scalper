@@ -3,7 +3,7 @@ from typing import Literal
 
 from nicegui import ui
 
-from ui.theme import BORDER, StatusPill
+from ui.theme import BORDER, MONO_CAPTION_CLASSES, StatusPill
 from utils import StudySummary
 
 
@@ -51,7 +51,7 @@ def StudyRailRow(
     with row:
         with ui.row().classes('w-full items-start justify-between gap-2 no-wrap'):
             ui.label(study.name).classes(
-                'text-xs font-mono text-neutral-200 leading-tight break-all'
+                f'{MONO_CAPTION_CLASSES} text-neutral-200 leading-tight break-all'
             )
             if last_run_state == 'running':
                 StatusPill('running', 'LIVE')
@@ -60,8 +60,8 @@ def StudyRailRow(
                 f'{study.best_is:.2f}' if study.best_is is not None else '—'
             )
             ui.label(f'trials {study.trial_count}').classes(
-                'text-[11px] font-mono text-neutral-400'
+                f'{MONO_CAPTION_CLASSES} text-neutral-400'
             )
             ui.label(f'IS {best_is_text}').classes(
-                'text-[11px] font-mono text-neutral-400'
+                f'{MONO_CAPTION_CLASSES} text-neutral-400'
             )

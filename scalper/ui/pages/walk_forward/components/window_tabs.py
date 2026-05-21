@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from nicegui import ui
 
 from data_system import OosWindowAggregate
-from ui.theme import BORDER, StatusPill, muted
+from ui.theme import BORDER, MONO_CAPTION_CLASSES, StatusPill, muted
 
 
 WindowKey = tuple[float, float]
@@ -130,7 +130,7 @@ def _render_tab(
     with tab:
         with ui.row().classes('w-full items-center justify-between gap-2 no-wrap'):
             ui.label(_format_window(window)).classes(
-                'text-[12px] font-mono text-neutral-200'
+                f'{MONO_CAPTION_CLASSES} text-neutral-200'
             )
             with ui.row().classes('items-center gap-1 no-wrap'):
                 if is_running:
@@ -148,13 +148,13 @@ def _render_tab(
                     button.on('click.stop')
         with ui.row().classes('w-full items-center gap-3 mt-1 no-wrap'):
             ui.label(f'best {window.best_oos:.3f}').classes(
-                'text-[10px] font-mono text-neutral-400'
+                f'{MONO_CAPTION_CLASSES} text-neutral-400'
             )
             ui.label(f'gen {window.generalised_count}').classes(
-                'text-[10px] font-mono text-emerald-400'
+                f'{MONO_CAPTION_CLASSES} text-emerald-400'
             )
             ui.label(f'over {window.overfit_count}').classes(
-                'text-[10px] font-mono text-red-400'
+                f'{MONO_CAPTION_CLASSES} text-red-400'
             )
 
 

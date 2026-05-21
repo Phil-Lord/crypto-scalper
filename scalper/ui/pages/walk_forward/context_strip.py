@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from nicegui import ui
 
-from ui.theme import caption, muted
+from ui.theme import MONO_CAPTION_CLASSES, caption, muted
 
 from .components import StatBlock
 
@@ -25,7 +25,7 @@ def render_context_strip(page: WalkForwardPage) -> None:
         with ui.column().classes('gap-0.5 items-start'):
             caption('Selected study')
             ui.label(study.name if study is not None else '—').classes(
-                'text-[13px] font-mono text-neutral-100'
+                f'{MONO_CAPTION_CLASSES} text-neutral-100'
             )
         ui.element('div').classes('h-8 w-px bg-neutral-800')
 

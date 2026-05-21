@@ -32,6 +32,7 @@ from data_system import JobRepository
 from ui.components import confirm_dialog
 from ui.services.walk_forward import split_trials, start_in_sample
 from ui.theme import (
+    MONO_CAPTION_CLASSES,
     SectionTitle,
     caption,
     muted,
@@ -199,7 +200,7 @@ class IsPanel:
         with ui.column().classes('gap-0.5'):
             caption('Window')
             ui.label(_format_window(inputs)).classes(
-                'text-[12px] font-mono text-neutral-300'
+                f'{MONO_CAPTION_CLASSES} text-neutral-300'
             )
 
         with ui.row().classes('w-full no-wrap gap-2'):

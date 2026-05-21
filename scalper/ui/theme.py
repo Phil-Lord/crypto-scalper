@@ -21,6 +21,13 @@ CHART_DIM_DECREASING = '#4b5563'
 CAPTION_CLASSES = 'text-[10px] uppercase tracking-wider text-neutral-500'
 MINOR_HEADER_CLASSES = 'text-[11px] uppercase tracking-wider text-neutral-400 font-semibold'
 
+# Small mono-spaced label text — metadata captions, counts, trial values, and
+# inline readouts across the walk-forward page. Owns the *size* only: one 11px
+# scale, replacing the former 10/11/12/13px drift. Compose the colour at the
+# call site (``f'{MONO_CAPTION_CLASSES} text-neutral-400'``) — mono colour
+# choices are intentionally local (e.g. emerald/red verdict counts).
+MONO_CAPTION_CLASSES = 'text-[11px] font-mono'
+
 # Muted body copy — empty-state placeholders and secondary captions
 # (e.g. 'No studies yet.'). See :func:`muted`.
 MUTED_TEXT_CLASSES = 'text-xs text-neutral-500'

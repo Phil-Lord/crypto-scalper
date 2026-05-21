@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from nicegui import ui
 
 from ui.services import list_studies
-from ui.theme import BORDER, muted, primary_button
+from ui.theme import BORDER, MONO_CAPTION_CLASSES, muted, primary_button
 from utils import StudySummary
 
 from .components import StudyRailRow
@@ -49,7 +49,7 @@ def render_rail(page: WalkForwardPage) -> None:
                 'text-sm uppercase tracking-wider text-neutral-300 font-semibold'
             )
             ui.label(str(len(page._studies))).classes(
-                'text-[11px] font-mono text-neutral-500'
+                f'{MONO_CAPTION_CLASSES} text-neutral-500'
             )
 
         page._rail_list = ui.column().classes(

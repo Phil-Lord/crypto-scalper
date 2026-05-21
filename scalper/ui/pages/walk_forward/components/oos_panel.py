@@ -52,6 +52,7 @@ from ui.services.walk_forward import (
 from ui.theme import (
     BORDER,
     MINOR_HEADER_CLASSES,
+    MONO_CAPTION_CLASSES,
     SectionTitle,
     StatusPill,
     muted,
@@ -257,7 +258,7 @@ class OosPanel:
             stop_button(on_click=self._on_stop)
             self._progress_label = ui.label(
                 self._format_progress()
-            ).classes('text-[11px] font-mono text-neutral-400 mt-1')
+            ).classes(f'{MONO_CAPTION_CLASSES} text-neutral-400 mt-1')
         else:
             button = primary_button('▶ EVALUATE', on_click=self._on_start)
             if is_running:
@@ -363,7 +364,7 @@ class OosPanel:
 
     def _render_trial_row(self, trial: TrialWithOos) -> None:
         with ui.row().classes(
-            'w-full items-center px-2 py-1 no-wrap text-[12px] font-mono '
+            f'w-full items-center px-2 py-1 no-wrap {MONO_CAPTION_CLASSES} '
             f'border-b {BORDER}/60'
         ):
             ui.label(f'#{trial.trial_number}').classes('w-16 text-neutral-200')
