@@ -4,7 +4,7 @@ import sys
 import click
 
 from backtesting_engine import evaluate_out_of_sample as run_evaluate_out_of_sample
-from core import DONE, PROGRESS, emit
+from core import DONE, JsonEvaluationProgressCallback, emit
 from utils import load_env, LOG_FORMAT, get_second_timestamp, parse_datetime
 
 load_env()
@@ -26,7 +26,7 @@ def evaluate_out_of_sample(
     start_ts = get_second_timestamp(*parse_datetime(start))
     end_ts = get_second_timestamp(*parse_datetime(end))
 
-    callback = JsonProgressCallback()
+    callback = JsonEvaluationProgressCallback()
     run_evaluate_out_of_sample(
         study_name=study_name,
         num_sets=num_sets,
@@ -36,20 +36,6 @@ def evaluate_out_of_sample(
         progress_callback=callback,
     )
     emit(DONE, {'trials': callback.count})
-
-
-class JsonProgressCallback:
-    '''
-    ``() -> None`` tick callback that emits a single ``PROGRESS {...}`` JSON line
-    per parameter set evaluated. Errors and human logs go to stderr.
-    '''
-
-    def __init__(self) -> None:
-        self.count = 0
-
-    def __call__(self) -> None:
-        self.count += 1
-        emit(PROGRESS, {'trial': self.count})
 
 
 if __name__ == '__main__':

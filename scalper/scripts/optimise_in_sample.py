@@ -2,10 +2,9 @@ import logging
 import sys
 
 import click
-import optuna
 
 from backtesting_engine import BacktestingEngine
-from core import DONE, PROGRESS, emit
+from core import DONE, JsonTrialProgressCallback, emit
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
 from strategy_manager import create_strategy
 from utils import (
@@ -38,7 +37,7 @@ def optimise_in_sample(
     ''' Run an in-sample Optuna parameter optimisation. Emits one JSON line per trial. '''
     params, grid = get_strategy_configs(strategy_name)
     engine = build_engine(pair, strategy_name, start, end, params)
-    callback = JsonProgressCallback()
+    callback = JsonTrialProgressCallback()
     engine.optimise_parameters(grid, n_trials=n_trials, n_jobs=n_jobs, progress_callback=callback)
     emit(DONE, {'trials': n_trials})
 
@@ -63,27 +62,6 @@ def build_engine(
     return BacktestingEngine(
         kraken_pair, strategy, repository, start_ts, end_ts, interval=1, vectorised=True,
     )
-
-
-class JsonProgressCallback:
-    '''
-    Optuna callback that emits a single ``PROGRESS {...}`` JSON line per trial
-    to stdout. Errors and human logs are routed to stderr by the entry point.
-    '''
-
-    def __call__(self, study: optuna.study.Study, trial: optuna.trial.FrozenTrial) -> None:
-        best = study.best_value if self._has_completed_trial(study) else None
-        emit(PROGRESS, {
-            'trial': trial.number,
-            'value': trial.value,
-            'best': best
-        })
-
-    def _has_completed_trial(self, study: optuna.study.Study) -> bool:
-        ''' Returns True if the study has at least one completed trial. '''
-        return any(
-            t.state == optuna.trial.TrialState.COMPLETE for t in study.get_trials(deepcopy=False)
-        )
 
 
 if __name__ == '__main__':
