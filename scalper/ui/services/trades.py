@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository, Trade
 from exchange_connector import TradesConnector
+from ui.theme import CHART_DIM_DECREASING, CHART_DIM_INCREASING
 from utils import get_nano_timestamp, get_second_timestamp, parse_datetime
 
 MAX_POINTS = 2000
@@ -68,8 +69,8 @@ def plot_trades(
         figure.add_trace(_candlestick_trace(
             trades,
             name='Existing' if existing_dim else 'Trades',
-            increasing_colour='#9ca3af' if existing_dim else None,
-            decreasing_colour='#4b5563' if existing_dim else None
+            increasing_colour=CHART_DIM_INCREASING if existing_dim else None,
+            decreasing_colour=CHART_DIM_DECREASING if existing_dim else None
         ))
 
     if new_trades is not None and not new_trades.empty:

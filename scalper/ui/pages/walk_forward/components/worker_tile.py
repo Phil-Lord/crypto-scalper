@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 
 from nicegui import ui
 
-from ui.theme import PillStatus, StatusPill
+from ui.theme import BORDER, MONO_CAPTION_CLASSES, PillStatus, StatusPill
 
 
 @dataclass(frozen=True)
@@ -88,12 +88,12 @@ def WorkerTile(state: WorkerTileState) -> None:
     '''
     pending = state.status == 'pending'
     with ui.column().classes(
-        'shrink-0 w-40 px-3 py-2 gap-1 border border-neutral-800 '
+        f'shrink-0 w-40 px-3 py-2 gap-1 border {BORDER} '
         'rounded bg-neutral-900/40'
     ):
         with ui.row().classes('w-full items-center justify-between gap-2 no-wrap'):
             ui.label(f'worker {state.worker_id}').classes(
-                'text-[11px] font-mono text-neutral-400'
+                f'{MONO_CAPTION_CLASSES} text-neutral-400'
             )
             StatusPill(state.status)
 
@@ -108,7 +108,7 @@ def WorkerTile(state: WorkerTileState) -> None:
                 'queued' if pending or state.latest_trial is None
                 else f'trial {state.latest_trial}'
             )
-            ui.label(trial_text).classes('text-[10px] font-mono text-neutral-500')
+            ui.label(trial_text).classes(f'{MONO_CAPTION_CLASSES} text-neutral-500')
             ui.label(f'{state.trials_done} of {state.total_trials}').classes(
-                'text-[10px] font-mono text-neutral-500'
+                f'{MONO_CAPTION_CLASSES} text-neutral-500'
             )

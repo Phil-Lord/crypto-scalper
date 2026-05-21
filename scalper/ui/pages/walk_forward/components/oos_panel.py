@@ -50,10 +50,14 @@ from ui.services.walk_forward import (
     start_out_of_sample,
 )
 from ui.theme import (
+    BORDER,
     MINOR_HEADER_CLASSES,
+    MONO_CAPTION_CLASSES,
     SectionTitle,
     StatusPill,
+    muted,
     primary_button,
+    separator,
     sidebar_input,
     stop_button,
 )
@@ -219,9 +223,7 @@ class OosPanel:
             self._render_header()
             study = self._get_selected_study()
             if study is None:
-                ui.label(
-                    'Create a study to enable out-of-sample evaluation.'
-                ).classes('text-xs text-neutral-500')
+                muted('Create a study to enable out-of-sample evaluation.')
                 return
             with ui.row().classes(
                 'w-full no-wrap gap-7 items-stretch flex-1 min-h-0'
@@ -256,7 +258,7 @@ class OosPanel:
             stop_button(on_click=self._on_stop)
             self._progress_label = ui.label(
                 self._format_progress()
-            ).classes('text-[11px] font-mono text-neutral-400 mt-1')
+            ).classes(f'{MONO_CAPTION_CLASSES} text-neutral-400 mt-1')
         else:
             button = primary_button('▶ EVALUATE', on_click=self._on_start)
             if is_running:
@@ -266,7 +268,7 @@ class OosPanel:
     def _render_tabs_section(self) -> None:
         with ui.row().classes('w-full items-center gap-2 no-wrap mb-1'):
             ui.label('OOS WINDOWS').classes(MINOR_HEADER_CLASSES)
-            ui.element('div').classes('flex-1 h-px bg-neutral-800')
+            separator()
         self._tabs_container = ui.column().classes('w-full gap-0')
         self._render_tabs()
 
@@ -321,7 +323,7 @@ class OosPanel:
     def _render_table_section(self) -> None:
         with ui.row().classes('w-full items-center gap-2 no-wrap mt-2 mb-1'):
             ui.label(self._table_title()).classes(MINOR_HEADER_CLASSES)
-            ui.element('div').classes('flex-1 h-px bg-neutral-800')
+            separator()
             ui.button(
                 icon='refresh', on_click=self.refresh,
             ).props('flat dense round').classes('text-neutral-400')
@@ -339,9 +341,9 @@ class OosPanel:
         self._table_container.clear()
         with self._table_container:
             if not self._trials:
-                ui.label(
+                muted(
                     'No top trials yet — extend the study first.'
-                ).classes('text-xs text-neutral-500 px-2 py-3')
+                ).classes('px-2 py-3')
                 return
             self._render_table_header()
             for trial in self._trials:
@@ -351,7 +353,7 @@ class OosPanel:
         with ui.row().classes(
             'w-full items-center px-2 py-1 no-wrap text-[10px] '
             'uppercase tracking-wider text-neutral-500 font-semibold '
-            'border-b border-neutral-800'
+            f'border-b {BORDER}'
         ):
             ui.label('Trial').classes('w-16')
             ui.label('IS').classes('w-20 text-right')
@@ -362,8 +364,8 @@ class OosPanel:
 
     def _render_trial_row(self, trial: TrialWithOos) -> None:
         with ui.row().classes(
-            'w-full items-center px-2 py-1 no-wrap text-[12px] font-mono '
-            'border-b border-neutral-800/60'
+            f'w-full items-center px-2 py-1 no-wrap {MONO_CAPTION_CLASSES} '
+            f'border-b {BORDER}/60'
         ):
             ui.label(f'#{trial.trial_number}').classes('w-16 text-neutral-200')
             ui.label(f'{trial.is_value:.3f}').classes(
