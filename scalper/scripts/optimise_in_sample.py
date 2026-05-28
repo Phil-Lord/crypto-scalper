@@ -3,21 +3,9 @@ import sys
 
 import click
 
-from backtesting_engine import BacktestingEngine
+from backtesting_engine import run_in_sample_optimisation
 from core import DONE, JsonTrialProgressCallback, emit
-from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
-from strategy_manager import create_strategy
-from utils import (
-    load_env,
-    LOG_FORMAT,
-    get_kraken_pair,
-    get_second_timestamp,
-    parse_datetime,
-    SMA_GRID,
-    PRECISION_TREND_GRID,
-    SMA_CONFIG,
-    PRECISION_TREND_CONFIG,
-)
+from utils import LOG_FORMAT, get_second_timestamp, load_env, parse_datetime
 
 load_env()
 logging.basicConfig(level=logging.WARNING, format=LOG_FORMAT, stream=sys.stderr)
@@ -35,33 +23,16 @@ def optimise_in_sample(
     pair: str, strategy_name: str, start: str, end: str, n_trials: int, n_jobs: int
 ) -> None:
     ''' Run an in-sample Optuna parameter optimisation. Emits one JSON line per trial. '''
-    params, grid = get_strategy_configs(strategy_name)
-    engine = build_engine(pair, strategy_name, start, end, params)
-    callback = JsonTrialProgressCallback()
-    engine.optimise_parameters(grid, n_trials=n_trials, n_jobs=n_jobs, progress_callback=callback)
-    emit(DONE, {'trials': n_trials})
-
-
-def get_strategy_configs(strategy_name: str) -> tuple[dict, dict]:
-    if strategy_name == 'SmaStrategy':
-        return SMA_CONFIG, SMA_GRID
-    if strategy_name == 'PrecisionTrendStrategy':
-        return PRECISION_TREND_CONFIG, PRECISION_TREND_GRID
-    raise ValueError(f'No default config found for strategy: {strategy_name}')
-
-
-def build_engine(
-    pair: str, strategy_name: str, start: str, end: str, params: dict
-) -> BacktestingEngine:
-    kraken_pair = get_kraken_pair(pair)
-    strategy = create_strategy(strategy_name, params)
-    client = SQLAlchemyClient()
-    repository = SQLAlchemyTradeRepository(client)
-    start_ts = get_second_timestamp(*parse_datetime(start))
-    end_ts = get_second_timestamp(*parse_datetime(end))
-    return BacktestingEngine(
-        kraken_pair, strategy, repository, start_ts, end_ts, interval=1, vectorised=True,
+    run_in_sample_optimisation(
+        pair=pair,
+        strategy_name=strategy_name,
+        start=get_second_timestamp(*parse_datetime(start)),
+        end=get_second_timestamp(*parse_datetime(end)),
+        n_trials=n_trials,
+        n_jobs=n_jobs,
+        progress_callback=JsonTrialProgressCallback(),
     )
+    emit(DONE, {'trials': n_trials})
 
 
 if __name__ == '__main__':

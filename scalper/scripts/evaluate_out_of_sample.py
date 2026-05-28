@@ -5,7 +5,7 @@ import click
 
 from backtesting_engine import evaluate_out_of_sample as run_evaluate_out_of_sample
 from core import DONE, JsonEvaluationProgressCallback, emit
-from utils import load_env, LOG_FORMAT, get_second_timestamp, parse_datetime
+from utils import LOG_FORMAT, get_second_timestamp, load_env, parse_datetime
 
 load_env()
 logging.basicConfig(level=logging.WARNING, format=LOG_FORMAT, stream=sys.stderr)
