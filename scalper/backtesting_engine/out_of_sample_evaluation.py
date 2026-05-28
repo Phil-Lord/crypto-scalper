@@ -1,7 +1,8 @@
+import json
 import logging
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Callable
 
@@ -127,24 +128,29 @@ class TrialWithOos:
 def build_out_of_sample_command(
     study_name: str,
     num_sets: int,
-    start: str,
-    end: str,
+    start: float,
+    end: float,
     n_workers: int = 1,
 ) -> list[str]:
     '''
-    Build the argv to invoke the out-of-sample evaluation as
-    ``python -m scripts.evaluate_out_of_sample``.
+    Build the argv to invoke the OOS worker as
+    ``python -m backtesting_engine._out_of_sample_worker '<json>'``.
 
-    Colocated with the evaluation entry point so flag changes update one place.
-    Used by ``ui.services.walk_forward`` to spawn the evaluation subprocess.
+    The single positional arg is :class:`OutOfSampleArgs` JSON-encoded — the
+    same dataclass the worker reconstructs on the other side, so producer and
+    consumer share one schema. Used by ``ui.services.walk_forward`` to spawn
+    the evaluation subprocess.
+
+    :param start: Window start, Unix seconds.
+    :param end: Window end, Unix seconds.
     '''
+    args = OutOfSampleArgs(
+        study_name=study_name, num_sets=num_sets, start=start, end=end,
+        n_workers=n_workers,
+    )
     return [
-        sys.executable, '-m', 'scripts.evaluate_out_of_sample',
-        '-sn', study_name,
-        '-n', str(num_sets),
-        '-s', start,
-        '-e', end,
-        '-w', str(n_workers),
+        sys.executable, '-m', 'backtesting_engine._out_of_sample_worker',
+        json.dumps(asdict(args)),
     ]
 
 
