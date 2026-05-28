@@ -27,6 +27,31 @@ logger = logging.getLogger(__name__)
 
 INITIAL_BALANCE = 1000
 
+
+@dataclass(frozen=True)
+class OutOfSampleArgs:
+    '''
+    Typed IPC contract for the out-of-sample worker subprocess.
+
+    Constructed by :func:`build_out_of_sample_command` on the UI side,
+    JSON-encoded across the process boundary, and reconstructed by
+    ``_out_of_sample_worker`` on the other side.
+
+    Attributes:
+        study_name (str): Optuna study name to load top trials from.
+        num_sets (int): Number of top trials to evaluate.
+        start (float): OOS window start (Unix seconds).
+        end (float): OOS window end (Unix seconds).
+        n_workers (int): Worker processes for parallel evaluation.
+            ``1`` runs serially in-process.
+    '''
+    study_name: str
+    num_sets: int
+    start: float
+    end: float
+    n_workers: int
+
+
 '''
 OOS verdict thresholds. A trial is overfit when either:
 

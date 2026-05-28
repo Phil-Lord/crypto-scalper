@@ -7,6 +7,7 @@ from .in_sample_evaluation import (
 from .out_of_sample_evaluation import (
     OOS_DRAWDOWN_LIMIT,
     OOS_FLOOR,
+    OutOfSampleArgs,
     TrialVerdict,
     TrialWithOos,
     build_out_of_sample_command,
