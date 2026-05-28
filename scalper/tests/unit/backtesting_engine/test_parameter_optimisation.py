@@ -3,11 +3,12 @@ import sys
 import pandas as pd
 import pytest
 
-from backtesting_engine.parameter_optimisation import build_in_sample_command, create_windows
+from backtesting_engine.in_sample_evaluation import build_in_sample_command
+from backtesting_engine.parameter_optimisation import create_windows
 
 
 @pytest.mark.backtesting_engine
-@pytest.mark.parameter_optimisation
+@pytest.mark.in_sample_evaluation
 class TestBuildInSampleCommand:
     def test_includes_all_required_flags(self):
         cmd = build_in_sample_command(
