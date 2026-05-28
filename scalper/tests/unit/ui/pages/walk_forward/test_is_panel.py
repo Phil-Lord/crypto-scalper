@@ -41,8 +41,8 @@ class TestDeriveRunInputs:
         assert result == IsRunInputs(
             raw_pair='BTCGBP',
             strategy='SmaStrategy',
-            start='2025-1-1-0-0-0',
-            end='2025-4-1-0-0-0',
+            start=get_second_timestamp(*parse_datetime('2025-1-1-0-0-0')),
+            end=get_second_timestamp(*parse_datetime('2025-4-1-0-0-0')),
         )
 
     def test_returns_none_for_legacy_name_without_window(self):
@@ -76,8 +76,8 @@ class TestDeriveRunInputs:
         rebuilt = create_study_name(
             inputs.strategy,
             get_kraken_pair(inputs.raw_pair),
-            get_second_timestamp(*parse_datetime(inputs.start)),
-            get_second_timestamp(*parse_datetime(inputs.end)),
+            inputs.start,
+            inputs.end,
         )
         assert rebuilt == original
 
@@ -266,8 +266,8 @@ class TestOnStart:
         call = deps['start_in_sample'].call_args
         assert call.args[0] == 'BTCGBP'
         assert call.args[1] == 'SmaStrategy'
-        assert call.args[2] == '2025-1-1-0-0-0'
-        assert call.args[3] == '2025-4-1-0-0-0'
+        assert call.args[2] == get_second_timestamp(*parse_datetime('2025-1-1-0-0-0'))
+        assert call.args[3] == get_second_timestamp(*parse_datetime('2025-4-1-0-0-0'))
         assert call.args[4] == 10
         assert call.args[5] == 4
         assert call.args[6] is deps['job_repo']

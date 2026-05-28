@@ -4,7 +4,16 @@ import pytest
 
 from core import StreamEvent
 from ui.pages.walk_forward.components import oos_panel as oos_panel_module
-from utils import StudyDirection, StudySummary
+from utils import (
+    StudyDirection,
+    StudySummary,
+    get_second_timestamp,
+    parse_datetime,
+)
+
+
+_START_TS = get_second_timestamp(*parse_datetime('2025-1-1-0-0-0'))
+_END_TS = get_second_timestamp(*parse_datetime('2025-4-1-0-0-0'))
 from ui.pages.walk_forward.components.oos_panel import (
     OosPanel,
     OosRunInputs,
@@ -32,15 +41,15 @@ class TestValidateOosForm:
     def test_returns_inputs_for_valid_input(self):
         inputs = validate_oos_form('2025-1-1-0-0-0', '2025-4-1-0-0-0', '25', '4')
         assert inputs == OosRunInputs(
-            start='2025-1-1-0-0-0',
-            end='2025-4-1-0-0-0',
+            start=_START_TS,
+            end=_END_TS,
             top_n=25,
             n_workers=4,
         )
 
     def test_strips_whitespace_around_dates(self):
         inputs = validate_oos_form(' 2025-1-1-0-0-0 ', '2025-4-1-0-0-0', '25', '4')
-        assert inputs.start == '2025-1-1-0-0-0'
+        assert inputs.start == _START_TS
 
     @pytest.mark.parametrize('start,end', [
         ('', '2025-4-1-0-0-0'),
@@ -223,8 +232,8 @@ class TestOnStart:
         call = deps['start_out_of_sample'].call_args
         assert call.args[0] == deps['selected'].name
         assert call.args[1] == 10
-        assert call.args[2] == '2025-1-1-0-0-0'
-        assert call.args[3] == '2025-4-1-0-0-0'
+        assert call.args[2] == _START_TS
+        assert call.args[3] == _END_TS
         assert call.args[4] == 3
         assert call.args[5] is deps['job_repo']
 
