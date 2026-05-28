@@ -8,8 +8,9 @@ the ``_in_sample_worker`` subprocess entry point.
 Mirrors :mod:`backtesting_engine.out_of_sample_evaluation` — argv builder and
 its receiving end live together.
 '''
+import json
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
 from strategy_manager import create_strategy
@@ -53,26 +54,30 @@ class InSampleArgs:
 def build_in_sample_command(
     pair: str,
     strategy_name: str,
-    start: str,
-    end: str,
+    start: float,
+    end: float,
     n_trials: int,
     n_jobs: int = 1,
 ) -> list[str]:
     '''
-    Build the argv to invoke the in-sample optimisation as
-    ``python -m scripts.optimise_in_sample``.
+    Build the argv to invoke the in-sample worker as
+    ``python -m backtesting_engine._in_sample_worker '<json>'``.
 
-    Colocated with the optimisation entry point so flag changes update one
-    place. Used by ``ui.services.walk_forward`` to spawn worker subprocesses.
+    The single positional arg is :class:`InSampleArgs` JSON-encoded — the same
+    dataclass the worker reconstructs on the other side, so producer and
+    consumer share one schema. Used by ``ui.services.walk_forward`` to spawn
+    worker subprocesses.
+
+    :param start: Window start, Unix seconds.
+    :param end: Window end, Unix seconds.
     '''
+    args = InSampleArgs(
+        pair=pair, strategy_name=strategy_name, start=start, end=end,
+        n_trials=n_trials, n_jobs=n_jobs,
+    )
     return [
-        sys.executable, '-m', 'scripts.optimise_in_sample',
-        '-p', pair,
-        '-sn', strategy_name,
-        '-s', start,
-        '-e', end,
-        '-n', str(n_trials),
-        '-j', str(n_jobs),
+        sys.executable, '-m', 'backtesting_engine._in_sample_worker',
+        json.dumps(asdict(args)),
     ]
 
 
