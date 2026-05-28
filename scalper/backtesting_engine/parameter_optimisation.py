@@ -1,5 +1,4 @@
 import os
-import sys
 from typing import Any, Callable
 import warnings
 
@@ -12,32 +11,6 @@ from utils import create_study_name, OptunaConfig
 
 
 OptunaCallback = Callable[[optuna.study.Study, optuna.trial.FrozenTrial], None]
-
-
-def build_in_sample_command(
-    pair: str,
-    strategy_name: str,
-    start: str,
-    end: str,
-    n_trials: int,
-    n_jobs: int = 1,
-) -> list[str]:
-    '''
-    Build the argv to invoke the in-sample optimisation as
-    ``python -m scripts.optimise_in_sample``.
-
-    Colocated with the optimisation entry point so flag changes update one
-    place. Used by ``ui.services.walk_forward`` to spawn worker subprocesses.
-    '''
-    return [
-        sys.executable, '-m', 'scripts.optimise_in_sample',
-        '-p', pair,
-        '-sn', strategy_name,
-        '-s', start,
-        '-e', end,
-        '-n', str(n_trials),
-        '-j', str(n_jobs),
-    ]
 
 
 def optimise_parameters(
