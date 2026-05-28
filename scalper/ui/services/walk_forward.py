@@ -141,8 +141,8 @@ async def start_in_sample(
 async def start_out_of_sample(
     study_name: str,
     num_sets: int,
-    start: str,
-    end: str,
+    start: float,
+    end: float,
     n_workers: int,
     job_repo: JobRepository,
     on_progress: Callable[[StreamEvent], None] | None = None,
@@ -150,8 +150,11 @@ async def start_out_of_sample(
     '''
     Run an out-of-sample evaluation as a single subprocess.
 
-    Parallelism happens inside the script's ``ProcessPoolExecutor``, so this
+    Parallelism happens inside the worker's ``ProcessPoolExecutor``, so this
     layer only spawns one OS process and creates one ``Job`` row.
+
+    :param start: Window start, Unix seconds.
+    :param end: Window end, Unix seconds.
     '''
     job = Job(job_type=JobType.EVALUATE_OUT_OF_SAMPLE)
     cmd = build_out_of_sample_command(study_name, num_sets, start, end, n_workers)

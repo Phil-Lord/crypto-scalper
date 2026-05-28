@@ -87,13 +87,13 @@ class OosRunInputs:
     Validated inputs for an OOS run.
 
     Attributes:
-        start (str): Window start in ``'YYYY-M-D-h-m-s'`` text format.
-        end (str): Window end in the same format.
+        start (float): Window start, Unix seconds.
+        end (float): Window end, Unix seconds.
         top_n (int): Number of top trials to evaluate.
         n_workers (int): Number of parallel workers inside the subprocess.
     '''
-    start: str
-    end: str
+    start: float
+    end: float
     top_n: int
     n_workers: int
 
@@ -120,11 +120,11 @@ def validate_oos_form(
     if not start_text or not end_text:
         raise ValueError('Window start and end are required.')
     try:
-        parse_datetime(start_text)
+        start_ts = get_second_timestamp(*parse_datetime(start_text))
     except ValueError as e:
         raise ValueError(f'Window start is not parseable: {e}')
     try:
-        parse_datetime(end_text)
+        end_ts = get_second_timestamp(*parse_datetime(end_text))
     except ValueError as e:
         raise ValueError(f'Window end is not parseable: {e}')
 
@@ -137,7 +137,7 @@ def validate_oos_form(
         raise ValueError('Top N and workers must be positive.')
 
     return OosRunInputs(
-        start=start_text, end=end_text, top_n=top_n_int, n_workers=workers_int
+        start=start_ts, end=end_ts, top_n=top_n_int, n_workers=workers_int
     )
 
 
@@ -539,11 +539,9 @@ class OosPanel:
             ui.notify(str(e), type='negative')
             return
 
-        try:
-            window_key = derive_window_key(inputs.start, inputs.end)
-        except (ValueError, TypeError) as e:
-            ui.notify(f'Could not parse window: {e}', type='negative')
-            return
+        # validate_oos_form already parsed dates into timestamps, so the
+        # window key is just the (start, end) pair.
+        window_key: WindowKey = (inputs.start, inputs.end)
 
         self._running_window = window_key
         self._selected_window = window_key
