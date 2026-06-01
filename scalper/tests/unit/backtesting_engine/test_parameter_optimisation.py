@@ -27,7 +27,6 @@ class TestBuildInSampleCommand:
             'start': 1700000000.0,
             'end': 1701000000.0,
             'n_trials': 50,
-            'n_jobs': 1,
         }
 
     def test_payload_round_trips_through_in_sample_args(self):
@@ -36,17 +35,13 @@ class TestBuildInSampleCommand:
         — that's the contract the worker depends on.
         '''
         cmd = build_in_sample_command(
-            'BTCGBP', 'SmaStrategy', 1.0, 2.0, n_trials=5, n_jobs=4,
+            'BTCGBP', 'SmaStrategy', 1.0, 2.0, n_trials=5,
         )
         args = InSampleArgs(**json.loads(cmd[3]))
         assert args == InSampleArgs(
             pair='BTCGBP', strategy_name='SmaStrategy',
-            start=1.0, end=2.0, n_trials=5, n_jobs=4,
+            start=1.0, end=2.0, n_trials=5,
         )
-
-    def test_defaults_n_jobs_to_one(self):
-        cmd = build_in_sample_command('BTCGBP', 'SmaStrategy', 1.0, 2.0, n_trials=10)
-        assert json.loads(cmd[3])['n_jobs'] == 1
 
 
 @pytest.mark.backtesting_engine

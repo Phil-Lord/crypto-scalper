@@ -37,6 +37,7 @@ from backtesting_engine import (
     build_out_of_sample_command,
     get_top_param_sets,
     get_top_trials_with_oos as _get_top_trials_with_oos_from_engine,
+    split_trials,
     TrialWithOos
 )
 from core import StreamEvent, parse, run_subprocess
@@ -122,7 +123,7 @@ async def start_in_sample(
     jobs = [Job(job_type=JobType.OPTIMISE_IN_SAMPLE) for _ in splits]
     tasks: list[asyncio.Task[None]] = []
     for index, (job, worker_trials) in enumerate(zip(jobs, splits)):
-        cmd = build_in_sample_command(pair, strategy_name, start, end, worker_trials, n_jobs=1)
+        cmd = build_in_sample_command(pair, strategy_name, start, end, worker_trials)
         callback = _make_progress_handler(index, on_progress)
         tasks.append(asyncio.create_task(
             run_subprocess(job_repo, job, cmd, on_progress=callback, cwd=str(SCALPER_DIR))
@@ -260,22 +261,6 @@ def get_evaluation_results(
     time window.
     '''
     return oos_repo.get(study_name, start, end)
-
-
-def split_trials(n_trials: int, n_workers: int) -> list[int]:
-    '''
-    Split ``n_trials`` across ``n_workers``, distributing the remainder to the
-    first workers. Returns one positive trial count per active worker — workers
-    that would receive zero trials are dropped.
-
-    Public so the IS panel can seed its worker grid with the same per-worker
-    trial counts the run will actually use.
-    '''
-    if n_trials <= 0 or n_workers <= 0:
-        return []
-    workers = min(n_workers, n_trials)
-    base, remainder = divmod(n_trials, workers)
-    return [base + (1 if i < remainder else 0) for i in range(workers)]
 
 
 def _make_progress_handler(

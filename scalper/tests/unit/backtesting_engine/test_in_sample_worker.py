@@ -27,7 +27,6 @@ class TestInSampleWorkerContract:
             start=1700000000.0,
             end=1701000000.0,
             n_trials=7,
-            n_jobs=1,
         )
 
         # When — call the worker's main with the JSON arg build_command produced.
@@ -43,7 +42,6 @@ class TestInSampleWorkerContract:
         assert kwargs['start'] == 1700000000.0
         assert kwargs['end'] == 1701000000.0
         assert kwargs['n_trials'] == 7
-        assert kwargs['n_jobs'] == 1
         assert isinstance(kwargs['progress_callback'], JsonTrialProgressCallback)
 
         # And a DONE line landed on stdout with the trial count.
@@ -62,7 +60,7 @@ class TestInSampleWorkerContract:
             'strategy_name': 'SmaStrategy',
             'start': 1.0,
             'end': 2.0,
-            # n_trials and n_jobs deliberately omitted
+            # n_trials deliberately omitted
         })
         with pytest.raises(TypeError, match='n_trials'):
             worker_main(bad_payload)

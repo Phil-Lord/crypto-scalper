@@ -17,7 +17,6 @@ def optimise_parameters(
     engine,
     param_grid: dict[str, list[Any]],
     n_trials: int = 100,
-    n_jobs: int = -1,
     progress_callback: OptunaCallback | None = None,
 ) -> None:
     '''
@@ -26,7 +25,6 @@ def optimise_parameters(
     :param engine: BacktestingEngine pre-loaded with OHLC data.
     :param param_grid: Search space, ``{name: [low, high]}``.
     :param n_trials: Number of Optuna trials.
-    :param n_jobs: Optuna concurrency. ``-1`` uses all available cores.
     :param progress_callback: Optional Optuna callback ``(study, trial) -> None``
         invoked after each trial. Entry points pick presentation; the library
         installs no default progress bar.
@@ -39,7 +37,7 @@ def optimise_parameters(
     storage = create_storage()
     study = create_study(storage, study_name, n_trials)
     validate_search_space(study, param_grid)
-    optimise(n_trials, study, engine, windows, param_grid, n_jobs, progress_callback)
+    optimise(n_trials, study, engine, windows, param_grid, progress_callback)
 
 
 def create_storage() -> optuna.storages.RDBStorage:
@@ -142,7 +140,6 @@ def optimise(
     engine,
     windows: list[tuple[pd.Timestamp, pd.Timestamp]],
     param_grid: dict[str, list[Any]],
-    n_jobs: int = -1,
     progress_callback: OptunaCallback | None = None,
 ) -> None:
     optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -150,6 +147,6 @@ def optimise(
     study.optimize(
         get_objective(engine, param_grid, windows),
         n_trials=n_trials,
-        n_jobs=n_jobs,
+        n_jobs=1,
         callbacks=callbacks,
     )

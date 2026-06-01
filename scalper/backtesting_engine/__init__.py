@@ -3,6 +3,8 @@ from .in_sample_evaluation import (
     InSampleArgs,
     build_in_sample_command,
     run_in_sample_optimisation,
+    run_in_sample_workers,
+    split_trials,
 )
 from .out_of_sample_evaluation import (
     OOS_DRAWDOWN_LIMIT,

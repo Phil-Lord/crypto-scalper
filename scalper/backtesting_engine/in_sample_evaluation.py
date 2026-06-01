@@ -9,8 +9,10 @@ Mirrors :mod:`backtesting_engine.out_of_sample_evaluation` — argv builder and
 its receiving end live together.
 '''
 import json
+import subprocess
 import sys
 from dataclasses import asdict, dataclass
+from pathlib import Path
 
 from data_system import SQLAlchemyClient, SQLAlchemyTradeRepository
 from strategy_manager import create_strategy
@@ -24,6 +26,11 @@ from utils import (
 
 from .backtesting_engine import BacktestingEngine
 from .parameter_optimisation import OptunaCallback
+
+
+# Workers run as ``python -m backtesting_engine._in_sample_worker`` — the package
+# must be importable, so spawn them from the scalper dir (this file's grandparent).
+_SCALPER_DIR = Path(__file__).resolve().parents[1]
 
 
 @dataclass(frozen=True)
@@ -41,14 +48,12 @@ class InSampleArgs:
         start (float): In-sample window start (Unix seconds).
         end (float): In-sample window end (Unix seconds).
         n_trials (int): Number of Optuna trials to run.
-        n_jobs (int): Optuna concurrency. ``-1`` uses all available cores.
     '''
     pair: str
     strategy_name: str
     start: float
     end: float
     n_trials: int
-    n_jobs: int
 
 
 def build_in_sample_command(
@@ -57,7 +62,6 @@ def build_in_sample_command(
     start: float,
     end: float,
     n_trials: int,
-    n_jobs: int = 1,
 ) -> list[str]:
     '''
     Build the argv to invoke the in-sample worker as
@@ -72,8 +76,7 @@ def build_in_sample_command(
     :param end: Window end, Unix seconds.
     '''
     args = InSampleArgs(
-        pair=pair, strategy_name=strategy_name, start=start, end=end,
-        n_trials=n_trials, n_jobs=n_jobs,
+        pair=pair, strategy_name=strategy_name, start=start, end=end, n_trials=n_trials
     )
     return [
         sys.executable, '-m', 'backtesting_engine._in_sample_worker',
@@ -87,7 +90,6 @@ def run_in_sample_optimisation(
     start: float,
     end: float,
     n_trials: int,
-    n_jobs: int,
     progress_callback: OptunaCallback | None = None,
 ) -> None:
     '''
@@ -102,7 +104,6 @@ def run_in_sample_optimisation(
     :param start: Window start, Unix seconds.
     :param end: Window end, Unix seconds.
     :param n_trials: Number of Optuna trials.
-    :param n_jobs: Optuna concurrency. ``-1`` uses all available cores.
     :param progress_callback: Optional Optuna callback ``(study, trial) -> None``
         invoked after each trial. Entry points pick presentation; the library
         installs no default progress bar.
@@ -110,8 +111,67 @@ def run_in_sample_optimisation(
     params, grid = _get_strategy_configs(strategy_name)
     engine = _build_engine(pair, strategy_name, start, end, params)
     engine.optimise_parameters(
-        grid, n_trials=n_trials, n_jobs=n_jobs, progress_callback=progress_callback,
+        grid, n_trials=n_trials, progress_callback=progress_callback,
     )
+
+
+def run_in_sample_workers(
+    pair: str,
+    strategy_name: str,
+    start: float,
+    end: float,
+    n_trials: int,
+    n_workers: int,
+) -> None:
+    '''
+    Run an in-sample optimisation as ``n_workers`` parallel ``_in_sample_worker``
+    subprocesses, splitting ``n_trials`` across them — the same fan-out the
+    walk-forward UI uses, without its ``Job`` / asyncio / cancellation wrapper.
+
+    Blocks until all workers exit, raising ``RuntimeError`` if any exited
+    non-zero. ``KeyboardInterrupt`` terminates survivors so none are orphaned.
+
+    :param start: Window start, Unix seconds.
+    :param end: Window end, Unix seconds.
+    '''
+    procs: list[subprocess.Popen] = []
+    try:
+        for worker_trials in split_trials(n_trials, n_workers):
+            cmd = build_in_sample_command(pair, strategy_name, start, end, worker_trials)
+            procs.append(subprocess.Popen(cmd, cwd=str(_SCALPER_DIR)))
+        return_codes = [proc.wait() for proc in procs]
+    finally:
+        _terminate_survivors(procs)
+
+    failures = [code for code in return_codes if code != 0]
+    if failures:
+        raise RuntimeError(f'{len(failures)} in-sample worker(s) exited non-zero: {failures}')
+
+
+def _terminate_survivors(procs: list[subprocess.Popen]) -> None:
+    ''' Terminate any still-running workers, escalating to kill after a grace period. '''
+    for proc in procs:
+        if proc.poll() is None:
+            proc.terminate()
+    for proc in procs:
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+
+
+def split_trials(n_trials: int, n_workers: int) -> list[int]:
+    '''
+    Split ``n_trials`` across ``n_workers``, distributing the remainder to the
+    first workers. Returns one positive trial count per active worker — workers
+    that would receive zero trials are dropped.
+    '''
+    if n_trials <= 0 or n_workers <= 0:
+        return []
+    workers = min(n_workers, n_trials)
+    base, remainder = divmod(n_trials, workers)
+    return [base + (1 if i < remainder else 0) for i in range(workers)]
 
 
 def _get_strategy_configs(strategy_name: str) -> tuple[dict, dict]:

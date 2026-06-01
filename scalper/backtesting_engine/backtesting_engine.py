@@ -51,10 +51,9 @@ class BacktestingEngine:
         self,
         param_grid: dict[str, list[Any]],
         n_trials: int = 100,
-        n_jobs: int = -1,
         progress_callback: OptunaCallback | None = None
     ) -> None:
-        optimise_parameters(self, param_grid, n_trials, n_jobs, progress_callback)
+        optimise_parameters(self, param_grid, n_trials, progress_callback)
 
     def calculate_position_profits(self, initial_quote_balance: float = 1000) -> pd.DataFrame:
         if self.results is None:
