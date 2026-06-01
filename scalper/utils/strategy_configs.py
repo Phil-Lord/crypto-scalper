@@ -21,7 +21,7 @@ PRECISION_TREND_CONFIG = {
 PRECISION_TREND_GRID = {
     'short_ema': [5, 50],
     'long_ema': [30, 150],
-    'rsi_window': [5, 30],
+    'rsi_window': [5, 40],
     'rsi_oversold': [10.0, 40.0],
     'rsi_overbought': [55.0, 75.0],
     'adx_window': [5, 50],
@@ -32,6 +32,6 @@ PRECISION_TREND_GRID = {
     'weight_rsi': [0.1, 1.0],
     'weight_adx': [0.1, 1.0],
     'weight_atr': [0.1, 1.0],
-    'buy_threshold': [0.1, 0.5],
-    'sell_threshold': [-0.5, -0.1]
+    'buy_threshold': [0.1, 0.7],
+    'sell_threshold': [-0.5, -0.05]
 }
