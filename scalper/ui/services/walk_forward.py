@@ -122,7 +122,7 @@ async def start_in_sample(
     jobs = [Job(job_type=JobType.OPTIMISE_IN_SAMPLE) for _ in splits]
     tasks: list[asyncio.Task[None]] = []
     for index, (job, worker_trials) in enumerate(zip(jobs, splits)):
-        cmd = build_in_sample_command(pair, strategy_name, start, end, worker_trials, n_jobs=1)
+        cmd = build_in_sample_command(pair, strategy_name, start, end, worker_trials)
         callback = _make_progress_handler(index, on_progress)
         tasks.append(asyncio.create_task(
             run_subprocess(job_repo, job, cmd, on_progress=callback, cwd=str(SCALPER_DIR))

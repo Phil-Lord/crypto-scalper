@@ -41,14 +41,12 @@ class InSampleArgs:
         start (float): In-sample window start (Unix seconds).
         end (float): In-sample window end (Unix seconds).
         n_trials (int): Number of Optuna trials to run.
-        n_jobs (int): Optuna concurrency. ``-1`` uses all available cores.
     '''
     pair: str
     strategy_name: str
     start: float
     end: float
     n_trials: int
-    n_jobs: int
 
 
 def build_in_sample_command(
@@ -57,7 +55,6 @@ def build_in_sample_command(
     start: float,
     end: float,
     n_trials: int,
-    n_jobs: int = 1,
 ) -> list[str]:
     '''
     Build the argv to invoke the in-sample worker as
@@ -72,8 +69,7 @@ def build_in_sample_command(
     :param end: Window end, Unix seconds.
     '''
     args = InSampleArgs(
-        pair=pair, strategy_name=strategy_name, start=start, end=end,
-        n_trials=n_trials, n_jobs=n_jobs,
+        pair=pair, strategy_name=strategy_name, start=start, end=end, n_trials=n_trials
     )
     return [
         sys.executable, '-m', 'backtesting_engine._in_sample_worker',
@@ -87,7 +83,6 @@ def run_in_sample_optimisation(
     start: float,
     end: float,
     n_trials: int,
-    n_jobs: int,
     progress_callback: OptunaCallback | None = None,
 ) -> None:
     '''
@@ -102,7 +97,6 @@ def run_in_sample_optimisation(
     :param start: Window start, Unix seconds.
     :param end: Window end, Unix seconds.
     :param n_trials: Number of Optuna trials.
-    :param n_jobs: Optuna concurrency. ``-1`` uses all available cores.
     :param progress_callback: Optional Optuna callback ``(study, trial) -> None``
         invoked after each trial. Entry points pick presentation; the library
         installs no default progress bar.
@@ -110,7 +104,7 @@ def run_in_sample_optimisation(
     params, grid = _get_strategy_configs(strategy_name)
     engine = _build_engine(pair, strategy_name, start, end, params)
     engine.optimise_parameters(
-        grid, n_trials=n_trials, n_jobs=n_jobs, progress_callback=progress_callback,
+        grid, n_trials=n_trials, progress_callback=progress_callback,
     )
 
 

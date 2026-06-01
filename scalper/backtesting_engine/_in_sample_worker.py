@@ -38,7 +38,6 @@ def main(raw_args: str) -> None:
         start=args.start,
         end=args.end,
         n_trials=args.n_trials,
-        n_jobs=args.n_jobs,
         progress_callback=JsonTrialProgressCallback(),
     )
     emit(DONE, {'trials': args.n_trials})
