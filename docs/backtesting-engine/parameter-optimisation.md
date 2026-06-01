@@ -9,7 +9,8 @@ The BacktestingEngine uses Optuna-based parameter optimisation to find effective
 1. **Define parameter space** — Specify ranges for each strategy parameter
 2. **Rolling window evaluation** — Test parameter combinations across multiple 3-month windows
 3. **Activity-penalised scoring** — Geometric mean of returns, adjusted for trade frequency
-4. **Concurrent optimisation** — Optuna runs trials in parallel with smart sampling
+4. **Concurrent optimisation** — multiple worker processes share one PostgreSQL-backed study,
+   each running trials sequentially with smart, conflict-free sampling
 
 ```python
 from backtesting_engine import BacktestingEngine
@@ -41,7 +42,6 @@ engine.optimise_parameters(param_grid, n_trials=100)
 
 **Optional parameters:**
 
-- `n_jobs`: Optuna concurrency. Defaults to `-1` (use all available cores).
 - `progress_callback`: Optuna-style `(study, trial) -> None` callback invoked after each trial.
   When `None`, the library installs a default tqdm-backed progress bar to preserve existing
   CLI behaviour.
