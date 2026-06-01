@@ -1,32 +1,52 @@
+import json
 import sys
 
 import pandas as pd
 import pytest
 
-from backtesting_engine.parameter_optimisation import build_in_sample_command, create_windows
+from backtesting_engine.in_sample_evaluation import InSampleArgs, build_in_sample_command
+from backtesting_engine.parameter_optimisation import create_windows
 
 
 @pytest.mark.backtesting_engine
-@pytest.mark.parameter_optimisation
+@pytest.mark.in_sample_evaluation
 class TestBuildInSampleCommand:
-    def test_includes_all_required_flags(self):
+    def test_argv_invokes_in_sample_worker_with_json_payload(self):
         cmd = build_in_sample_command(
-            'BTCGBP', 'PrecisionTrendStrategy', '2025-1-1-0-0-0', '2025-4-1-0-0-0',
+            'BTCGBP', 'PrecisionTrendStrategy', 1700000000.0, 1701000000.0,
             n_trials=50,
         )
 
         assert cmd[0] == sys.executable
-        assert cmd[1:3] == ['-m', 'scripts.optimise_in_sample']
-        assert cmd[cmd.index('-p') + 1] == 'BTCGBP'
-        assert cmd[cmd.index('-sn') + 1] == 'PrecisionTrendStrategy'
-        assert cmd[cmd.index('-s') + 1] == '2025-1-1-0-0-0'
-        assert cmd[cmd.index('-e') + 1] == '2025-4-1-0-0-0'
-        assert cmd[cmd.index('-n') + 1] == '50'
-        assert cmd[cmd.index('-j') + 1] == '1'
+        assert cmd[1:3] == ['-m', 'backtesting_engine._in_sample_worker']
+        assert len(cmd) == 4
+        payload = json.loads(cmd[3])
+        assert payload == {
+            'pair': 'BTCGBP',
+            'strategy_name': 'PrecisionTrendStrategy',
+            'start': 1700000000.0,
+            'end': 1701000000.0,
+            'n_trials': 50,
+            'n_jobs': 1,
+        }
 
-    def test_overrides_n_jobs(self):
-        cmd = build_in_sample_command('BTCGBP', 'SmaStrategy', 's', 'e', n_trials=10, n_jobs=4)
-        assert cmd[cmd.index('-j') + 1] == '4'
+    def test_payload_round_trips_through_in_sample_args(self):
+        '''
+        The JSON payload must reconstruct verbatim through :class:`InSampleArgs`
+        — that's the contract the worker depends on.
+        '''
+        cmd = build_in_sample_command(
+            'BTCGBP', 'SmaStrategy', 1.0, 2.0, n_trials=5, n_jobs=4,
+        )
+        args = InSampleArgs(**json.loads(cmd[3]))
+        assert args == InSampleArgs(
+            pair='BTCGBP', strategy_name='SmaStrategy',
+            start=1.0, end=2.0, n_trials=5, n_jobs=4,
+        )
+
+    def test_defaults_n_jobs_to_one(self):
+        cmd = build_in_sample_command('BTCGBP', 'SmaStrategy', 1.0, 2.0, n_trials=10)
+        assert json.loads(cmd[3])['n_jobs'] == 1
 
 
 @pytest.mark.backtesting_engine

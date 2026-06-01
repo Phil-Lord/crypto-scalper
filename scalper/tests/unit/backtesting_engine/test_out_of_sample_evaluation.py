@@ -1,3 +1,4 @@
+import json
 import sys
 from unittest.mock import MagicMock
 
@@ -9,6 +10,7 @@ from backtesting_engine.out_of_sample_evaluation import (
     INITIAL_BALANCE,
     OOS_DRAWDOWN_LIMIT,
     OOS_FLOOR,
+    OutOfSampleArgs,
     TrialVerdict,
     TrialWithOos,
     _evaluate_chunk_worker,
@@ -28,26 +30,37 @@ from data_system.models.out_of_sample_evaluation_model import OutOfSampleEvaluat
 @pytest.mark.backtesting_engine
 @pytest.mark.out_of_sample_evaluation
 class TestBuildOutOfSampleCommand:
-    def test_includes_all_required_flags(self):
+    def test_argv_invokes_oos_worker_with_json_payload(self):
         cmd = build_out_of_sample_command(
             'PrecisionTrendStrategy_XXBTZGBP_20250101-20250401',
             num_sets=10,
-            start='2025-4-1-0-0-0',
-            end='2025-7-1-0-0-0',
+            start=1700000000.0,
+            end=1701000000.0,
             n_workers=2,
         )
 
         assert cmd[0] == sys.executable
-        assert cmd[1:3] == ['-m', 'scripts.evaluate_out_of_sample']
-        assert cmd[cmd.index('-sn') + 1] == 'PrecisionTrendStrategy_XXBTZGBP_20250101-20250401'
-        assert cmd[cmd.index('-n') + 1] == '10'
-        assert cmd[cmd.index('-s') + 1] == '2025-4-1-0-0-0'
-        assert cmd[cmd.index('-e') + 1] == '2025-7-1-0-0-0'
-        assert cmd[cmd.index('-w') + 1] == '2'
+        assert cmd[1:3] == ['-m', 'backtesting_engine._out_of_sample_worker']
+        assert len(cmd) == 4
+        payload = json.loads(cmd[3])
+        assert payload == {
+            'study_name': 'PrecisionTrendStrategy_XXBTZGBP_20250101-20250401',
+            'num_sets': 10,
+            'start': 1700000000.0,
+            'end': 1701000000.0,
+            'n_workers': 2,
+        }
+
+    def test_payload_round_trips_through_out_of_sample_args(self):
+        cmd = build_out_of_sample_command('s', 7, 1.0, 2.0, n_workers=3)
+        args = OutOfSampleArgs(**json.loads(cmd[3]))
+        assert args == OutOfSampleArgs(
+            study_name='s', num_sets=7, start=1.0, end=2.0, n_workers=3,
+        )
 
     def test_defaults_workers_to_one(self):
-        cmd = build_out_of_sample_command('s', 1, 's', 'e')
-        assert cmd[cmd.index('-w') + 1] == '1'
+        cmd = build_out_of_sample_command('s', 1, 1.0, 2.0)
+        assert json.loads(cmd[3])['n_workers'] == 1
 
 
 def _make_trial(mocker, number: int, value: float, params: dict = None, complete: bool = True):

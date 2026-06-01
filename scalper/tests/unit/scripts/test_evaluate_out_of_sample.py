@@ -4,10 +4,8 @@ from unittest.mock import patch
 import pytest
 from click.testing import CliRunner
 
-from scripts.evaluate_out_of_sample import (
-    JsonProgressCallback,
-    evaluate_out_of_sample,
-)
+from core import JsonEvaluationProgressCallback
+from scripts.evaluate_out_of_sample import evaluate_out_of_sample
 
 
 @pytest.mark.scripts
@@ -46,7 +44,7 @@ class TestEvaluateOutOfSampleCli:
         assert kwargs['study_name'] == 'study_x'
         assert kwargs['num_sets'] == 3
         assert kwargs['n_workers'] == 4
-        assert isinstance(kwargs['progress_callback'], JsonProgressCallback)
+        assert isinstance(kwargs['progress_callback'], JsonEvaluationProgressCallback)
 
     @patch('scripts.evaluate_out_of_sample.run_evaluate_out_of_sample')
     def test_emits_done_with_count_of_emitted_progress(self, mock_run, runner: CliRunner):
@@ -70,24 +68,3 @@ class TestEvaluateOutOfSampleCli:
         assert events[-1] == 'DONE'
         last_event, last_payload = lines[-1].split(' ', 1)
         assert json.loads(last_payload) == {'trials': 2}
-
-
-@pytest.mark.scripts
-@pytest.mark.evaluate_out_of_sample
-class TestJsonProgressCallback:
-
-    def test_emits_progress_with_incrementing_count(self, capsys):
-        # Given
-        callback = JsonProgressCallback()
-
-        # When
-        callback()
-        callback()
-
-        # Then
-        lines = capsys.readouterr().out.strip().splitlines()
-        assert len(lines) == 2
-        for i, line in enumerate(lines, start=1):
-            event, payload_json = line.split(' ', 1)
-            assert event == 'PROGRESS'
-            assert json.loads(payload_json) == {'trial': i}

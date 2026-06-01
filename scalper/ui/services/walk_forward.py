@@ -3,11 +3,11 @@ Walk-forward UI service.
 
 Orchestrates the in-sample / out-of-sample subprocesses via
 :func:`core.run_subprocess`, parsing each stdout line through
-:func:`core.parse` into the shared :class:`core.StreamEvent` contract that
-``scripts/optimise_in_sample.py`` and ``scripts/evaluate_out_of_sample.py``
+:func:`core.parse` into the shared :class:`core.StreamEvent` contract that the
+``backtesting_engine._in_sample_worker`` / ``_out_of_sample_worker`` modules
 emit. argv for each subprocess is built by ``build_in_sample_command`` /
-``build_out_of_sample_command`` colocated with the optimisation entry points
-in :mod:`backtesting_engine`.
+``build_out_of_sample_command`` colocated with the worker entry points in
+:mod:`backtesting_engine`.
 
 The two phases share a single module because they share both the event
 contract and the surrounding lifecycle (``Job`` rows, cancellation, progress
@@ -88,8 +88,8 @@ def invalidate_study_cache(study_name: str | None = None) -> None:
 async def start_in_sample(
     pair: str,
     strategy_name: str,
-    start: str,
-    end: str,
+    start: float,
+    end: float,
     n_trials: int,
     n_workers: int,
     job_repo: JobRepository,
@@ -100,9 +100,11 @@ async def start_in_sample(
 
     Trials are split as evenly as possible across workers. Each worker runs in
     its own OS process with its own ``Job(JobType.OPTIMISE_IN_SAMPLE)`` row, and
-    contributes trials to the same Optuna study (the script resolves the study
+    contributes trials to the same Optuna study (the worker resolves the study
     name deterministically from the pair / strategy / time window).
 
+    :param start: Window start, Unix seconds.
+    :param end: Window end, Unix seconds.
     :param on_progress: ``(worker_index, parsed_event)`` invoked for each
         ``PROGRESS`` / ``DONE`` line emitted by any worker. Non-contract lines
         are dropped.
@@ -139,8 +141,8 @@ async def start_in_sample(
 async def start_out_of_sample(
     study_name: str,
     num_sets: int,
-    start: str,
-    end: str,
+    start: float,
+    end: float,
     n_workers: int,
     job_repo: JobRepository,
     on_progress: Callable[[StreamEvent], None] | None = None,
@@ -148,8 +150,11 @@ async def start_out_of_sample(
     '''
     Run an out-of-sample evaluation as a single subprocess.
 
-    Parallelism happens inside the script's ``ProcessPoolExecutor``, so this
+    Parallelism happens inside the worker's ``ProcessPoolExecutor``, so this
     layer only spawns one OS process and creates one ``Job`` row.
+
+    :param start: Window start, Unix seconds.
+    :param end: Window end, Unix seconds.
     '''
     job = Job(job_type=JobType.EVALUATE_OUT_OF_SAMPLE)
     cmd = build_out_of_sample_command(study_name, num_sets, start, end, n_workers)

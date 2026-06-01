@@ -1,7 +1,8 @@
+import json
 import logging
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Callable
 
@@ -26,6 +27,31 @@ logger = logging.getLogger(__name__)
 
 
 INITIAL_BALANCE = 1000
+
+
+@dataclass(frozen=True)
+class OutOfSampleArgs:
+    '''
+    Typed IPC contract for the out-of-sample worker subprocess.
+
+    Constructed by :func:`build_out_of_sample_command` on the UI side,
+    JSON-encoded across the process boundary, and reconstructed by
+    ``_out_of_sample_worker`` on the other side.
+
+    Attributes:
+        study_name (str): Optuna study name to load top trials from.
+        num_sets (int): Number of top trials to evaluate.
+        start (float): OOS window start (Unix seconds).
+        end (float): OOS window end (Unix seconds).
+        n_workers (int): Worker processes for parallel evaluation.
+            ``1`` runs serially in-process.
+    '''
+    study_name: str
+    num_sets: int
+    start: float
+    end: float
+    n_workers: int
+
 
 '''
 OOS verdict thresholds. A trial is overfit when either:
@@ -102,24 +128,29 @@ class TrialWithOos:
 def build_out_of_sample_command(
     study_name: str,
     num_sets: int,
-    start: str,
-    end: str,
+    start: float,
+    end: float,
     n_workers: int = 1,
 ) -> list[str]:
     '''
-    Build the argv to invoke the out-of-sample evaluation as
-    ``python -m scripts.evaluate_out_of_sample``.
+    Build the argv to invoke the OOS worker as
+    ``python -m backtesting_engine._out_of_sample_worker '<json>'``.
 
-    Colocated with the evaluation entry point so flag changes update one place.
-    Used by ``ui.services.walk_forward`` to spawn the evaluation subprocess.
+    The single positional arg is :class:`OutOfSampleArgs` JSON-encoded — the
+    same dataclass the worker reconstructs on the other side, so producer and
+    consumer share one schema. Used by ``ui.services.walk_forward`` to spawn
+    the evaluation subprocess.
+
+    :param start: Window start, Unix seconds.
+    :param end: Window end, Unix seconds.
     '''
+    args = OutOfSampleArgs(
+        study_name=study_name, num_sets=num_sets, start=start, end=end,
+        n_workers=n_workers,
+    )
     return [
-        sys.executable, '-m', 'scripts.evaluate_out_of_sample',
-        '-sn', study_name,
-        '-n', str(num_sets),
-        '-s', start,
-        '-e', end,
-        '-w', str(n_workers),
+        sys.executable, '-m', 'backtesting_engine._out_of_sample_worker',
+        json.dumps(asdict(args)),
     ]
 
 

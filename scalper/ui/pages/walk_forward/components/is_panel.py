@@ -24,8 +24,8 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
-import pandas as pd
 from nicegui import ui
 
 from data_system import JobRepository
@@ -58,8 +58,8 @@ class IsRunInputs:
     Attributes:
         raw_pair (str): Pair in the script's input format (e.g. ``'BTCGBP'``).
         strategy (str): Strategy class name.
-        start (str): Start datetime in ``'YYYY-M-D-h-m-s'`` text format.
-        end (str): End datetime in the same text format.
+        start (float): Window start, Unix seconds.
+        end (float): Window end, Unix seconds.
     '''
     raw_pair: str
     strategy: str
@@ -86,13 +86,11 @@ def derive_run_inputs(study: StudySummary) -> IsRunInputs | None:
     except (ValueError, KeyError):
         return None
 
-    start_dt = pd.to_datetime(parsed.start_ts, unit='s')
-    end_dt = pd.to_datetime(parsed.end_ts, unit='s')
     return IsRunInputs(
         raw_pair=raw_pair,
         strategy=parsed.strategy,
-        start=f'{start_dt.year}-{start_dt.month}-{start_dt.day}-0-0-0',
-        end=f'{end_dt.year}-{end_dt.month}-{end_dt.day}-0-0-0'
+        start=parsed.start_ts,
+        end=parsed.end_ts,
     )
 
 
@@ -303,5 +301,6 @@ class IsPanel:
 def _format_window(inputs: IsRunInputs | None) -> str:
     if inputs is None:
         return 'unparseable study name'
-    # Drop the '-0-0-0' time suffix for display.
-    return f'{inputs.start.removesuffix('-0-0-0')} → {inputs.end.removesuffix('-0-0-0')}'
+    start = datetime.fromtimestamp(inputs.start, tz=timezone.utc).strftime('%Y-%m-%d')
+    end = datetime.fromtimestamp(inputs.end, tz=timezone.utc).strftime('%Y-%m-%d')
+    return f'{start} → {end}'

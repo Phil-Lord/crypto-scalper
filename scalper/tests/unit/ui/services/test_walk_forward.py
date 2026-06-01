@@ -1,4 +1,5 @@
 import asyncio
+import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -73,7 +74,7 @@ class TestStartInSample:
         mock_repo = mocker.MagicMock(spec=JobRepository)
 
         jobs = asyncio.run(svc.start_in_sample(
-            'BTCGBP', 'SmaStrategy', '2025-1-1-0-0-0', '2025-2-1-0-0-0',
+            'BTCGBP', 'SmaStrategy', 1700000000.0, 1701000000.0,
             n_trials=10, n_workers=4, job_repo=mock_repo,
         ))
 
@@ -82,7 +83,8 @@ class TestStartInSample:
         # 10 trials across 4 workers = [3, 3, 2, 2]
         trial_counts = []
         for _, cmd, _ in captured:
-            trial_counts.append(int(cmd[cmd.index('-n') + 1]))
+            payload = json.loads(cmd[-1])
+            trial_counts.append(payload['n_trials'])
         assert sorted(trial_counts) == [2, 2, 3, 3]
         # All run with cwd set to the scalper/ directory.
         assert all(cwd is not None and cwd.endswith('/scalper') for _, _, cwd in captured)
@@ -123,7 +125,7 @@ class TestStartInSample:
 
         with pytest.raises(OSError, match='cannot spawn'):
             asyncio.run(svc.start_in_sample(
-                'BTCGBP', 'SmaStrategy', '2025-1-1-0-0-0', '2025-2-1-0-0-0',
+                'BTCGBP', 'SmaStrategy', 1700000000.0, 1701000000.0,
                 n_trials=10, n_workers=4, job_repo=mock_repo,
             ))
 
@@ -151,7 +153,7 @@ class TestStartInSample:
         captured = []
 
         asyncio.run(svc.start_in_sample(
-            'BTCGBP', 'SmaStrategy', '2025-1-1-0-0-0', '2025-2-1-0-0-0',
+            'BTCGBP', 'SmaStrategy', 1700000000.0, 1701000000.0,
             n_trials=2, n_workers=2, job_repo=mock_repo,
             on_progress=lambda i, e: captured.append((i, e)),
         ))
