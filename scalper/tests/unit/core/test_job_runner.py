@@ -121,13 +121,21 @@ class TestRunSubprocess:
         persisted = mock_repo.update.call_args.args[0]
         assert persisted.status == JobStatus.DONE
 
-    def test_marks_job_error_when_subprocess_exits_non_zero(self, mocker, mock_repo, job: Job):
-        self._patch_subprocess(mocker, _MockProc(returncode=1, lines=[]))
+    def test_marks_job_error_and_raises_when_subprocess_exits_non_zero(
+        self, mocker, mock_repo, job: Job
+    ):
+        # Last stdout line stands in for the worker's final traceback line,
+        # which the raised error surfaces so the failure isn't silent.
+        self._patch_subprocess(
+            mocker, _MockProc(returncode=1, lines=[b'ValueError: boom\n'])
+        )
 
-        asyncio.run(run_subprocess(mock_repo, job, ['false']))
+        with pytest.raises(RuntimeError, match='exited with code 1'):
+            asyncio.run(run_subprocess(mock_repo, job, ['false']))
 
         persisted = mock_repo.update.call_args.args[0]
         assert persisted.status == JobStatus.ERROR
+        assert 'ValueError: boom' in persisted.message
 
     def test_persists_running_status_before_streaming(self, mocker, mock_repo, job: Job):
         proc = _MockProc(returncode=0, lines=[])

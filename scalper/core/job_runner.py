@@ -80,7 +80,11 @@ async def run_subprocess(
                 last_update = now
 
         await proc.wait()
-        job = job.update(status=JobStatus.DONE if proc.returncode == 0 else JobStatus.ERROR)
+        if proc.returncode != 0:
+            # Raise rather than silently marking ERROR, so callers can surface it.
+            # job.message is the last stdout line — usually the worker's traceback.
+            raise RuntimeError(f'Subprocess exited with code {proc.returncode}: {job.message}')
+        job = job.update(status=JobStatus.DONE)
         job_repo.update(job)
     except asyncio.CancelledError:
         if proc is not None:
