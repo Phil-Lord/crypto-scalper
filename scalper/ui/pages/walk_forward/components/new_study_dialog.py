@@ -34,8 +34,9 @@ class NewStudyForm:
         pair (str): Raw pair symbol, e.g. ``'BTCGBP'``.
         strategy (str): Strategy class name registered in
             ``strategy_manager.factory.STRATEGIES``.
-        start (str): Start datetime in ``'YYYY-M-D-h-m-s'`` text format,
-            preserved verbatim so it can be passed straight into ``start_in_sample``.
+        start (str): Start datetime in ``'YYYY-M-D-h-m-s'`` text format, as the
+            user typed it. Callers convert to a second timestamp via
+            ``get_second_timestamp(*parse_datetime(start))`` before use.
         end (str): End datetime in the same text format.
         n_trials (int): Total Optuna trials to run.
         n_workers (int): Number of parallel worker subprocesses.

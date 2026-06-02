@@ -13,7 +13,7 @@ from nicegui import ui
 
 from ui.services import start_in_sample
 from ui.services.walk_forward import split_trials
-from utils import StudyDirection, StudySummary
+from utils import StudyDirection, StudySummary, get_second_timestamp, parse_datetime
 
 from .components import NewStudyForm, derive_study_name, show_new_study_dialog
 
@@ -70,6 +70,9 @@ async def start_in_sample_from_form(page: WalkForwardPage, form: NewStudyForm) -
         page._selected_study = placeholder
         page._running_study_name = predicted_name
 
+    start_ts = get_second_timestamp(*parse_datetime(form.start))
+    end_ts = get_second_timestamp(*parse_datetime(form.end))
+
     splits = split_trials(form.n_trials, form.n_workers)
     try:
         task = page.phase_mutex.start(
@@ -77,8 +80,8 @@ async def start_in_sample_from_form(page: WalkForwardPage, form: NewStudyForm) -
             start_in_sample(
                 form.pair,
                 form.strategy,
-                form.start,
-                form.end,
+                start_ts,
+                end_ts,
                 form.n_trials,
                 form.n_workers,
                 page.job_repo,
