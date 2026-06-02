@@ -21,6 +21,21 @@ class StudyDirection(str, Enum):
     MINIMIZE = 'minimize'
 
 
+class StudyNotFoundError(Exception):
+    '''
+    Raised when a study name has no corresponding record in Optuna storage.
+
+    Distinguishes the expected "not created yet" state — e.g. the UI's
+    optimistic placeholder row before the in-sample subprocess reaches
+    ``create_study`` — from genuine storage errors, so callers can degrade
+    quietly rather than logging a failure.
+    '''
+
+    def __init__(self, study_name: str) -> None:
+        super().__init__(f'Optuna study does not exist in storage: {study_name!r}')
+        self.study_name = study_name
+
+
 @dataclass(frozen=True)
 class ParsedStudyName:
     '''
@@ -131,6 +146,7 @@ def load_study(study_name: str, application_name: str = 'scalper') -> optuna.Stu
 
     :param application_name: Postgres ``application_name`` to tag the
         connection with. Defaults to ``'scalper'``.
+    :raises StudyNotFoundError: If no study with ``study_name`` exists in storage.
     '''
     logger.info(f'Loading study: {study_name}')
     storage = optuna.storages.RDBStorage(
@@ -143,7 +159,12 @@ def load_study(study_name: str, application_name: str = 'scalper') -> optuna.Stu
             }
         }
     )
-    return optuna.load_study(study_name=study_name, storage=storage)
+    try:
+        return optuna.load_study(study_name=study_name, storage=storage)
+    except KeyError as e:
+        # Optuna's RDBStorage raises a bare KeyError('Record does not exist.')
+        # when the study name isn't in storage. Translate to discern from real failures.
+        raise StudyNotFoundError(study_name) from e
 
 
 def list_studies() -> list[StudySummary]:

@@ -1,3 +1,11 @@
+from ui.pages.walk_forward.phase_mutex import PhaseMutex
+from ui.pages.walk_forward.components.window_tabs import WindowKey
+from ui.pages.walk_forward.components.oos_panel import (
+    OosPanel,
+    OosRunInputs,
+    derive_window_key,
+    validate_oos_form,
+)
 import asyncio
 
 import pytest
@@ -6,6 +14,7 @@ from core import StreamEvent
 from ui.pages.walk_forward.components import oos_panel as oos_panel_module
 from utils import (
     StudyDirection,
+    StudyNotFoundError,
     StudySummary,
     get_second_timestamp,
     parse_datetime,
@@ -14,14 +23,6 @@ from utils import (
 
 _START_TS = get_second_timestamp(*parse_datetime('2025-1-1-0-0-0'))
 _END_TS = get_second_timestamp(*parse_datetime('2025-4-1-0-0-0'))
-from ui.pages.walk_forward.components.oos_panel import (
-    OosPanel,
-    OosRunInputs,
-    derive_window_key,
-    validate_oos_form,
-)
-from ui.pages.walk_forward.components.window_tabs import WindowKey
-from ui.pages.walk_forward.phase_mutex import PhaseMutex
 
 
 def _summary(name: str = 'SmaStrategy_XXBTZGBP_20250101-20250401') -> StudySummary:
@@ -563,6 +564,45 @@ class TestParamsCache:
 
         assert panel._params_cache == {}
         bulk.assert_not_called()
+
+
+@pytest.mark.ui
+@pytest.mark.walk_forward_oos_panel
+class TestRefreshData:
+    def test_study_not_found_yields_empty_trials_without_warning(self, mocker):
+        '''
+        A fresh placeholder row has no Optuna study in storage yet (the IS
+        subprocess hasn't reached create_study). That expected state must
+        degrade quietly to an empty table, not log a failure.
+        '''
+        panel, _ = _make_panel(mocker)
+        mocker.patch.object(oos_panel_module, 'invalidate_study_cache')
+        mocker.patch.object(oos_panel_module, 'list_oos_windows', return_value=[])
+        mocker.patch.object(
+            oos_panel_module, 'get_top_trials_with_oos',
+            side_effect=StudyNotFoundError('SmaStrategy_XXBTZGBP_20250101-20250401'),
+        )
+        warning = mocker.patch.object(oos_panel_module.logger, 'warning')
+
+        panel._refresh_data('SmaStrategy_XXBTZGBP_20250101-20250401')
+
+        assert panel._trials == []
+        warning.assert_not_called()
+
+    def test_unexpected_error_logs_warning_and_empties_trials(self, mocker):
+        panel, _ = _make_panel(mocker)
+        mocker.patch.object(oos_panel_module, 'invalidate_study_cache')
+        mocker.patch.object(oos_panel_module, 'list_oos_windows', return_value=[])
+        mocker.patch.object(
+            oos_panel_module, 'get_top_trials_with_oos',
+            side_effect=RuntimeError('storage offline'),
+        )
+        warning = mocker.patch.object(oos_panel_module.logger, 'warning')
+
+        panel._refresh_data('SmaStrategy_XXBTZGBP_20250101-20250401')
+
+        assert panel._trials == []
+        warning.assert_called_once()
 
 
 @pytest.mark.ui

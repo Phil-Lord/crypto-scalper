@@ -13,7 +13,8 @@ from utils.optuna_utils import (
     get_study_choices,
     list_studies,
     load_study,
-    parse_study_name
+    parse_study_name,
+    StudyNotFoundError
 )
 
 
@@ -257,6 +258,17 @@ class TestLoadStudy:
             rdb_kwargs['engine_kwargs']['connect_args']['application_name']
             == 'out_of_sample_evaluation'
         )
+
+    @patch('utils.optuna_utils.optuna')
+    def test_raises_study_not_found_when_record_does_not_exist(self, mock_optuna):
+        ''' Optuna signals a missing study with a bare KeyError; translate it
+        into the typed error so callers can tell it apart from real failures. '''
+        mock_optuna.load_study.side_effect = KeyError('Record does not exist.')
+
+        with pytest.raises(StudyNotFoundError) as exc_info:
+            load_study('missing-study')
+
+        assert exc_info.value.study_name == 'missing-study'
 
 
 @pytest.mark.utils

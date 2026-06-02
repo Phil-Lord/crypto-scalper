@@ -11,6 +11,7 @@ from .optuna_utils import (
     ParsedStudyName,
     STUDY_NAME_FORMAT,
     StudyDirection,
+    StudyNotFoundError,
     StudySummary
 )
 from .pair_config import (

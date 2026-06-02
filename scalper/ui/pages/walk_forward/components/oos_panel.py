@@ -61,7 +61,7 @@ from ui.theme import (
     sidebar_input,
     stop_button,
 )
-from utils import get_second_timestamp, parse_datetime, StudySummary
+from utils import get_second_timestamp, parse_datetime, StudyNotFoundError, StudySummary
 
 from ..phase_mutex import PhaseMutex
 from .window_tabs import (
@@ -476,6 +476,11 @@ class OosPanel:
             self._trials = get_top_trials_with_oos(
                 study_name, self._selected_window, top_n, self._oos_repo,
             )
+        except StudyNotFoundError:
+            # Study not materialised in Optuna storage yet — expected while the
+            # IS subprocess is still spinning up against a fresh placeholder row.
+            logger.debug('Study %s not in storage yet; showing no trials', study_name)
+            self._trials = []
         except Exception as e:
             logger.warning('Failed to load top trials for %s: %s', study_name, e)
             self._trials = []
@@ -514,6 +519,9 @@ class OosPanel:
             self._trials = get_top_trials_with_oos(
                 study.name, key, top_n, self._oos_repo,
             )
+        except StudyNotFoundError:
+            logger.debug('Study %s not in storage yet; showing no trials', study.name)
+            self._trials = []
         except Exception as e:
             logger.warning('Failed to refresh trials on tab click: %s', e)
             self._trials = []
