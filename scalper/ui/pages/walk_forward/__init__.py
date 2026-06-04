@@ -49,7 +49,11 @@ class WalkForwardPage:
         ui.query('.nicegui-content').classes('p-0 gap-0')  # Remove padding/gap from main content
         ui.query('body').style('overflow: hidden')  # Prevent page scrolling
 
-        # Held on self so the phase-done refresh task isn't GC'd mid-flight.
+        # Captured for the background-render guard: timer ticks and the
+        # phase-done refresh run after awaits, by which point the client
+        # may have disconnected. ``_can_render`` gates UI mutation on it.
+        self.client = ui.context.client
+        self._mounted = False
         self._phase_refresh_task: asyncio.Task | None = None
 
         client = SQLAlchemyClient()
@@ -69,6 +73,7 @@ class WalkForwardPage:
             get_selected_study=lambda: self._selected_study,
             job_repo=self.job_repo,
             set_running_study_name=self._set_running_study_name,
+            is_connected=self._can_render,
         )
         self.oos_panel = OosPanel(
             phase_mutex=self.phase_mutex,
@@ -76,6 +81,7 @@ class WalkForwardPage:
             oos_repo=self.oos_repo,
             job_repo=self.job_repo,
             set_running_study_name=self._set_running_study_name,
+            is_connected=self._can_render,
         )
 
         render_header()
@@ -99,6 +105,17 @@ class WalkForwardPage:
         self._studies = await rail.load_studies()
         self._selected_study = self._studies[0] if self._studies else None
         await self._rerender_all()
+        self._mounted = True
+
+    def _can_render(self) -> bool:
+        '''
+        ``True`` while it is safe to mutate this page's elements: during the
+        initial build (before the socket connects) and whenever the client is
+        connected. ``False`` only once a mounted page's client has gone, so
+        background renders after a disconnect bail instead of throwing
+        ``The client this element belongs to has been deleted.``.
+        '''
+        return not self._mounted or self.client.has_socket_connection
 
     async def _rerender_all(self) -> None:
         '''
@@ -110,6 +127,8 @@ class WalkForwardPage:
         the rail, since rebuilding the IS/OOS panels mid-run would discard
         live worker-tile and progress state.
         '''
+        if not self._can_render():
+            return
         rail.render_rail_rows(self)
         context_strip.render_context_strip(self)
         self.is_panel.render(self._is_row)
@@ -138,8 +157,11 @@ class WalkForwardPage:
 
         Runs synchronously as a mutex listener. The phase-done rail reload now
         hits storage, so it is offloaded onto a background task
-        (``_phase_refresh_task``) rather than blocking the notify.
+        (``_phase_refresh_task``) rather than blocking the notify. Bails early
+        if the client has gone — a run can outlive its page.
         '''
+        if not self._can_render():
+            return
         if self.phase_mutex.is_busy:
             rail.render_rail_rows(self)
             self.new_study_button.disable()
@@ -174,6 +196,8 @@ class WalkForwardPage:
         off the event loop, so a 4000-trial study no longer blocks the tick.
         '''
         if not self.phase_mutex.is_active('is'):
+            return
+        if not self._can_render():
             return
         if self._running_study_name is not None:
             invalidate_study_cache(self._running_study_name)

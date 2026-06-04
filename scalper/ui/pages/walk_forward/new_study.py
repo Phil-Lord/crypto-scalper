@@ -101,6 +101,8 @@ async def start_in_sample_from_form(page: WalkForwardPage, form: NewStudyForm) -
     try:
         await task
     except asyncio.CancelledError:
-        ui.notify('In-sample run cancelled.', type='warning')
+        if page._can_render():
+            ui.notify('In-sample run cancelled.', type='warning')
     except Exception as e:
-        ui.notify(f'In-sample run failed: {e}', type='negative')
+        if page._can_render():
+            ui.notify(f'In-sample run failed: {e}', type='negative')

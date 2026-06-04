@@ -125,6 +125,10 @@ class IsPanel:
     :param set_running_study_name: Page setter for ``_running_study_name``;
         called with the study name on run start, and rolled back to ``None``
         if :meth:`PhaseMutex.start` raises.
+    :param is_connected: Page guard returning ``True`` while it is safe to
+        mutate this panel's elements. A run is awaited here, so the client
+        can disappear before it finishes; the panel re-checks this before
+        notifying once the awaited task returns.
     '''
 
     def __init__(
@@ -133,11 +137,13 @@ class IsPanel:
         get_selected_study: Callable[[], StudySummary | None],
         job_repo: JobRepository,
         set_running_study_name: Callable[[str | None], None],
+        is_connected: Callable[[], bool],
     ) -> None:
         self._phase_mutex = phase_mutex
         self._get_selected_study = get_selected_study
         self._job_repo = job_repo
         self._set_running_study_name = set_running_study_name
+        self._is_connected = is_connected
         self._strip: WorkerStrip | None = None
         self._trials_input: ui.input | None = None
         self._workers_input: ui.input | None = None
@@ -279,9 +285,11 @@ class IsPanel:
         try:
             await task
         except asyncio.CancelledError:
-            ui.notify('In-sample run cancelled.', type='warning')
+            if self._is_connected():
+                ui.notify('In-sample run cancelled.', type='warning')
         except Exception as e:
-            ui.notify(f'In-sample run failed: {e}', type='negative')
+            if self._is_connected():
+                ui.notify(f'In-sample run failed: {e}', type='negative')
 
         # Strip cleanup is the page's job — it re-renders this panel on
         # phase done, which rebuilds the strip in its idle state.

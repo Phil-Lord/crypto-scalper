@@ -129,6 +129,7 @@ def _make_panel(
         oos_repo=oos_repo,
         job_repo=job_repo,
         set_running_study_name=set_running,
+        is_connected=lambda: True,
     )
     panel._start_input = mocker.MagicMock(value=start_value)
     panel._end_input = mocker.MagicMock(value=end_value)
@@ -653,3 +654,58 @@ class TestOnUseAsTemplate:
         key = derive_window_key('2025-1-1-0-0-0', '2025-4-1-0-0-0')
 
         panel._on_use_as_template(key)  # must not raise
+
+
+@pytest.mark.ui
+@pytest.mark.walk_forward_oos_panel
+class TestBackgroundRenderGuard:
+    '''
+    Part C: the loaders await off the event loop, so the client can vanish
+    mid-load (an IS run outlives its page). Data is still loaded — but the
+    UI render after the await must be skipped, or it throws ``The client
+    this element belongs to has been deleted.``.
+    '''
+
+    def test_refresh_loads_but_skips_render_when_disconnected(self, mocker):
+        panel, _ = _make_panel(mocker)
+        panel._is_connected = lambda: False
+        load = mocker.patch.object(panel, '_load_data')
+        tabs = mocker.patch.object(panel, '_render_tabs')
+        table = mocker.patch.object(panel, '_render_table')
+
+        asyncio.run(panel.refresh())
+
+        load.assert_awaited_once()
+        tabs.assert_not_called()
+        table.assert_not_called()
+
+    def test_refresh_renders_when_connected(self, mocker):
+        panel, _ = _make_panel(mocker)  # is_connected defaults to True
+        mocker.patch.object(panel, '_load_data')
+        tabs = mocker.patch.object(panel, '_render_tabs')
+        table = mocker.patch.object(panel, '_render_table')
+
+        asyncio.run(panel.refresh())
+
+        tabs.assert_called_once()
+        table.assert_called_once()
+
+    def test_reload_loads_but_skips_render_when_disconnected(self, mocker):
+        panel, deps = _make_panel(mocker)
+        panel._is_connected = lambda: False
+        panel._container = mocker.MagicMock()
+        load = mocker.patch.object(panel, '_load_data')
+
+        asyncio.run(panel.reload())
+
+        load.assert_awaited_once()
+        deps['render'].assert_not_called()
+
+    def test_reload_renders_into_container_when_connected(self, mocker):
+        panel, deps = _make_panel(mocker)
+        panel._container = mocker.MagicMock()
+        mocker.patch.object(panel, '_load_data')
+
+        asyncio.run(panel.reload())
+
+        deps['render'].assert_called_once_with(panel._container)

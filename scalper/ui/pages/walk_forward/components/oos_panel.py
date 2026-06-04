@@ -174,6 +174,11 @@ class OosPanel:
     :param set_running_study_name: Page setter for ``_running_study_name``;
         called with the study name on run start, and rolled back to
         ``None`` if :meth:`PhaseMutex.start` raises.
+    :param is_connected: Page guard returning ``True`` while it is safe to
+        mutate this panel's elements — during the initial build (before the
+        socket connects) and whenever the client is connected. Background
+        loads await off the event loop, so the client can disappear mid-load;
+        the panel re-checks this before touching the UI after every await.
     '''
 
     def __init__(
@@ -183,12 +188,14 @@ class OosPanel:
         oos_repo: OutOfSampleEvaluationRepository,
         job_repo: JobRepository,
         set_running_study_name: Callable[[str | None], None],
+        is_connected: Callable[[], bool],
     ) -> None:
         self._phase_mutex = phase_mutex
         self._get_selected_study = get_selected_study
         self._oos_repo = oos_repo
         self._job_repo = job_repo
         self._set_running_study_name = set_running_study_name
+        self._is_connected = is_connected
 
         self._container: ui.column | None = None
         self._start_input: ui.input | None = None
@@ -248,11 +255,14 @@ class OosPanel:
         phase-done refresh) where the sidebar must rebuild too. The live-run
         tick uses :meth:`refresh` instead, which re-renders only the tabs and
         table so the sidebar's STOP / progress state is preserved.
+
+        Bails without touching the UI if the client has gone while the
+        offloaded reads were in flight.
         '''
         study = self._get_selected_study()
         if study is not None:
             await self._load_data(study.name)
-        if self._container is None:
+        if self._container is None or not self._is_connected():
             return
         self.render(self._container)
 
@@ -431,8 +441,11 @@ class OosPanel:
                     'Lazy fetch of trial %d params failed: %s',
                     trial.trial_number, e,
                 )
-                ui.notify('Could not load trial params.', type='negative')
+                if self._is_connected():
+                    ui.notify('Could not load trial params.', type='negative')
                 return
+        if not self._is_connected():
+            return
         params_json = json.dumps(params)
         ui.run_javascript(
             f'navigator.clipboard.writeText({json.dumps(params_json)})'
@@ -450,12 +463,15 @@ class OosPanel:
         manual click.
 
         Partial re-render only (tabs + table) so the sidebar's running STOP /
-        progress state survives.
+        progress state survives. Bails without touching the UI if the client
+        has gone while the offloaded reads were in flight.
         '''
         study = self._get_selected_study()
         if study is None:
             return
         await self._load_data(study.name)
+        if not self._is_connected():
+            return
         self._render_tabs()
         self._render_table()
 
@@ -550,6 +566,8 @@ class OosPanel:
             logger.warning('Failed to refresh trials on tab click: %s', e)
             self._trials = []
         await self._refresh_params_cache(study.name)
+        if not self._is_connected():
+            return
         self._render_tabs()
         self._render_table()
 
@@ -611,9 +629,11 @@ class OosPanel:
         try:
             await task
         except asyncio.CancelledError:
-            ui.notify('Out-of-sample run cancelled.', type='warning')
+            if self._is_connected():
+                ui.notify('Out-of-sample run cancelled.', type='warning')
         except Exception as e:
-            ui.notify(f'Out-of-sample run failed: {e}', type='negative')
+            if self._is_connected():
+                ui.notify(f'Out-of-sample run failed: {e}', type='negative')
         finally:
             self._running_window = None
 

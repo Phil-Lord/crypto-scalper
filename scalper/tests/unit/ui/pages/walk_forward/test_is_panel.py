@@ -137,6 +137,7 @@ def _make_panel(
         get_selected_study=lambda: selected,
         job_repo=job_repo,
         set_running_study_name=set_running,
+        is_connected=lambda: True,
     )
     panel._strip = mocker.MagicMock()
     panel._trials_input = mocker.MagicMock(value=trials_value)
@@ -324,6 +325,24 @@ class TestOnStart:
     def test_does_not_notify_on_clean_completion(self, mocker):
         panel, deps = _make_panel(mocker)
         deps['phase_mutex'].start.side_effect = lambda phase, coro: _completed_task()
+        notify = mocker.patch.object(is_panel_module.ui, 'notify')
+
+        asyncio.run(panel._on_start())
+
+        notify.assert_not_called()
+
+    def test_does_not_notify_failure_when_client_disconnected(self, mocker):
+        '''
+        Part C: a run can outlive its page. If the client has gone by the
+        time the awaited task fails, the notify must be skipped — mutating a
+        torn-down client throws ``The client this element belongs to has
+        been deleted.``.
+        '''
+        panel, deps = _make_panel(mocker)
+        panel._is_connected = lambda: False
+        deps['phase_mutex'].start.side_effect = (
+            lambda phase, coro: _failing_task(RuntimeError('worker died'))
+        )
         notify = mocker.patch.object(is_panel_module.ui, 'notify')
 
         asyncio.run(panel._on_start())

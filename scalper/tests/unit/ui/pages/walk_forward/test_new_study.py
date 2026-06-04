@@ -32,8 +32,10 @@ class TestStartInSampleFromForm:
     def _make_page(self, mocker):
         page = mocker.MagicMock()
         page.phase_mutex.is_busy = False
-        # ``_rerender_all`` is now a coroutine the flow awaits.
+        # ``_rerender_all`` is now a coroutine the flow awaits, and
+        # ``_can_render`` gates the post-run notify (truthy by default).
         page._rerender_all = mocker.AsyncMock()
+        page._can_render.return_value = True
         # Build the task lazily inside the running loop (start is called from
         # within ``asyncio.run``), not at fixture-setup time.
         page.phase_mutex.start.side_effect = lambda phase, coro: _completed_task([])
