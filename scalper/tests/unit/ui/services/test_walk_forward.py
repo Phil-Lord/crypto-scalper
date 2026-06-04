@@ -1,6 +1,6 @@
 import asyncio
 import json
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -43,7 +43,7 @@ class TestGetTopTrials:
         )
 
         # When
-        result = svc.get_top_trials('my_study', 2)
+        result = asyncio.run(svc.get_top_trials('my_study', 2))
 
         # Then
         load.assert_called_once_with('my_study')
@@ -181,7 +181,7 @@ class TestListStudies:
             svc, '_list_studies_from_storage', return_value=sentinel,
         )
 
-        result = svc.list_studies()
+        result = asyncio.run(svc.list_studies())
 
         assert result is sentinel
         loader.assert_called_once_with()
@@ -201,7 +201,7 @@ class TestListOosWindows:
         repo = MagicMock()
         repo.aggregate_windows.return_value = aggregates
 
-        result = svc.list_oos_windows('study-x', repo)
+        result = asyncio.run(svc.list_oos_windows('study-x', repo))
 
         assert result == aggregates
         repo.aggregate_windows.assert_called_once_with(
@@ -212,7 +212,7 @@ class TestListOosWindows:
         repo = MagicMock()
         repo.aggregate_windows.return_value = []
 
-        assert svc.list_oos_windows('empty', repo) == []
+        assert asyncio.run(svc.list_oos_windows('empty', repo)) == []
 
 
 @pytest.mark.ui
@@ -229,7 +229,9 @@ class TestGetTopTrialsWithOos:
         )
         repo = MagicMock()
 
-        result = svc.get_top_trials_with_oos('study-x', (10.0, 20.0), n_trials=5, oos_repo=repo)
+        result = asyncio.run(
+            svc.get_top_trials_with_oos('study-x', (10.0, 20.0), n_trials=5, oos_repo=repo)
+        )
 
         load.assert_called_once_with('study-x')
         engine_fn.assert_called_once_with(study_sentinel, (10.0, 20.0), 5, repo)
@@ -246,21 +248,21 @@ class TestGetTrialParams:
         study = MagicMock(trials=[trial_a, trial_b])
         mocker.patch.object(svc, 'load_study', return_value=study)
 
-        assert svc.get_trial_params('s', 7) == {'a': 2, 'b': 3}
+        assert asyncio.run(svc.get_trial_params('s', 7)) == {'a': 2, 'b': 3}
 
     def test_raises_keyerror_when_trial_missing(self, mocker):
         study = MagicMock(trials=[MagicMock(number=0)])
         mocker.patch.object(svc, 'load_study', return_value=study)
 
         with pytest.raises(KeyError, match='Trial 99'):
-            svc.get_trial_params('s', 99)
+            asyncio.run(svc.get_trial_params('s', 99))
 
     def test_raises_keyerror_when_study_has_no_trials(self, mocker):
         study = MagicMock(trials=[])
         mocker.patch.object(svc, 'load_study', return_value=study)
 
         with pytest.raises(KeyError, match='Trial 0'):
-            svc.get_trial_params('s', 0)
+            asyncio.run(svc.get_trial_params('s', 0))
 
 
 @pytest.mark.ui
@@ -276,7 +278,7 @@ class TestGetTrialParamsBulk:
         study = MagicMock(trials=trials)
         load = mocker.patch.object(svc, 'load_study', return_value=study)
 
-        result = svc.get_trial_params_bulk('s', [0, 9])
+        result = asyncio.run(svc.get_trial_params_bulk('s', [0, 9]))
 
         assert result == {0: {'a': 1}, 9: {'a': 3}}
         load.assert_called_once_with('s')
@@ -290,12 +292,12 @@ class TestGetTrialParamsBulk:
         study = MagicMock(trials=[MagicMock(number=0, params={'a': 1})])
         mocker.patch.object(svc, 'load_study', return_value=study)
 
-        assert svc.get_trial_params_bulk('s', [0, 42]) == {0: {'a': 1}}
+        assert asyncio.run(svc.get_trial_params_bulk('s', [0, 42])) == {0: {'a': 1}}
 
     def test_empty_input_skips_load_study(self, mocker):
         load = mocker.patch.object(svc, 'load_study')
 
-        assert svc.get_trial_params_bulk('s', []) == {}
+        assert asyncio.run(svc.get_trial_params_bulk('s', [])) == {}
         load.assert_not_called()
 
 
@@ -358,3 +360,50 @@ class TestStudyCache:
 
     def test_invalidate_missing_entry_is_noop(self):
         svc.invalidate_study_cache('does-not-exist')
+
+
+@pytest.mark.ui
+@pytest.mark.ui_services
+@pytest.mark.walk_forward
+class TestIoBoundOffloading:
+    '''
+    The read helpers offload their blocking bodies to NiceGUI's thread pool
+    via :func:`nicegui.run.io_bound`, so a large study never blocks the UI
+    event loop. The public coroutines are thin wrappers around the private
+    synchronous ``_*`` implementations.
+    '''
+
+    def test_wrapper_awaits_io_bound_with_sync_impl(self, mocker):
+        sentinel = [object()]
+        io_bound = mocker.patch.object(
+            svc.run, 'io_bound', new=AsyncMock(return_value=sentinel),
+        )
+        repo = MagicMock()
+
+        result = asyncio.run(
+            svc.get_top_trials_with_oos('study-x', (1.0, 2.0), 5, repo)
+        )
+
+        io_bound.assert_awaited_once_with(
+            svc._get_top_trials_with_oos, 'study-x', (1.0, 2.0), 5, repo,
+        )
+        assert result is sentinel
+
+    def test_wrapper_coerces_cancelled_none_to_empty_list(self, mocker):
+        '''
+        ``io_bound`` returns ``None`` if the awaiting task is cancelled (client
+        disconnect) or the app is stopping. The list wrappers coerce that to an
+        empty list so callers never iterate over ``None``.
+        '''
+        mocker.patch.object(svc.run, 'io_bound', new=AsyncMock(return_value=None))
+
+        assert asyncio.run(svc.list_studies()) == []
+        assert asyncio.run(
+            svc.get_top_trials_with_oos('s', None, 5, MagicMock())
+        ) == []
+
+    def test_wrapper_coerces_cancelled_none_to_empty_dict(self, mocker):
+        mocker.patch.object(svc.run, 'io_bound', new=AsyncMock(return_value=None))
+
+        assert asyncio.run(svc.get_trial_params_bulk('s', [1, 2])) == {}
+        assert asyncio.run(svc.get_trial_params('s', 1)) == {}

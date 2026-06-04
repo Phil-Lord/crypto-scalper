@@ -23,12 +23,22 @@ Also exposes read-only helpers the redesigned walk-forward page consumes:
 ``load_study`` results are cached in-process so the page can rerender
 without paying the Optuna round-trip; :func:`invalidate_study_cache`
 lets the page drop entries when a phase finishes.
+
+The read helpers are ``async`` and offload their blocking Optuna/DB work to
+NiceGUI's thread pool via :func:`nicegui.run.io_bound`, so materialising a
+large study never blocks the single UI event loop (which would drop the
+websocket). The synchronous bodies live in private ``_*`` functions — the
+public coroutines are thin offload wrappers. ``io_bound`` returns ``None`` if
+the awaiting task is cancelled (client disconnect) or the app is stopping;
+the wrappers coerce that to an empty result so callers never have to special-
+case it, and a torn-down client is handled by the page's render guards.
 '''
 import asyncio
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
 import optuna
+from nicegui import run
 
 from backtesting_engine import (
     OOS_DRAWDOWN_LIMIT,
@@ -169,12 +179,19 @@ async def start_out_of_sample(
     return job
 
 
-def list_studies() -> list[StudySummary]:
+async def list_studies() -> list[StudySummary]:
     ''' Return a summary row for every Optuna study in storage, ordered by name. '''
-    return _list_studies_from_storage()
+    return await run.io_bound(_list_studies_from_storage) or []
 
 
-def list_oos_windows(
+def _list_oos_windows(
+    study_name: str,
+    oos_repo: OutOfSampleEvaluationRepository,
+) -> list[OosWindowAggregate]:
+    return oos_repo.aggregate_windows(study_name, OOS_FLOOR, OOS_DRAWDOWN_LIMIT)
+
+
+async def list_oos_windows(
     study_name: str,
     oos_repo: OutOfSampleEvaluationRepository,
 ) -> list[OosWindowAggregate]:
@@ -186,10 +203,14 @@ def list_oos_windows(
     :return: One aggregate per evaluated window, ordered by start timestamp.
         Empty if the study has no OOS evaluations yet.
     '''
-    return oos_repo.aggregate_windows(study_name, OOS_FLOOR, OOS_DRAWDOWN_LIMIT)
+    return await run.io_bound(_list_oos_windows, study_name, oos_repo) or []
 
 
-def get_top_trials(study_name: str, n: int) -> list[dict]:
+def _get_top_trials(study_name: str, n: int) -> list[dict]:
+    return get_top_param_sets(load_study(study_name), n)
+
+
+async def get_top_trials(study_name: str, n: int) -> list[dict]:
     '''
     Return the top ``n`` completed trials of a study, highest objective first
     (or lowest if the study minimises).
@@ -198,10 +219,21 @@ def get_top_trials(study_name: str, n: int) -> list[dict]:
     evaluate. Includes already-evaluated trials (the preview shows the full
     selection, not the to-do list).
     '''
-    return get_top_param_sets(load_study(study_name), n)
+    return await run.io_bound(_get_top_trials, study_name, n) or []
 
 
-def get_top_trials_with_oos(
+def _get_top_trials_with_oos(
+    study_name: str,
+    window: tuple[float, float] | None,
+    n_trials: int,
+    oos_repo: OutOfSampleEvaluationRepository,
+) -> list[TrialWithOos]:
+    return _get_top_trials_with_oos_from_engine(
+        load_study(study_name), window, n_trials, oos_repo,
+    )
+
+
+async def get_top_trials_with_oos(
     study_name: str,
     window: tuple[float, float] | None,
     n_trials: int,
@@ -212,17 +244,12 @@ def get_top_trials_with_oos(
     injects the in-process cached study so repeated page renders don't pay the
     Optuna round-trip.
     '''
-    return _get_top_trials_with_oos_from_engine(
-        load_study(study_name), window, n_trials, oos_repo,
-    )
+    return await run.io_bound(
+        _get_top_trials_with_oos, study_name, window, n_trials, oos_repo,
+    ) or []
 
 
-def get_trial_params(study_name: str, trial_number: int) -> dict:
-    '''
-    Return the params dict for a single trial. Used by the page's
-    copy-params button as a lazy-fetch fallback when the bulk prefetch
-    is unavailable.
-    '''
+def _get_trial_params(study_name: str, trial_number: int) -> dict:
     study = load_study(study_name)
     for trial in study.trials:
         if trial.number == trial_number:
@@ -230,15 +257,16 @@ def get_trial_params(study_name: str, trial_number: int) -> dict:
     raise KeyError(f'Trial {trial_number} not found in study {study_name}')
 
 
-def get_trial_params_bulk(study_name: str, trial_numbers: Iterable[int]) -> dict[int, dict]:
+async def get_trial_params(study_name: str, trial_number: int) -> dict:
     '''
-    Return ``{trial_number: params}`` for every requested trial in a single
-    pass over ``study.trials``. Used by the OOS panel's eager prefetch so
-    loading N rows is O(study.trials) rather than O(N * study.trials).
+    Return the params dict for a single trial. Used by the page's
+    copy-params button as a lazy-fetch fallback when the bulk prefetch
+    is unavailable.
+    '''
+    return await run.io_bound(_get_trial_params, study_name, trial_number) or {}
 
-    Missing trial numbers are silently omitted — callers fall back to a
-    per-click lookup via :func:`get_trial_params`.
-    '''
+
+def _get_trial_params_bulk(study_name: str, trial_numbers: Iterable[int]) -> dict[int, dict]:
     needed = set(trial_numbers)
     if not needed:
         return {}
@@ -248,6 +276,22 @@ def get_trial_params_bulk(study_name: str, trial_numbers: Iterable[int]) -> dict
         for trial in study.trials
         if trial.number in needed
     }
+
+
+async def get_trial_params_bulk(
+    study_name: str, trial_numbers: Iterable[int]
+) -> dict[int, dict]:
+    '''
+    Return ``{trial_number: params}`` for every requested trial in a single
+    pass over ``study.trials``. Used by the OOS panel's eager prefetch so
+    loading N rows is O(study.trials) rather than O(N * study.trials).
+
+    Missing trial numbers are silently omitted — callers fall back to a
+    per-click lookup via :func:`get_trial_params`.
+    '''
+    return await run.io_bound(
+        _get_trial_params_bulk, study_name, list(trial_numbers),
+    ) or {}
 
 
 def get_evaluation_results(

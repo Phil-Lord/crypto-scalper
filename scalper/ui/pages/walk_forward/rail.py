@@ -24,15 +24,16 @@ if TYPE_CHECKING:
 RAIL_WIDTH_PX = 320
 
 
-def load_studies() -> list[StudySummary]:
+async def load_studies() -> list[StudySummary]:
     '''
-    Fetch studies for the rail.
+    Fetch studies for the rail, offloading the storage read to a worker
+    thread via the ``async`` :func:`list_studies` service helper.
 
     Ordered most-recently-active-first by reversing the service's creation-order output,
     so the default selection sits at the top of the rail.
     '''
     try:
-        return list(reversed(list_studies()))
+        return list(reversed(await list_studies()))
     except Exception as e:
         ui.notify(f'Could not list studies: {e}', type='negative')
         return []
@@ -88,20 +89,20 @@ def render_rail_rows(page: WalkForwardPage) -> None:
             )
 
 
-def _select_study(page: WalkForwardPage, study: StudySummary) -> None:
+async def _select_study(page: WalkForwardPage, study: StudySummary) -> None:
     if page._selected_study is not None and study.name == page._selected_study.name:
         return
     page._selected_study = study
-    page._rerender_all()
+    await page._rerender_all()
 
 
-def refresh_rail(page: WalkForwardPage, select_name: str | None = None) -> None:
+async def refresh_rail(page: WalkForwardPage, select_name: str | None = None) -> None:
     '''
     Reload studies and re-render the rail. When ``select_name`` matches a
     study, that study becomes the selection; otherwise the existing
     selection is preserved if it still exists.
     '''
-    page._studies = load_studies()
+    page._studies = await load_studies()
     target_name = select_name or (
         page._selected_study.name if page._selected_study is not None else None
     )
@@ -113,4 +114,4 @@ def refresh_rail(page: WalkForwardPage, select_name: str | None = None) -> None:
     else:
         page._selected_study = page._studies[0] if page._studies else None
 
-    page._rerender_all()
+    await page._rerender_all()

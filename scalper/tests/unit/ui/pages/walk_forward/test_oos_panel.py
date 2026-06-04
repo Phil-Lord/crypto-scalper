@@ -525,7 +525,7 @@ class TestParamsCache:
             return_value={1: {'sma': 5}, 2: {'sma': 10}},
         )
 
-        panel._refresh_params_cache('study')
+        asyncio.run(panel._refresh_params_cache('study'))
 
         assert panel._params_cache == {1: {'sma': 5}, 2: {'sma': 10}}
         call = bulk.call_args
@@ -551,7 +551,7 @@ class TestParamsCache:
             side_effect=RuntimeError('storage offline'),
         )
 
-        panel._refresh_params_cache('study')
+        asyncio.run(panel._refresh_params_cache('study'))
 
         assert panel._params_cache == {}
 
@@ -560,7 +560,7 @@ class TestParamsCache:
         panel._trials = []
         bulk = mocker.patch.object(oos_panel_module, 'get_trial_params_bulk')
 
-        panel._refresh_params_cache('study')
+        asyncio.run(panel._refresh_params_cache('study'))
 
         assert panel._params_cache == {}
         bulk.assert_not_called()
@@ -568,7 +568,7 @@ class TestParamsCache:
 
 @pytest.mark.ui
 @pytest.mark.walk_forward_oos_panel
-class TestRefreshData:
+class TestLoadData:
     def test_study_not_found_yields_empty_trials_without_warning(self, mocker):
         '''
         A fresh placeholder row has no Optuna study in storage yet (the IS
@@ -584,7 +584,7 @@ class TestRefreshData:
         )
         warning = mocker.patch.object(oos_panel_module.logger, 'warning')
 
-        panel._refresh_data('SmaStrategy_XXBTZGBP_20250101-20250401')
+        asyncio.run(panel._load_data('SmaStrategy_XXBTZGBP_20250101-20250401'))
 
         assert panel._trials == []
         warning.assert_not_called()
@@ -599,7 +599,7 @@ class TestRefreshData:
         )
         warning = mocker.patch.object(oos_panel_module.logger, 'warning')
 
-        panel._refresh_data('SmaStrategy_XXBTZGBP_20250101-20250401')
+        asyncio.run(panel._load_data('SmaStrategy_XXBTZGBP_20250101-20250401'))
 
         assert panel._trials == []
         warning.assert_called_once()

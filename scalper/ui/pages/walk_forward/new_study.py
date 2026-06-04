@@ -95,7 +95,7 @@ async def start_in_sample_from_form(page: WalkForwardPage, form: NewStudyForm) -
         ui.notify(str(e), type='negative')
         return
 
-    page._rerender_all()
+    await page._rerender_all()
     page.is_panel.seed_strip(splits)
 
     try:

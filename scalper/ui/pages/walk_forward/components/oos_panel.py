@@ -210,11 +210,16 @@ class OosPanel:
 
     def render(self, container: ui.column) -> None:
         '''
-        Rebuild the panel into ``container``, replacing any prior content.
+        Rebuild the panel into ``container`` from the panel's current state,
+        replacing any prior content.
 
-        Idempotent — the page calls this on initial mount and again on
-        every study selection change and phase-done refresh. The panel
-        itself calls it once on run start so the sidebar flips from
+        Pure rendering — it does not read storage. Data is loaded off the
+        event loop by :meth:`reload` / :meth:`refresh` *before* a render, so
+        this stays synchronous and safe to call from any context.
+
+        Idempotent — the page calls it (via :meth:`reload`) on initial mount
+        and again on every study selection change and phase-done refresh. The
+        panel itself calls it once on run start so the sidebar flips from
         ``EVALUATE`` to ``STOP``.
         '''
         self._container = container
@@ -231,11 +236,25 @@ class OosPanel:
                 with ui.column().classes('w-64 shrink-0 gap-2'):
                     self._render_sidebar()
                 with ui.column().classes('flex-1 min-w-0 gap-3 min-h-0'):
-                    # Sidebar inputs exist by the time we get here, so
-                    # the data refresh can read top-N off the form.
-                    self._refresh_data(study.name)
                     self._render_tabs_section()
                     self._render_table_section()
+
+    async def reload(self) -> None:
+        '''
+        Load data for the selected study off the event loop, then fully
+        re-render the panel into its container.
+
+        Used for full re-renders (initial mount, study selection change,
+        phase-done refresh) where the sidebar must rebuild too. The live-run
+        tick uses :meth:`refresh` instead, which re-renders only the tabs and
+        table so the sidebar's STOP / progress state is preserved.
+        '''
+        study = self._get_selected_study()
+        if study is not None:
+            await self._load_data(study.name)
+        if self._container is None:
+            return
+        self.render(self._container)
 
     def _render_header(self) -> None:
         running = self._phase_mutex.is_active('oos')
@@ -406,7 +425,7 @@ class OosPanel:
             if study is None:
                 return
             try:
-                params = get_trial_params(study.name, trial.trial_number)
+                params = await get_trial_params(study.name, trial.trial_number)
             except Exception as e:
                 logger.warning(
                     'Lazy fetch of trial %d params failed: %s',
@@ -423,25 +442,30 @@ class OosPanel:
             type='positive',
         )
 
-    def refresh(self) -> None:
+    async def refresh(self) -> None:
         '''
         Re-fetch windows + top trials and re-render the tabs strip and trials
         table. Wired to the manual refresh button and called every tick by the
         page's IS-run live timer so accumulating trials surface without a
         manual click.
+
+        Partial re-render only (tabs + table) so the sidebar's running STOP /
+        progress state survives.
         '''
         study = self._get_selected_study()
         if study is None:
             return
-        self._refresh_data(study.name)
+        await self._load_data(study.name)
         self._render_tabs()
         self._render_table()
 
-    def _refresh_data(self, study_name: str) -> None:
+    async def _load_data(self, study_name: str) -> None:
         '''
         Fetch windows, resolve the selected tab, and load + cache the top
-        trials for it. Best-effort: errors at any step degrade gracefully
-        to an empty section rather than tearing down the panel.
+        trials for it, offloading every storage read to a worker thread via
+        the ``async`` service helpers so the event loop never blocks on a
+        large study. Best-effort: errors at any step degrade gracefully to an
+        empty section rather than tearing down the panel.
 
         Drops the module-level Optuna study cache for ``study_name`` so each
         render reads fresh trials. Optuna's ``_CachedStorage`` wraps the
@@ -452,7 +476,7 @@ class OosPanel:
         '''
         invalidate_study_cache(study_name)
         try:
-            self._windows = list_oos_windows(study_name, self._oos_repo)
+            self._windows = await list_oos_windows(study_name, self._oos_repo)
         except Exception as e:
             logger.warning('Failed to list OOS windows for %s: %s', study_name, e)
             self._windows = []
@@ -473,7 +497,7 @@ class OosPanel:
 
         top_n = self._current_top_n()
         try:
-            self._trials = get_top_trials_with_oos(
+            self._trials = await get_top_trials_with_oos(
                 study_name, self._selected_window, top_n, self._oos_repo,
             )
         except StudyNotFoundError:
@@ -485,12 +509,12 @@ class OosPanel:
             logger.warning('Failed to load top trials for %s: %s', study_name, e)
             self._trials = []
 
-        self._refresh_params_cache(study_name)
+        await self._refresh_params_cache(study_name)
 
-    def _refresh_params_cache(self, study_name: str) -> None:
+    async def _refresh_params_cache(self, study_name: str) -> None:
         '''
         Eagerly populate the params cache for every visible trial in a
-        single pass over the cached Optuna study.
+        single offloaded pass over the cached Optuna study.
 
         Bulk-fetch failure falls back to an empty cache; the copy button
         still works via :func:`get_trial_params` on click rather than
@@ -500,14 +524,14 @@ class OosPanel:
             self._params_cache = {}
             return
         try:
-            self._params_cache = get_trial_params_bulk(
-                study_name, (t.trial_number for t in self._trials),
+            self._params_cache = await get_trial_params_bulk(
+                study_name, [t.trial_number for t in self._trials],
             )
         except Exception as e:
             logger.warning('Failed to prefetch trial params for %s: %s', study_name, e)
             self._params_cache = {}
 
-    def _on_select_window(self, key: WindowKey) -> None:
+    async def _on_select_window(self, key: WindowKey) -> None:
         if self._selected_window == key:
             return
         self._selected_window = key
@@ -516,7 +540,7 @@ class OosPanel:
             return
         top_n = self._current_top_n()
         try:
-            self._trials = get_top_trials_with_oos(
+            self._trials = await get_top_trials_with_oos(
                 study.name, key, top_n, self._oos_repo,
             )
         except StudyNotFoundError:
@@ -525,7 +549,7 @@ class OosPanel:
         except Exception as e:
             logger.warning('Failed to refresh trials on tab click: %s', e)
             self._trials = []
-        self._refresh_params_cache(study.name)
+        await self._refresh_params_cache(study.name)
         self._render_tabs()
         self._render_table()
 
