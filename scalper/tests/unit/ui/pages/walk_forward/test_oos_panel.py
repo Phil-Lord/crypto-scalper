@@ -608,6 +608,40 @@ class TestLoadData:
 
 @pytest.mark.ui
 @pytest.mark.walk_forward_oos_panel
+class TestCacheInvalidationContract:
+    '''
+    Re-renders must reuse the in-process study cache, so
+    ``_load_data`` no longer busts it on every call — doing so defeated the
+    cache and drove a full reload of all (4000+) trials on every render and
+    live tick. Only the explicit fresh-data paths invalidate: :meth:`refresh`
+    (manual button + live tick) and the page's phase-done handler.
+    '''
+
+    def test_load_data_does_not_invalidate_cache(self, mocker):
+        panel, _ = _make_panel(mocker)
+        invalidate = mocker.patch.object(oos_panel_module, 'invalidate_study_cache')
+        mocker.patch.object(oos_panel_module, 'list_oos_windows', return_value=[])
+        mocker.patch.object(oos_panel_module, 'get_top_trials_with_oos', return_value=[])
+        mocker.patch.object(panel, '_refresh_params_cache')
+
+        asyncio.run(panel._load_data('SmaStrategy_XXBTZGBP_20250101-20250401'))
+
+        invalidate.assert_not_called()
+
+    def test_refresh_invalidates_cache_for_selected_study(self, mocker):
+        panel, _ = _make_panel(mocker)
+        invalidate = mocker.patch.object(oos_panel_module, 'invalidate_study_cache')
+        mocker.patch.object(panel, '_load_data')
+        mocker.patch.object(panel, '_render_tabs')
+        mocker.patch.object(panel, '_render_table')
+
+        asyncio.run(panel.refresh())
+
+        invalidate.assert_called_once_with('SmaStrategy_XXBTZGBP_20250101-20250401')
+
+
+@pytest.mark.ui
+@pytest.mark.walk_forward_oos_panel
 class TestOnUseAsTemplate:
     '''
     Re-evaluating an existing window after extending IS is the bread-and-

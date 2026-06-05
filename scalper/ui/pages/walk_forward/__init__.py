@@ -192,17 +192,15 @@ class WalkForwardPage:
         surface without a manual refresh. Defensive guard against a stray
         tick after deactivation: only fires while IS is the active phase.
 
-        Invalidates the cached Study for the running run before refreshing
-        so ``get_top_trials_with_oos`` sees the trials the IS workers have
-        persisted since the last tick. The refresh itself offloads its reads
-        off the event loop, so a 4000-trial study no longer blocks the tick.
+        ``OosPanel.refresh`` busts the study cache for the selected study
+        before re-reading, so ``get_top_trials_with_oos`` sees the trials the
+        IS workers have persisted since the last tick. Those reads offload off
+        the event loop, so a 4000-trial study no longer blocks the tick.
         '''
         if not self.phase_mutex.is_active('is'):
             return
         if not self._can_render():
             return
-        if self._running_study_name is not None:
-            invalidate_study_cache(self._running_study_name)
         await self.oos_panel.refresh()
 
 

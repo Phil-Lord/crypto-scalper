@@ -465,10 +465,15 @@ class OosPanel:
         Partial re-render only (tabs + table) so the sidebar's running STOP /
         progress state survives. Bails without touching the UI if the client
         has gone while the offloaded reads were in flight.
+
+        Manual refresh and the live tick are the explicit "fetch fresh trials
+        now" paths, so this busts the study cache before reading; plain
+        re-renders via :meth:`_load_data` reuse the cache.
         '''
         study = self._get_selected_study()
         if study is None:
             return
+        invalidate_study_cache(study.name)
         await self._load_data(study.name)
         if not self._is_connected():
             return
@@ -483,14 +488,14 @@ class OosPanel:
         large study. Best-effort: errors at any step degrade gracefully to an
         empty section rather than tearing down the panel.
 
-        Drops the module-level Optuna study cache for ``study_name`` so each
-        render reads fresh trials. Optuna's ``_CachedStorage`` wraps the
-        ``RDBStorage`` the cached :class:`optuna.Study` holds onto, and that
-        view can drift across an IS run completing in another process or a
-        long-idle UI session — symptom is an empty trials table even though
-        trials are visible in the database.
+        Does *not* drop the in-process Optuna study cache — reusing it across
+        re-renders is what keeps a large study cheap to display. Callers that
+        need fresh trials invalidate first: :meth:`refresh` (manual button +
+        live tick) and the page's phase-done handler. Optuna's
+        ``_CachedStorage`` view can otherwise lag the database across an IS run
+        completing in another process — symptom is an empty trials table even
+        though trials are visible in the database.
         '''
-        invalidate_study_cache(study_name)
         try:
             self._windows = await list_oos_windows(study_name, self._oos_repo)
         except Exception as e:
