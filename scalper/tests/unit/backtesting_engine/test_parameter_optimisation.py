@@ -1,11 +1,14 @@
 import json
 import sys
 
+import optuna
 import pandas as pd
 import pytest
+from optuna.distributions import FloatDistribution, IntDistribution
+from optuna.trial import TrialState, create_trial
 
 from backtesting_engine.in_sample_evaluation import InSampleArgs, build_in_sample_command
-from backtesting_engine.parameter_optimisation import create_windows
+from backtesting_engine.parameter_optimisation import create_windows, validate_search_space
 
 
 @pytest.mark.backtesting_engine
@@ -42,6 +45,72 @@ class TestBuildInSampleCommand:
             pair='BTCGBP', strategy_name='SmaStrategy',
             start=1.0, end=2.0, n_trials=5,
         )
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.parameter_optimisation
+class TestValidateSearchSpace:
+    GRID = {'short_ema': [5, 50], 'buy_threshold': [0.1, 0.5]}
+    DISTS = {
+        'short_ema': IntDistribution(5, 50),
+        'buy_threshold': FloatDistribution(0.1, 0.5),
+    }
+    PARAMS = {'short_ema': 20, 'buy_threshold': 0.3}
+
+    @pytest.fixture
+    def study(self) -> optuna.Study:
+        return optuna.create_study(direction='maximize')
+
+    def _complete_trial(self, params: dict, dists: dict):
+        return create_trial(
+            state=TrialState.COMPLETE, value=1.0, params=params, distributions=dists,
+        )
+
+    def _running_trial(self, params: dict, dists: dict):
+        return create_trial(state=TrialState.RUNNING, params=params, distributions=dists)
+
+    def test_passes_when_study_has_no_trials(self, study: optuna.Study):
+        # Nothing to validate against — no raise.
+        validate_search_space(study, self.GRID)
+
+    def test_passes_when_grid_matches_completed_trial(self, study: optuna.Study):
+        study.add_trial(self._complete_trial(self.PARAMS, self.DISTS))
+        validate_search_space(study, self.GRID)
+
+    def test_raises_when_param_names_differ(self, study: optuna.Study):
+        study.add_trial(self._complete_trial(self.PARAMS, self.DISTS))
+        grid = {'short_ema': [5, 50], 'long_ema': [30, 150]}
+
+        with pytest.raises(ValueError, match='names conflict'):
+            validate_search_space(study, grid)
+
+    def test_raises_when_param_ranges_differ(self, study: optuna.Study):
+        study.add_trial(self._complete_trial(self.PARAMS, self.DISTS))
+        grid = {'short_ema': [5, 80], 'buy_threshold': [0.1, 0.5]}
+
+        with pytest.raises(ValueError, match='ranges conflict'):
+            validate_search_space(study, grid)
+
+    def test_ignores_running_trial_with_partial_distributions(self, study: optuna.Study):
+        '''
+        Regression: a concurrent worker's RUNNING trial mid-``suggest_parameters``
+        carries only a subset of params. It must not be read as the reference,
+        or the name check spuriously fails (the parallel-worker race).
+        '''
+        study.add_trial(self._complete_trial(self.PARAMS, self.DISTS))
+        study.add_trial(self._running_trial(
+            {'short_ema': 20}, {'short_ema': IntDistribution(5, 50)},
+        ))
+
+        validate_search_space(study, self.GRID)
+
+    def test_passes_when_only_running_partial_trials_exist(self, study: optuna.Study):
+        # No completed trials yet — nothing reliable to validate against.
+        study.add_trial(self._running_trial(
+            {'short_ema': 20}, {'short_ema': IntDistribution(5, 50)},
+        ))
+
+        validate_search_space(study, self.GRID)
 
 
 @pytest.mark.backtesting_engine
