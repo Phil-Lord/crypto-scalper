@@ -30,7 +30,9 @@ from .components import IsPanel, OosPanel
 from .phase_mutex import PhaseMutex
 
 
-LIVE_REFRESH_INTERVAL_S = 5.0
+# Live IS-run refresh cadence. Each tick re-reads the running study's
+# trials from Postgres, so the interval is deliberately long.
+LIVE_REFRESH_INTERVAL_S = 30.0
 
 
 class WalkForwardPage:
