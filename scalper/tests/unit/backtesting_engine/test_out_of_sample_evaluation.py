@@ -2,7 +2,6 @@ import json
 import sys
 from unittest.mock import MagicMock
 
-import optuna
 import pandas as pd
 import pytest
 
@@ -63,141 +62,38 @@ class TestBuildOutOfSampleCommand:
         assert json.loads(cmd[3])['n_workers'] == 1
 
 
-def _make_trial(mocker, number: int, value: float, params: dict = None, complete: bool = True):
-    trial = mocker.Mock()
-    trial.number = number
-    trial.value = value
-    trial.params = params or {}
-    trial.state = optuna.trial.TrialState.COMPLETE if complete else optuna.trial.TrialState.FAIL
-    return trial
-
-
-def _make_study(mocker, trials: list, direction: optuna.study.StudyDirection = optuna.study.StudyDirection.MAXIMIZE):
-    study = mocker.Mock()
-    study.trials = trials
-    study.direction = direction
-    return study
-
-
 @pytest.mark.backtesting_engine
 @pytest.mark.out_of_sample_evaluation
 class TestGetTopParamSets:
-    def test_returns_top_n_trials_for_maximise_direction(self, mocker):
-        # Given
-        trials = [
-            _make_trial(mocker, 0, 1.0, {'sma_period': 5}),
-            _make_trial(mocker, 1, 3.0, {'sma_period': 10}),
-            _make_trial(mocker, 2, 2.0, {'sma_period': 20}),
-        ]
-        study = _make_study(mocker, trials)
+    '''
+    Thin delegate over :func:`utils.fetch_top_param_sets` — the top-N selection,
+    ordering, exclusion and param-reconstruction behaviour is exercised against
+    a real Optuna study in ``test_optuna_utils.TestFetchTopParamSets``. Here we
+    only pin that the study name and exclusion set are forwarded and the result
+    passed straight back.
+    '''
 
-        # When
-        result = get_top_param_sets(study, n=2, evaluated_trials=set())
+    def test_forwards_study_name_and_exclusion_to_query(self, mocker):
+        sentinel = [{'trial_number': 1, 'value': 1.5, 'params': {'a': 1}}]
+        fetch = mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.fetch_top_param_sets',
+            return_value=sentinel,
+        )
 
-        # Then
-        assert len(result) == 2
-        assert result[0]['value'] == 3.0
-        assert result[1]['value'] == 2.0
+        result = get_top_param_sets('study-x', n=3, evaluated_trials={7})
 
-    def test_returns_top_n_trials_for_minimise_direction(self, mocker):
-        # Given
-        trials = [
-            _make_trial(mocker, 0, 1.0, {'sma_period': 5}),
-            _make_trial(mocker, 1, 3.0, {'sma_period': 10}),
-            _make_trial(mocker, 2, 2.0, {'sma_period': 20}),
-        ]
-        study = _make_study(mocker, trials, optuna.study.StudyDirection.MINIMIZE)
+        fetch.assert_called_once_with('study-x', 3, exclude_trial_numbers={7})
+        assert result is sentinel
 
-        # When
-        result = get_top_param_sets(study, n=2, evaluated_trials=set())
+    def test_defaults_exclusion_to_none(self, mocker):
+        fetch = mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.fetch_top_param_sets',
+            return_value=[],
+        )
 
-        # Then
-        assert len(result) == 2
-        assert result[0]['value'] == 1.0
-        assert result[1]['value'] == 2.0
+        get_top_param_sets('study-x', n=2)
 
-    def test_excludes_already_evaluated_trials(self, mocker):
-        # Given
-        trials = [
-            _make_trial(mocker, 0, 3.0, {'sma_period': 5}),
-            _make_trial(mocker, 1, 2.0, {'sma_period': 10}),
-            _make_trial(mocker, 2, 1.0, {'sma_period': 20}),
-        ]
-        study = _make_study(mocker, trials)
-
-        # When
-        result = get_top_param_sets(study, n=3, evaluated_trials={0})
-
-        # Then
-        assert len(result) == 2
-        assert all(r['trial_number'] != 0 for r in result)
-
-    def test_returns_empty_list_when_all_evaluated(self, mocker):
-        # Given
-        trials = [
-            _make_trial(mocker, 0, 3.0),
-            _make_trial(mocker, 1, 2.0),
-        ]
-        study = _make_study(mocker, trials)
-
-        # When
-        result = get_top_param_sets(study, n=2, evaluated_trials={0, 1})
-
-        # Then
-        assert result == []
-
-    def test_excludes_incomplete_trials(self, mocker):
-        # Given
-        trials = [
-            _make_trial(mocker, 0, 3.0, complete=True),
-            _make_trial(mocker, 1, 5.0, complete=False),
-        ]
-        study = _make_study(mocker, trials)
-
-        # When
-        result = get_top_param_sets(study, n=2, evaluated_trials=set())
-
-        # Then
-        assert len(result) == 1
-        assert result[0]['trial_number'] == 0
-
-    def test_returns_correct_dict_structure(self, mocker):
-        # Given
-        params = {'sma_period': 10, 'ema_period': 20}
-        trial = _make_trial(mocker, 42, 1.5, params)
-        study = _make_study(mocker, [trial])
-
-        # When
-        result = get_top_param_sets(study, n=1, evaluated_trials=set())
-
-        # Then
-        assert result == [{'trial_number': 42, 'value': 1.5, 'params': params}]
-
-    def test_returns_fewer_than_n_when_not_enough_trials(self, mocker):
-        # Given
-        trials = [_make_trial(mocker, 0, 1.0)]
-        study = _make_study(mocker, trials)
-
-        # When
-        result = get_top_param_sets(study, n=5, evaluated_trials=set())
-
-        # Then
-        assert len(result) == 1
-
-    def test_default_evaluated_trials_includes_every_completed_trial(self, mocker):
-        # Given — the UI preview path passes no evaluated_trials and expects to
-        # see every completed trial regardless of prior evaluation state.
-        trials = [
-            _make_trial(mocker, 0, 3.0, {'sma_period': 5}),
-            _make_trial(mocker, 1, 2.0, {'sma_period': 10}),
-        ]
-        study = _make_study(mocker, trials)
-
-        # When
-        result = get_top_param_sets(study, n=2)
-
-        # Then
-        assert {r['trial_number'] for r in result} == {0, 1}
+        fetch.assert_called_once_with('study-x', 2, exclude_trial_numbers=None)
 
 
 @pytest.mark.backtesting_engine
@@ -534,8 +430,6 @@ class TestRunEvaluationParallel:
 class TestEvaluateOutOfSample:
     @pytest.fixture
     def patches(self, mocker):
-        mocker.patch('backtesting_engine.out_of_sample_evaluation.load_study')
-
         eval_repo = mocker.Mock()
         eval_repo.get_evaluated_trial_numbers.return_value = set()
         mocker.patch(
@@ -912,7 +806,7 @@ class TestClassifyVerdict:
 @pytest.mark.out_of_sample_evaluation
 class TestGetTopTrialsWithOos:
     def test_left_merges_oos_scores_and_computes_verdicts(self, mocker):
-        study = MagicMock(study_name='study-x')
+        study_name = 'study-x'
         mocker.patch(
             'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
             return_value=[
@@ -928,7 +822,7 @@ class TestGetTopTrialsWithOos:
             # trial 3 has no OOS row -> pending
         ]
 
-        result = get_top_trials_with_oos(study, (10.0, 20.0), n_trials=3, oos_repo=repo)
+        result = get_top_trials_with_oos(study_name, (10.0, 20.0), n_trials=3, oos_repo=repo)
 
         assert result == [
             TrialWithOos(
@@ -949,7 +843,7 @@ class TestGetTopTrialsWithOos:
         repo.get.assert_called_once_with('study-x', 10.0, 20.0)
 
     def test_window_none_marks_all_pending_and_skips_repo(self, mocker):
-        study = MagicMock(study_name='s')
+        study_name = 's'
         mocker.patch(
             'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
             return_value=[
@@ -959,7 +853,7 @@ class TestGetTopTrialsWithOos:
         )
         repo = MagicMock()
 
-        result = get_top_trials_with_oos(study, None, n_trials=2, oos_repo=repo)
+        result = get_top_trials_with_oos(study_name, None, n_trials=2, oos_repo=repo)
 
         repo.get.assert_not_called()
         assert all(t.verdict == TrialVerdict.PENDING for t in result)
@@ -970,19 +864,19 @@ class TestGetTopTrialsWithOos:
         Direction-awareness lives in ``get_top_param_sets``. This test pins
         that the study is forwarded unchanged so direction is honoured.
         '''
-        study = MagicMock(study_name='s')
+        study_name = 's'
         get_top = mocker.patch(
             'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
             return_value=[],
         )
         repo = MagicMock(get=MagicMock(return_value=[]))
 
-        get_top_trials_with_oos(study, (0.0, 1.0), n_trials=5, oos_repo=repo)
+        get_top_trials_with_oos(study_name, (0.0, 1.0), n_trials=5, oos_repo=repo)
 
-        get_top.assert_called_once_with(study, 5)
+        get_top.assert_called_once_with(study_name, 5)
 
     def test_returns_empty_when_no_top_trials(self, mocker):
-        study = MagicMock(study_name='s')
+        study_name = 's'
         mocker.patch(
             'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
             return_value=[],
@@ -990,7 +884,7 @@ class TestGetTopTrialsWithOos:
         repo = MagicMock()
         repo.get.return_value = []
 
-        result = get_top_trials_with_oos(study, (0.0, 1.0), n_trials=10, oos_repo=repo)
+        result = get_top_trials_with_oos(study_name, (0.0, 1.0), n_trials=10, oos_repo=repo)
 
         assert result == []
 
@@ -999,7 +893,7 @@ class TestGetTopTrialsWithOos:
         OOS rows for trials that aren't in the top-N selection are silently
         dropped — the function joins onto top-trials, not the other way around.
         '''
-        study = MagicMock(study_name='s')
+        study_name = 's'
         mocker.patch(
             'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
             return_value=[{'trial_number': 1, 'value': 1.5, 'params': {}}],
@@ -1010,7 +904,7 @@ class TestGetTopTrialsWithOos:
             _make_oos_eval(trial_number=99, oos_balance_ratio=0.95),
         ]
 
-        result = get_top_trials_with_oos(study, (0.0, 1.0), n_trials=1, oos_repo=repo)
+        result = get_top_trials_with_oos(study_name, (0.0, 1.0), n_trials=1, oos_repo=repo)
 
         assert len(result) == 1
         assert result[0].trial_number == 1
@@ -1022,7 +916,7 @@ class TestGetTopTrialsWithOos:
         is queried), but the repo returns nothing — all trials should still
         come back as pending rather than overfit.
         '''
-        study = MagicMock(study_name='s')
+        study_name = 's'
         mocker.patch(
             'backtesting_engine.out_of_sample_evaluation.get_top_param_sets',
             return_value=[
@@ -1033,7 +927,7 @@ class TestGetTopTrialsWithOos:
         repo = MagicMock()
         repo.get.return_value = []
 
-        result = get_top_trials_with_oos(study, (10.0, 20.0), n_trials=2, oos_repo=repo)
+        result = get_top_trials_with_oos(study_name, (10.0, 20.0), n_trials=2, oos_repo=repo)
 
         repo.get.assert_called_once_with('s', 10.0, 20.0)
         assert all(t.verdict == TrialVerdict.PENDING for t in result)
