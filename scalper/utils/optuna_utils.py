@@ -1,10 +1,16 @@
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 
 import optuna
 import pandas as pd
+from optuna.distributions import json_to_distribution
+from optuna.storages._rdb.models import TrialModel, TrialParamModel, TrialValueModel
+from optuna.trial import TrialState
 from questionary import Choice
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from utils import OptunaConfig
 
@@ -173,6 +179,106 @@ def load_study(study_name: str, application_name: str = 'scalper') -> optuna.Stu
         # Optuna's RDBStorage raises a bare KeyError('Record does not exist.')
         # when the study name isn't in storage. Translate to discern from real failures.
         raise StudyNotFoundError(study_name) from e
+
+
+def fetch_top_param_sets(
+    study_name: str,
+    n: int,
+    exclude_trial_numbers: set[int] | None = None,
+    *,
+    storage: optuna.storages.RDBStorage | None = None,
+) -> list[dict]:
+    '''
+    Return the top ``n`` completed trials of a study as parameter-set dicts,
+    highest objective first (or lowest if the study minimises), via a top-N
+    query against the Optuna RDB.
+
+    Only the ``n`` ranked rows (and their params) are pulled out of the
+    database, so this stays cheap on studies with tens of thousands of trials:
+    materialising ``study.trials`` is O(total trials) in DB transfer, Python
+    object construction, and memory, whereas this is O(``n``) plus an
+    in-database sort.
+
+    Mirrors the historical ``study.trials`` selection: the top ``n`` are
+    chosen first, *then* ``exclude_trial_numbers`` are dropped, so fewer than
+    ``n`` rows may come back. Objective values are assumed finite (balance
+    ratios); non-finite objectives are not expected and would not rank
+    meaningfully.
+
+    :param exclude_trial_numbers: Trial numbers to drop from the top ``n``
+        (e.g. already-evaluated trials). ``None`` keeps the full top ``n``.
+    :param storage: Injectable RDB storage — tests pass a SQLite-backed study.
+        Defaults to the project's configured Postgres storage.
+    :return: ``[{'trial_number': int, 'value': float, 'params': dict}, ...]``.
+    :raises StudyNotFoundError: If no study named ``study_name`` exists.
+    '''
+    storage = storage or _make_rdb_storage()
+    try:
+        study_id = storage.get_study_id_from_name(study_name)
+    except KeyError as e:
+        raise StudyNotFoundError(study_name) from e
+
+    maximises = (
+        storage.get_study_directions(study_id)[0] == optuna.study.StudyDirection.MAXIMIZE
+    )
+    value_order = TrialValueModel.value.desc() if maximises else TrialValueModel.value.asc()
+
+    with Session(storage.engine) as session:
+        ranked = session.execute(
+            select(
+                TrialModel.trial_id,
+                TrialModel.number,
+                TrialValueModel.value,
+                TrialValueModel.value_type,
+            )
+            .join(TrialValueModel, TrialValueModel.trial_id == TrialModel.trial_id)
+            .where(
+                TrialModel.study_id == study_id,
+                TrialModel.state == TrialState.COMPLETE,
+                TrialValueModel.objective == 0,
+            )
+            .order_by(value_order)
+            .limit(n)
+        ).all()
+
+        exclude = exclude_trial_numbers or set()
+        ranked = [row for row in ranked if row.number not in exclude]
+        if not ranked:
+            return []
+
+        params_by_trial = _params_by_trial_id(session, [row.trial_id for row in ranked])
+
+    return [
+        {
+            'trial_number': row.number,
+            'value': TrialValueModel.stored_repr_to_value(row.value, row.value_type),
+            'params': params_by_trial.get(row.trial_id, {}),
+        }
+        for row in ranked
+    ]
+
+
+def _params_by_trial_id(session: Session, trial_ids: list[int]) -> dict[int, dict]:
+    '''
+    Reconstruct external-repr param dicts for ``trial_ids`` in a single query.
+
+    ``trial_params.param_value`` is Optuna's internal float encoding; the
+    external value (e.g. a categorical choice or an int) is recovered via the
+    per-param ``distribution_json``.
+    '''
+    rows = session.execute(
+        select(
+            TrialParamModel.trial_id,
+            TrialParamModel.param_name,
+            TrialParamModel.param_value,
+            TrialParamModel.distribution_json,
+        ).where(TrialParamModel.trial_id.in_(trial_ids))
+    ).all()
+    params: dict[int, dict] = defaultdict(dict)
+    for trial_id, name, value, distribution_json in rows:
+        distribution = json_to_distribution(distribution_json)
+        params[trial_id][name] = distribution.to_external_repr(value)
+    return dict(params)
 
 
 def list_studies() -> list[StudySummary]:
