@@ -5,7 +5,6 @@ from unittest.mock import Mock, MagicMock, patch
 
 from backtesting_engine import BacktestingEngine
 from backtesting_engine.out_of_sample_evaluation import (
-    get_top_param_sets,
     run_evaluation,
     save_results
 )
@@ -393,42 +392,10 @@ class TestBacktestingEngineIntegration:
 
     # ==================== Out-of-Sample Evaluation Integration Tests ====================
 
-    def test_get_top_param_sets_extracts_completed_trials(self):
-        '''
-        Test extraction of top parameter sets from Optuna study.
-        Verifies filtering and sorting logic.
-        '''
-        # Given - Mock Optuna study
-        import optuna
-
-        mock_trial_1 = Mock()
-        mock_trial_1.state = optuna.trial.TrialState.COMPLETE
-        mock_trial_1.number = 1
-        mock_trial_1.value = 1.05
-        mock_trial_1.params = {'short_window': 5, 'long_window': 10}
-
-        mock_trial_2 = Mock()
-        mock_trial_2.state = optuna.trial.TrialState.COMPLETE
-        mock_trial_2.number = 2
-        mock_trial_2.value = 1.08
-        mock_trial_2.params = {'short_window': 3, 'long_window': 12}
-
-        mock_trial_3 = Mock()
-        mock_trial_3.state = optuna.trial.TrialState.PRUNED
-        mock_trial_3.number = 3
-
-        mock_study = Mock()
-        mock_study.trials = [mock_trial_1, mock_trial_2, mock_trial_3]
-        mock_study.direction = optuna.study.StudyDirection.MAXIMIZE
-
-        # When
-        top_sets = get_top_param_sets(mock_study, n=2, evaluated_trials=set())
-
-        # Then
-        assert len(top_sets) == 2
-        assert top_sets[0]['trial_number'] == 2  # Higher value first
-        assert top_sets[0]['value'] == 1.08
-        assert top_sets[1]['trial_number'] == 1
+    # Note: top-N extraction (``get_top_param_sets`` → ``fetch_top_param_sets``)
+    # now runs as a query against the Optuna RDB. It is integration-tested against
+    # a real SQLite-backed study in ``tests/unit/utils/test_optuna_utils.py``
+    # (``TestFetchTopParamSets``), so there is no mock-study unit here.
 
     def test_run_evaluation_calculates_metrics(self, mock_trade_repository: Mock, sma_strategy: SmaStrategy):
         '''
