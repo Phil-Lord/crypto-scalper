@@ -135,21 +135,17 @@ def parse_study_name(study_name: str) -> ParsedStudyName:
     )
 
 
-def load_study(study_name: str, application_name: str = 'scalper') -> optuna.Study:
+def _make_rdb_storage(application_name: str = 'scalper') -> optuna.storages.RDBStorage:
     '''
-    Load an Optuna study from the project's configured RDB storage.
+    Build an :class:`optuna.storages.RDBStorage` against the project's
+    configured Optuna database.
 
     - Tags the Postgres connection with ``application_name`` so call sites
         remain distinguishable in ``pg_stat_activity``.
     - Enables ``keepalives`` / ``pool_pre_ping`` to survive idle/dropped
         connections under long-running UI sessions.
-
-    :param application_name: Postgres ``application_name`` to tag the
-        connection with. Defaults to ``'scalper'``.
-    :raises StudyNotFoundError: If no study with ``study_name`` exists in storage.
     '''
-    logger.info(f'Loading study: {study_name}')
-    storage = optuna.storages.RDBStorage(
+    return optuna.storages.RDBStorage(
         url=OptunaConfig.DB_URL,
         engine_kwargs={
             'pool_pre_ping': True,
@@ -159,6 +155,18 @@ def load_study(study_name: str, application_name: str = 'scalper') -> optuna.Stu
             }
         }
     )
+
+
+def load_study(study_name: str, application_name: str = 'scalper') -> optuna.Study:
+    '''
+    Load an Optuna study from the project's configured RDB storage.
+
+    :param application_name: Postgres ``application_name`` to tag the
+        connection with. Defaults to ``'scalper'``.
+    :raises StudyNotFoundError: If no study with ``study_name`` exists in storage.
+    '''
+    logger.info(f'Loading study: {study_name}')
+    storage = _make_rdb_storage(application_name)
     try:
         return optuna.load_study(study_name=study_name, storage=storage)
     except KeyError as e:
@@ -175,7 +183,7 @@ def list_studies() -> list[StudySummary]:
     studies that don't match :data:`STUDY_NAME_FORMAT` are returned with
     empty pair/strategy strings.
     '''
-    storage = optuna.storages.RDBStorage(url=OptunaConfig.DB_URL)
+    storage = _make_rdb_storage()
     summaries = optuna.get_all_study_summaries(storage)
     return [_to_study_summary(summary) for summary in summaries]
 
