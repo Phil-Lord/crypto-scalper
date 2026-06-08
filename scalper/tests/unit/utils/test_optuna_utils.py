@@ -10,6 +10,7 @@ from utils.optuna_utils import (
     StudyDirection,
     StudySummary,
     create_study_name,
+    fetch_top_param_sets,
     get_study_choices,
     list_studies,
     load_study,
@@ -396,3 +397,154 @@ class TestStudySummary:
                 strategy='SmaStrategy',
                 trial_count=5,
             )
+
+
+def _dist_for(value):
+    if isinstance(value, str):
+        return optuna.distributions.CategoricalDistribution([value])
+    if isinstance(value, bool):
+        return optuna.distributions.CategoricalDistribution([True, False])
+    if isinstance(value, int):
+        return optuna.distributions.IntDistribution(0, 1_000_000)
+    return optuna.distributions.FloatDistribution(0.0, 1e12)
+
+
+def _seed_sqlite_study(
+    tmp_path,
+    trials,
+    name: str = 'SmaStrategy_XXBTZGBP_20250101-20250401',
+    direction: optuna.study.StudyDirection = optuna.study.StudyDirection.MAXIMIZE,
+    distributions: dict | None = None,
+) -> tuple[optuna.storages.RDBStorage, str]:
+    '''
+    Build a real SQLite-backed Optuna study so the top-N query runs against
+    genuine RDB tables (trials / trial_values / trial_params). ``trials`` is a
+    list of ``(value, params, complete)``; trial numbers fall out of insertion
+    order (0, 1, 2, ...). Returns the storage (to inject) and the study name.
+    '''
+    storage = optuna.storages.RDBStorage(url=f'sqlite:///{tmp_path}/optuna.db')
+    study = optuna.create_study(study_name=name, storage=storage, direction=direction)
+    for value, params, complete in trials:
+        if not complete:
+            study.add_trial(optuna.trial.create_trial(state=optuna.trial.TrialState.FAIL))
+            continue
+        dists = distributions or {k: _dist_for(v) for k, v in params.items()}
+        study.add_trial(
+            optuna.trial.create_trial(
+                params=params,
+                distributions=dists,
+                value=value,
+                state=optuna.trial.TrialState.COMPLETE,
+            )
+        )
+    return storage, name
+
+
+@pytest.mark.utils
+@pytest.mark.optuna_utils
+class TestFetchTopParamSets:
+    '''
+    Behaviour of the top-N RDB query, exercised against a real SQLite-backed
+    Optuna study (no Postgres needed). Doubles as the parity check that the
+    query returns the same shape and selection the old ``study.trials`` scan
+    did, including correct external-repr param reconstruction.
+    '''
+
+    def test_returns_top_n_for_maximise_direction(self, tmp_path):
+        storage, name = _seed_sqlite_study(tmp_path, [
+            (1.0, {'sma_period': 5}, True),
+            (3.0, {'sma_period': 10}, True),
+            (2.0, {'sma_period': 20}, True),
+        ])
+
+        result = fetch_top_param_sets(name, n=2, storage=storage)
+
+        assert [r['value'] for r in result] == [3.0, 2.0]
+
+    def test_returns_top_n_for_minimise_direction(self, tmp_path):
+        storage, name = _seed_sqlite_study(
+            tmp_path,
+            [
+                (1.0, {'sma_period': 5}, True),
+                (3.0, {'sma_period': 10}, True),
+                (2.0, {'sma_period': 20}, True),
+            ],
+            direction=optuna.study.StudyDirection.MINIMIZE,
+        )
+
+        result = fetch_top_param_sets(name, n=2, storage=storage)
+
+        assert [r['value'] for r in result] == [1.0, 2.0]
+
+    def test_excludes_evaluated_after_taking_top_n(self, tmp_path):
+        storage, name = _seed_sqlite_study(tmp_path, [
+            (3.0, {'sma_period': 5}, True),
+            (2.0, {'sma_period': 10}, True),
+            (1.0, {'sma_period': 20}, True),
+        ])
+
+        result = fetch_top_param_sets(name, n=3, exclude_trial_numbers={0}, storage=storage)
+
+        assert len(result) == 2
+        assert all(r['trial_number'] != 0 for r in result)
+
+    def test_returns_empty_when_all_top_n_excluded(self, tmp_path):
+        storage, name = _seed_sqlite_study(tmp_path, [
+            (3.0, {'sma_period': 5}, True),
+            (2.0, {'sma_period': 10}, True),
+        ])
+
+        result = fetch_top_param_sets(name, n=2, exclude_trial_numbers={0, 1}, storage=storage)
+
+        assert result == []
+
+    def test_ignores_incomplete_trials(self, tmp_path):
+        storage, name = _seed_sqlite_study(tmp_path, [
+            (3.0, {'sma_period': 5}, True),
+            (5.0, None, False),
+        ])
+
+        result = fetch_top_param_sets(name, n=2, storage=storage)
+
+        assert len(result) == 1
+        assert result[0]['trial_number'] == 0
+
+    def test_reconstructs_external_param_values(self, tmp_path):
+        # 'fast' is index 1 internally; reconstruction must map it back.
+        storage, name = _seed_sqlite_study(
+            tmp_path,
+            [(1.5, {'sma_period': 10, 'mode': 'fast'}, True)],
+            distributions={
+                'sma_period': optuna.distributions.IntDistribution(1, 100),
+                'mode': optuna.distributions.CategoricalDistribution(['slow', 'fast']),
+            },
+        )
+
+        result = fetch_top_param_sets(name, n=1, storage=storage)
+
+        assert result == [
+            {'trial_number': 0, 'value': 1.5, 'params': {'sma_period': 10, 'mode': 'fast'}}
+        ]
+
+    def test_returns_fewer_than_n_when_not_enough_trials(self, tmp_path):
+        storage, name = _seed_sqlite_study(tmp_path, [(1.0, {'sma_period': 5}, True)])
+
+        result = fetch_top_param_sets(name, n=5, storage=storage)
+
+        assert len(result) == 1
+
+    def test_no_exclusion_keeps_every_completed_trial(self, tmp_path):
+        storage, name = _seed_sqlite_study(tmp_path, [
+            (3.0, {'sma_period': 5}, True),
+            (2.0, {'sma_period': 10}, True),
+        ])
+
+        result = fetch_top_param_sets(name, n=2, storage=storage)
+
+        assert {r['trial_number'] for r in result} == {0, 1}
+
+    def test_raises_study_not_found_for_unknown_study(self, tmp_path):
+        storage, _ = _seed_sqlite_study(tmp_path, [(1.0, {'sma_period': 5}, True)])
+
+        with pytest.raises(StudyNotFoundError):
+            fetch_top_param_sets('does-not-exist', n=1, storage=storage)
