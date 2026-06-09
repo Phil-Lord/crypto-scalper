@@ -82,7 +82,9 @@ class TestGetTopParamSets:
 
         result = get_top_param_sets('study-x', n=3, evaluated_trials={7})
 
-        fetch.assert_called_once_with('study-x', 3, exclude_trial_numbers={7})
+        fetch.assert_called_once_with(
+            'study-x', 3, exclude_trial_numbers={7}, application_name='scalper',
+        )
         assert result is sentinel
 
     def test_defaults_exclusion_to_none(self, mocker):
@@ -93,7 +95,19 @@ class TestGetTopParamSets:
 
         get_top_param_sets('study-x', n=2)
 
-        fetch.assert_called_once_with('study-x', 2, exclude_trial_numbers=None)
+        fetch.assert_called_once_with(
+            'study-x', 2, exclude_trial_numbers=None, application_name='scalper',
+        )
+
+    def test_forwards_application_name(self, mocker):
+        fetch = mocker.patch(
+            'backtesting_engine.out_of_sample_evaluation.fetch_top_param_sets',
+            return_value=[],
+        )
+
+        get_top_param_sets('study-x', n=2, application_name='out_of_sample_evaluation')
+
+        assert fetch.call_args.kwargs['application_name'] == 'out_of_sample_evaluation'
 
 
 @pytest.mark.backtesting_engine

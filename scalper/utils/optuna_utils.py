@@ -186,6 +186,7 @@ def fetch_top_param_sets(
     n: int,
     exclude_trial_numbers: set[int] | None = None,
     *,
+    application_name: str = 'scalper',
     storage: optuna.storages.RDBStorage | None = None,
 ) -> list[dict]:
     '''
@@ -207,12 +208,14 @@ def fetch_top_param_sets(
 
     :param exclude_trial_numbers: Trial numbers to drop from the top ``n``
         (e.g. already-evaluated trials). ``None`` keeps the full top ``n``.
+    :param application_name: Postgres ``application_name`` to tag the read with
+        in ``pg_stat_activity``. Ignored when ``storage`` is injected.
     :param storage: Injectable RDB storage — tests pass a SQLite-backed study.
         Defaults to the project's configured Postgres storage.
     :return: ``[{'trial_number': int, 'value': float, 'params': dict}, ...]``.
     :raises StudyNotFoundError: If no study named ``study_name`` exists.
     '''
-    storage = storage or _make_rdb_storage()
+    storage = storage or _make_rdb_storage(application_name)
     try:
         study_id = storage.get_study_id_from_name(study_name)
     except KeyError as e:

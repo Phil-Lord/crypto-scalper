@@ -185,7 +185,10 @@ def evaluate_out_of_sample(
     eval_repo = SQLAlchemyOutOfSampleEvaluationRepository(client)
 
     evaluated_trials = eval_repo.get_evaluated_trial_numbers(study_name, start, end)
-    top_param_sets = get_top_param_sets(study_name, num_sets, evaluated_trials)
+    top_param_sets = get_top_param_sets(
+        study_name, num_sets, evaluated_trials,
+        application_name='out_of_sample_evaluation',
+    )
     if len(top_param_sets) == 0:
         return
 
@@ -208,7 +211,11 @@ def evaluate_out_of_sample(
 
 
 def get_top_param_sets(
-    study_name: str, n: int, evaluated_trials: set[int] | None = None
+    study_name: str,
+    n: int,
+    evaluated_trials: set[int] | None = None,
+    *,
+    application_name: str = 'scalper',
 ) -> list[dict]:
     '''
     Return the top ``n`` completed trials of ``study_name`` as parameter-set
@@ -217,9 +224,15 @@ def get_top_param_sets(
     :param evaluated_trials: Trial numbers to exclude (already evaluated). Pass
         ``None`` to include every completed trial — used by the UI preview which
         shows what *would* be evaluated, regardless of prior evaluation state.
+    :param application_name: Postgres ``application_name`` for the underlying
+        RDB read, so call sites stay distinguishable in ``pg_stat_activity``.
     '''
     logger.info(f'Extracting top {n} parameter sets from study...')
-    top_param_sets = fetch_top_param_sets(study_name, n, exclude_trial_numbers=evaluated_trials)
+    top_param_sets = fetch_top_param_sets(
+        study_name, n,
+        exclude_trial_numbers=evaluated_trials,
+        application_name=application_name,
+    )
     logger.info(f'Selected {len(top_param_sets)} parameter sets for evaluation.')
     return top_param_sets
 
