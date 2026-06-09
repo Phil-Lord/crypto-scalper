@@ -223,51 +223,6 @@ async def get_top_trials_with_oos(
     ) or []
 
 
-def _get_trial_params(study_name: str, trial_number: int) -> dict:
-    study = load_study(study_name)
-    for trial in study.trials:
-        if trial.number == trial_number:
-            return trial.params
-    raise KeyError(f'Trial {trial_number} not found in study {study_name}')
-
-
-async def get_trial_params(study_name: str, trial_number: int) -> dict:
-    '''
-    Return the params dict for a single trial. Used by the page's
-    copy-params button as a lazy-fetch fallback when the bulk prefetch
-    is unavailable.
-    '''
-    return await run.io_bound(_get_trial_params, study_name, trial_number) or {}
-
-
-def _get_trial_params_bulk(study_name: str, trial_numbers: Iterable[int]) -> dict[int, dict]:
-    needed = set(trial_numbers)
-    if not needed:
-        return {}
-    study = load_study(study_name)
-    return {
-        trial.number: trial.params
-        for trial in study.trials
-        if trial.number in needed
-    }
-
-
-async def get_trial_params_bulk(
-    study_name: str, trial_numbers: Iterable[int]
-) -> dict[int, dict]:
-    '''
-    Return ``{trial_number: params}`` for every requested trial in a single
-    pass over ``study.trials``. Used by the OOS panel's eager prefetch so
-    loading N rows is O(study.trials) rather than O(N * study.trials).
-
-    Missing trial numbers are silently omitted — callers fall back to a
-    per-click lookup via :func:`get_trial_params`.
-    '''
-    return await run.io_bound(
-        _get_trial_params_bulk, study_name, list(trial_numbers),
-    ) or {}
-
-
 def get_evaluation_results(
     study_name: str,
     start: float,

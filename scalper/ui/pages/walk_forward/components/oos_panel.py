@@ -16,11 +16,9 @@ Single-subprocess phase: PROGRESS events come *without* a worker index
 (unlike IS), so this panel renders ``evaluating trial X of N`` rather
 than a worker grid.
 
-Eager params prefetch: on study or window change, the panel calls
-``get_trial_params`` for every visible trial and stashes the result keyed
-by trial number. The copy button reads the stash so the click is instant
-and a prefetch failure on one trial only forces a lazy lookup for that
-trial's click — the button stays visible.
+Each top-trial row (:class:`TrialWithOos`) already carries its ``params``,
+fetched by the top-N RDB query, so the copy button reads ``trial.params``
+directly without any extra per-trial lookup.
 '''
 from __future__ import annotations
 
@@ -29,7 +27,6 @@ import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
 
 from nicegui import ui
 
@@ -43,8 +40,6 @@ from data_system import (
 from ui.components import confirm_dialog
 from ui.services.walk_forward import (
     get_top_trials_with_oos,
-    get_trial_params,
-    get_trial_params_bulk,
     list_oos_windows,
     start_out_of_sample,
 )
@@ -210,7 +205,6 @@ class OosPanel:
         self._selected_window: WindowKey | None = None
         self._running_window: WindowKey | None = None
         self._trials: list[TrialWithOos] = []
-        self._params_cache: dict[int, dict[str, Any]] = {}
         self._progress_count: int = 0
         self._progress_total: int = 0
 
@@ -427,25 +421,12 @@ class OosPanel:
                 on_click=lambda _e, t=trial: self._on_copy_params(t),
             ).props('flat dense round').classes('w-8 text-neutral-400')
 
-    async def _on_copy_params(self, trial: TrialWithOos) -> None:
-        params = self._params_cache.get(trial.trial_number)
-        if params is None:
-            study = self._get_selected_study()
-            if study is None:
-                return
-            try:
-                params = await get_trial_params(study.name, trial.trial_number)
-            except Exception as e:
-                logger.warning(
-                    'Lazy fetch of trial %d params failed: %s',
-                    trial.trial_number, e,
-                )
-                if self._is_connected():
-                    ui.notify('Could not load trial params.', type='negative')
-                return
+    def _on_copy_params(self, trial: TrialWithOos) -> None:
+        # The top-N query already populated ``trial.params``, so the copy is a
+        # pure client-side action — no storage read on click.
         if not self._is_connected():
             return
-        params_json = json.dumps(params)
+        params_json = json.dumps(trial.params)
         ui.run_javascript(
             f'navigator.clipboard.writeText({json.dumps(params_json)})'
         )
@@ -520,28 +501,6 @@ class OosPanel:
             logger.warning('Failed to load top trials for %s: %s', study_name, e)
             self._trials = []
 
-        await self._refresh_params_cache(study_name)
-
-    async def _refresh_params_cache(self, study_name: str) -> None:
-        '''
-        Eagerly populate the params cache for every visible trial in a
-        single offloaded pass over the cached Optuna study.
-
-        Bulk-fetch failure falls back to an empty cache; the copy button
-        still works via :func:`get_trial_params` on click rather than
-        disappearing.
-        '''
-        if not self._trials:
-            self._params_cache = {}
-            return
-        try:
-            self._params_cache = await get_trial_params_bulk(
-                study_name, [t.trial_number for t in self._trials],
-            )
-        except Exception as e:
-            logger.warning('Failed to prefetch trial params for %s: %s', study_name, e)
-            self._params_cache = {}
-
     async def _on_select_window(self, key: WindowKey) -> None:
         if self._selected_window == key:
             return
@@ -560,7 +519,6 @@ class OosPanel:
         except Exception as e:
             logger.warning('Failed to refresh trials on tab click: %s', e)
             self._trials = []
-        await self._refresh_params_cache(study.name)
         if not self._is_connected():
             return
         self._render_tabs()
