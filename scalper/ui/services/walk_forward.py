@@ -17,27 +17,26 @@ Also exposes read-only helpers the redesigned walk-forward page consumes:
 
 - study summaries
 - OOS-window aggregates
-- top trials joined with OOS scores
-- single-trial param lookups.
-
-``load_study`` results are cached in-process so the page can rerender
-without paying the Optuna round-trip; :func:`invalidate_study_cache`
-lets the page drop entries when a phase finishes.
+- top trials joined with OOS scores.
 
 The read helpers are ``async`` and offload their blocking Optuna/DB work to
-NiceGUI's thread pool via :func:`nicegui.run.io_bound`, so materialising a
-large study never blocks the single UI event loop (which would drop the
-websocket). The synchronous bodies live in private ``_*`` functions — the
-public coroutines are thin offload wrappers. ``io_bound`` returns ``None`` if
-the awaiting task is cancelled (client disconnect) or the app is stopping;
-the wrappers coerce that to an empty result so callers never have to special-
-case it, and a torn-down client is handled by the page's render guards.
+NiceGUI's thread pool via :func:`nicegui.run.io_bound`, so a read never blocks
+the single UI event loop (which would drop the websocket). The synchronous
+bodies live in private ``_*`` functions — the public coroutines are thin
+offload wrappers. ``io_bound`` returns ``None`` if the awaiting task is
+cancelled (client disconnect) or the app is stopping; the wrappers coerce that
+to an empty result so callers never have to special-case it, and a torn-down
+client is handled by the page's render guards.
+
+Top-trial reads use a top-N query against the Optuna RDB
+(:func:`backtesting_engine.get_top_param_sets`), so they stay cheap on studies
+with tens of thousands of trials and no in-process study cache is needed — each
+read returns fresh data without a full materialise.
 '''
 import asyncio
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from pathlib import Path
 
-import optuna
 from nicegui import run
 
 from backtesting_engine import (
@@ -61,39 +60,11 @@ from data_system import (
 )
 from utils import (
     list_studies as _list_studies_from_storage,
-    load_study as _load_study_from_storage,
     StudySummary
 )
 
 
 SCALPER_DIR = Path(__file__).resolve().parents[2]
-
-
-_study_cache: dict[str, optuna.Study] = {}
-
-
-def load_study(study_name: str) -> optuna.Study:
-    '''
-    Return a cached :class:`optuna.Study` for ``study_name``, loading it on
-    first access. Subsequent calls reuse the cached instance — call
-    :func:`invalidate_study_cache` after a phase finishes to pick up new trials.
-    '''
-    if study_name not in _study_cache:
-        _study_cache[study_name] = _load_study_from_storage(study_name)
-    return _study_cache[study_name]
-
-
-def invalidate_study_cache(study_name: str | None = None) -> None:
-    '''
-    Drop cached :class:`optuna.Study` instances.
-
-    :param study_name: If provided, drop only that study; otherwise clear the
-        whole cache. Missing entries are a no-op.
-    '''
-    if study_name is None:
-        _study_cache.clear()
-    else:
-        _study_cache.pop(study_name, None)
 
 
 async def start_in_sample(
@@ -207,7 +178,7 @@ async def list_oos_windows(
 
 
 def _get_top_trials(study_name: str, n: int) -> list[dict]:
-    return get_top_param_sets(load_study(study_name), n)
+    return get_top_param_sets(study_name, n)
 
 
 async def get_top_trials(study_name: str, n: int) -> list[dict]:
@@ -229,7 +200,7 @@ def _get_top_trials_with_oos(
     oos_repo: OutOfSampleEvaluationRepository,
 ) -> list[TrialWithOos]:
     return _get_top_trials_with_oos_from_engine(
-        load_study(study_name), window, n_trials, oos_repo,
+        study_name, window, n_trials, oos_repo,
     )
 
 
@@ -240,9 +211,12 @@ async def get_top_trials_with_oos(
     oos_repo: OutOfSampleEvaluationRepository,
 ) -> list[TrialWithOos]:
     '''
-    Thin wrapper around :func:`backtesting_engine.get_top_trials_with_oos` that
-    injects the in-process cached study so repeated page renders don't pay the
-    Optuna round-trip.
+    Offloaded wrapper around :func:`backtesting_engine.get_top_trials_with_oos`.
+
+    Each call runs a top-N query against the Optuna RDB, so it is cheap to call
+    on every render and live tick even for a 100k-trial study. Returned rows
+    already carry their ``params``, so callers read those directly rather than
+    a separate per-trial lookup.
     '''
     return await run.io_bound(
         _get_top_trials_with_oos, study_name, window, n_trials, oos_repo,

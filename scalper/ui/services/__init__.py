@@ -6,7 +6,6 @@ from .walk_forward import (
     get_top_trials_with_oos,
     get_trial_params,
     get_trial_params_bulk,
-    invalidate_study_cache,
     list_oos_windows,
     list_studies,
     start_in_sample,

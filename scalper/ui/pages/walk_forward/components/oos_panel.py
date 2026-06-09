@@ -45,7 +45,6 @@ from ui.services.walk_forward import (
     get_top_trials_with_oos,
     get_trial_params,
     get_trial_params_bulk,
-    invalidate_study_cache,
     list_oos_windows,
     start_out_of_sample,
 )
@@ -465,15 +464,10 @@ class OosPanel:
         Partial re-render only (tabs + table) so the sidebar's running STOP /
         progress state survives. Bails without touching the UI if the client
         has gone while the offloaded reads were in flight.
-
-        Manual refresh and the live tick are the explicit "fetch fresh trials
-        now" paths, so this busts the study cache before reading; plain
-        re-renders via :meth:`_load_data` reuse the cache.
         '''
         study = self._get_selected_study()
         if study is None:
             return
-        invalidate_study_cache(study.name)
         await self._load_data(study.name)
         if not self._is_connected():
             return
@@ -482,19 +476,15 @@ class OosPanel:
 
     async def _load_data(self, study_name: str) -> None:
         '''
-        Fetch windows, resolve the selected tab, and load + cache the top
-        trials for it, offloading every storage read to a worker thread via
-        the ``async`` service helpers so the event loop never blocks on a
-        large study. Best-effort: errors at any step degrade gracefully to an
-        empty section rather than tearing down the panel.
+        Fetch windows, resolve the selected tab, and load the top trials for
+        it, offloading every storage read to a worker thread via the ``async``
+        service helpers so the event loop never blocks. Best-effort: errors at
+        any step degrade gracefully to an empty section rather than tearing
+        down the panel.
 
-        Does *not* drop the in-process Optuna study cache — reusing it across
-        re-renders is what keeps a large study cheap to display. Callers that
-        need fresh trials invalidate first: :meth:`refresh` (manual button +
-        live tick) and the page's phase-done handler. Optuna's
-        ``_CachedStorage`` view can otherwise lag the database across an IS run
-        completing in another process — symptom is an empty trials table even
-        though trials are visible in the database.
+        Top trials come from a fresh top-N RDB query each call (no in-process
+        cache), so a study that completed in another process surfaces its new
+        trials without any cache invalidation.
         '''
         try:
             self._windows = await list_oos_windows(study_name, self._oos_repo)
