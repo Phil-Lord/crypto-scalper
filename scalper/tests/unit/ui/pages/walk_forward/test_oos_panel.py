@@ -438,133 +438,40 @@ class TestEffectiveRunningWindow:
 
 @pytest.mark.ui
 @pytest.mark.walk_forward_oos_panel
-class TestParamsCache:
-    def test_copy_uses_cached_params_without_lazy_fetch(self, mocker):
-        panel, deps = _make_panel(mocker)
-        panel._params_cache = {7: {'sma_window': 12}}
-        get_trial_params = mocker.patch.object(
-            oos_panel_module, 'get_trial_params'
-        )
-        run_javascript = mocker.patch.object(oos_panel_module.ui, 'run_javascript')
-        mocker.patch.object(oos_panel_module.ui, 'notify')
+class TestCopyParams:
+    '''
+    The top-N query already populates ``trial.params``, so copying is a pure
+    client-side action — no storage read on click.
+    '''
 
+    def _trial(self, params: dict):
         from backtesting_engine import TrialVerdict, TrialWithOos
-        trial = TrialWithOos(
+        return TrialWithOos(
             trial_number=7, is_value=1.0, oos_score=None,
-            delta=None, verdict=TrialVerdict.PENDING, params={},
+            delta=None, verdict=TrialVerdict.PENDING, params=params,
         )
-        asyncio.run(panel._on_copy_params(trial))
 
-        get_trial_params.assert_not_called()
-        run_javascript.assert_called_once()
-
-    def test_copy_falls_back_to_lazy_fetch_on_cache_miss(self, mocker):
-        '''
-        Per WF7 prefetch failure → lazy fetch on click. The button stays
-        visible regardless.
-        '''
-        panel, deps = _make_panel(mocker)
-        panel._params_cache = {}  # prefetch failed
-        get_trial_params = mocker.patch.object(
-            oos_panel_module, 'get_trial_params',
-            return_value={'sma_window': 9},
-        )
-        run_javascript = mocker.patch.object(oos_panel_module.ui, 'run_javascript')
-        mocker.patch.object(oos_panel_module.ui, 'notify')
-
-        from backtesting_engine import TrialVerdict, TrialWithOos
-        trial = TrialWithOos(
-            trial_number=42, is_value=1.0, oos_score=None,
-            delta=None, verdict=TrialVerdict.PENDING, params={},
-        )
-        asyncio.run(panel._on_copy_params(trial))
-
-        get_trial_params.assert_called_once_with(deps['selected'].name, 42)
-        run_javascript.assert_called_once()
-
-    def test_copy_notifies_when_lazy_fetch_fails(self, mocker):
+    def test_copies_trial_params_without_storage_read(self, mocker):
         panel, _ = _make_panel(mocker)
-        panel._params_cache = {}
-        mocker.patch.object(
-            oos_panel_module, 'get_trial_params',
-            side_effect=RuntimeError('storage offline'),
-        )
         run_javascript = mocker.patch.object(oos_panel_module.ui, 'run_javascript')
         notify = mocker.patch.object(oos_panel_module.ui, 'notify')
 
-        from backtesting_engine import TrialVerdict, TrialWithOos
-        trial = TrialWithOos(
-            trial_number=1, is_value=1.0, oos_score=None,
-            delta=None, verdict=TrialVerdict.PENDING, params={},
-        )
-        asyncio.run(panel._on_copy_params(trial))
+        panel._on_copy_params(self._trial({'sma_window': 12}))
+
+        run_javascript.assert_called_once()
+        assert '12' in run_javascript.call_args.args[0]
+        assert notify.call_args.kwargs['type'] == 'positive'
+
+    def test_skips_copy_when_client_disconnected(self, mocker):
+        panel, _ = _make_panel(mocker)
+        panel._is_connected = lambda: False
+        run_javascript = mocker.patch.object(oos_panel_module.ui, 'run_javascript')
+        notify = mocker.patch.object(oos_panel_module.ui, 'notify')
+
+        panel._on_copy_params(self._trial({'sma_window': 12}))
 
         run_javascript.assert_not_called()
-        notify.assert_called_once()
-        assert notify.call_args.kwargs['type'] == 'negative'
-
-    def test_prefetch_populates_cache_from_bulk_fetch(self, mocker):
-        '''
-        The panel asks the service for params in one pass, keyed by trial
-        number. Subsequent copy clicks then hit the cache rather than
-        re-querying Optuna.
-        '''
-        panel, _ = _make_panel(mocker)
-        from backtesting_engine import TrialVerdict, TrialWithOos
-        panel._trials = [
-            TrialWithOos(
-                trial_number=1, is_value=1.0, oos_score=None,
-                delta=None, verdict=TrialVerdict.PENDING, params={},
-            ),
-            TrialWithOos(
-                trial_number=2, is_value=0.9, oos_score=None,
-                delta=None, verdict=TrialVerdict.PENDING, params={},
-            ),
-        ]
-        bulk = mocker.patch.object(
-            oos_panel_module, 'get_trial_params_bulk',
-            return_value={1: {'sma': 5}, 2: {'sma': 10}},
-        )
-
-        asyncio.run(panel._refresh_params_cache('study'))
-
-        assert panel._params_cache == {1: {'sma': 5}, 2: {'sma': 10}}
-        call = bulk.call_args
-        assert call.args[0] == 'study'
-        assert sorted(call.args[1]) == [1, 2]
-
-    def test_prefetch_failure_falls_back_to_empty_cache(self, mocker):
-        '''
-        If the bulk fetch raises (e.g. Optuna storage offline), the cache
-        is cleared so every copy click falls back to the lazy lookup
-        rather than wedging on a stale entry.
-        '''
-        panel, _ = _make_panel(mocker)
-        from backtesting_engine import TrialVerdict, TrialWithOos
-        panel._trials = [
-            TrialWithOos(
-                trial_number=1, is_value=1.0, oos_score=None,
-                delta=None, verdict=TrialVerdict.PENDING, params={},
-            ),
-        ]
-        mocker.patch.object(
-            oos_panel_module, 'get_trial_params_bulk',
-            side_effect=RuntimeError('storage offline'),
-        )
-
-        asyncio.run(panel._refresh_params_cache('study'))
-
-        assert panel._params_cache == {}
-
-    def test_prefetch_with_no_trials_is_a_no_op(self, mocker):
-        panel, _ = _make_panel(mocker)
-        panel._trials = []
-        bulk = mocker.patch.object(oos_panel_module, 'get_trial_params_bulk')
-
-        asyncio.run(panel._refresh_params_cache('study'))
-
-        assert panel._params_cache == {}
-        bulk.assert_not_called()
+        notify.assert_not_called()
 
 
 @pytest.mark.ui
@@ -577,7 +484,6 @@ class TestLoadData:
         degrade quietly to an empty table, not log a failure.
         '''
         panel, _ = _make_panel(mocker)
-        mocker.patch.object(oos_panel_module, 'invalidate_study_cache')
         mocker.patch.object(oos_panel_module, 'list_oos_windows', return_value=[])
         mocker.patch.object(
             oos_panel_module, 'get_top_trials_with_oos',
@@ -592,7 +498,6 @@ class TestLoadData:
 
     def test_unexpected_error_logs_warning_and_empties_trials(self, mocker):
         panel, _ = _make_panel(mocker)
-        mocker.patch.object(oos_panel_module, 'invalidate_study_cache')
         mocker.patch.object(oos_panel_module, 'list_oos_windows', return_value=[])
         mocker.patch.object(
             oos_panel_module, 'get_top_trials_with_oos',
@@ -604,40 +509,6 @@ class TestLoadData:
 
         assert panel._trials == []
         warning.assert_called_once()
-
-
-@pytest.mark.ui
-@pytest.mark.walk_forward_oos_panel
-class TestCacheInvalidationContract:
-    '''
-    Re-renders must reuse the in-process study cache, so
-    ``_load_data`` no longer busts it on every call — doing so defeated the
-    cache and drove a full reload of all (4000+) trials on every render and
-    live tick. Only the explicit fresh-data paths invalidate: :meth:`refresh`
-    (manual button + live tick) and the page's phase-done handler.
-    '''
-
-    def test_load_data_does_not_invalidate_cache(self, mocker):
-        panel, _ = _make_panel(mocker)
-        invalidate = mocker.patch.object(oos_panel_module, 'invalidate_study_cache')
-        mocker.patch.object(oos_panel_module, 'list_oos_windows', return_value=[])
-        mocker.patch.object(oos_panel_module, 'get_top_trials_with_oos', return_value=[])
-        mocker.patch.object(panel, '_refresh_params_cache')
-
-        asyncio.run(panel._load_data('SmaStrategy_XXBTZGBP_20250101-20250401'))
-
-        invalidate.assert_not_called()
-
-    def test_refresh_invalidates_cache_for_selected_study(self, mocker):
-        panel, _ = _make_panel(mocker)
-        invalidate = mocker.patch.object(oos_panel_module, 'invalidate_study_cache')
-        mocker.patch.object(panel, '_load_data')
-        mocker.patch.object(panel, '_render_tabs')
-        mocker.patch.object(panel, '_render_table')
-
-        asyncio.run(panel.refresh())
-
-        invalidate.assert_called_once_with('SmaStrategy_XXBTZGBP_20250101-20250401')
 
 
 @pytest.mark.ui

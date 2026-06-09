@@ -33,11 +33,9 @@ class TestSplitTrials:
 @pytest.mark.ui_services
 @pytest.mark.walk_forward
 class TestGetTopTrials:
-    def test_delegates_to_backtesting_engine_helpers(self, mocker):
+    def test_delegates_to_backtesting_engine_helper_by_study_name(self, mocker):
         # Given
-        study_sentinel = object()
         param_sets_sentinel = [{'trial_number': 1, 'value': 5.0, 'params': {}}]
-        load = mocker.patch.object(svc, 'load_study', return_value=study_sentinel)
         get_top = mocker.patch.object(
             svc, 'get_top_param_sets', return_value=param_sets_sentinel,
         )
@@ -46,8 +44,7 @@ class TestGetTopTrials:
         result = asyncio.run(svc.get_top_trials('my_study', 2))
 
         # Then
-        load.assert_called_once_with('my_study')
-        get_top.assert_called_once_with(study_sentinel, 2)
+        get_top.assert_called_once_with('my_study', 2)
         assert result is param_sets_sentinel
 
 
@@ -219,11 +216,9 @@ class TestListOosWindows:
 @pytest.mark.ui_services
 @pytest.mark.walk_forward
 class TestGetTopTrialsWithOos:
-    def test_delegates_to_engine_with_cached_study(self, mocker):
-        ''' The service is a thin wrapper that injects the cached study. '''
-        study_sentinel = object()
+    def test_delegates_to_engine_by_study_name(self, mocker):
+        ''' Thin offload wrapper — forwards the study name straight through. '''
         result_sentinel = [object()]
-        load = mocker.patch.object(svc, 'load_study', return_value=study_sentinel)
         engine_fn = mocker.patch.object(
             svc, '_get_top_trials_with_oos_from_engine', return_value=result_sentinel,
         )
@@ -233,133 +228,8 @@ class TestGetTopTrialsWithOos:
             svc.get_top_trials_with_oos('study-x', (10.0, 20.0), n_trials=5, oos_repo=repo)
         )
 
-        load.assert_called_once_with('study-x')
-        engine_fn.assert_called_once_with(study_sentinel, (10.0, 20.0), 5, repo)
+        engine_fn.assert_called_once_with('study-x', (10.0, 20.0), 5, repo)
         assert result is result_sentinel
-
-
-@pytest.mark.ui
-@pytest.mark.ui_services
-@pytest.mark.walk_forward
-class TestGetTrialParams:
-    def test_returns_params_for_matching_trial(self, mocker):
-        trial_a = MagicMock(number=0, params={'a': 1})
-        trial_b = MagicMock(number=7, params={'a': 2, 'b': 3})
-        study = MagicMock(trials=[trial_a, trial_b])
-        mocker.patch.object(svc, 'load_study', return_value=study)
-
-        assert asyncio.run(svc.get_trial_params('s', 7)) == {'a': 2, 'b': 3}
-
-    def test_raises_keyerror_when_trial_missing(self, mocker):
-        study = MagicMock(trials=[MagicMock(number=0)])
-        mocker.patch.object(svc, 'load_study', return_value=study)
-
-        with pytest.raises(KeyError, match='Trial 99'):
-            asyncio.run(svc.get_trial_params('s', 99))
-
-    def test_raises_keyerror_when_study_has_no_trials(self, mocker):
-        study = MagicMock(trials=[])
-        mocker.patch.object(svc, 'load_study', return_value=study)
-
-        with pytest.raises(KeyError, match='Trial 0'):
-            asyncio.run(svc.get_trial_params('s', 0))
-
-
-@pytest.mark.ui
-@pytest.mark.ui_services
-@pytest.mark.walk_forward
-class TestGetTrialParamsBulk:
-    def test_returns_params_for_requested_trials_in_single_pass(self, mocker):
-        trials = [
-            MagicMock(number=0, params={'a': 1}),
-            MagicMock(number=7, params={'a': 2}),
-            MagicMock(number=9, params={'a': 3}),
-        ]
-        study = MagicMock(trials=trials)
-        load = mocker.patch.object(svc, 'load_study', return_value=study)
-
-        result = asyncio.run(svc.get_trial_params_bulk('s', [0, 9]))
-
-        assert result == {0: {'a': 1}, 9: {'a': 3}}
-        load.assert_called_once_with('s')
-
-    def test_omits_missing_trial_numbers(self, mocker):
-        '''
-        Missing trial numbers don't raise; the panel falls back to a lazy
-        per-click lookup via :func:`get_trial_params` for any number it
-        didn't get back.
-        '''
-        study = MagicMock(trials=[MagicMock(number=0, params={'a': 1})])
-        mocker.patch.object(svc, 'load_study', return_value=study)
-
-        assert asyncio.run(svc.get_trial_params_bulk('s', [0, 42])) == {0: {'a': 1}}
-
-    def test_empty_input_skips_load_study(self, mocker):
-        load = mocker.patch.object(svc, 'load_study')
-
-        assert asyncio.run(svc.get_trial_params_bulk('s', [])) == {}
-        load.assert_not_called()
-
-
-@pytest.mark.ui
-@pytest.mark.ui_services
-@pytest.mark.walk_forward
-class TestStudyCache:
-    def setup_method(self) -> None:
-        svc.invalidate_study_cache()
-
-    def teardown_method(self) -> None:
-        svc.invalidate_study_cache()
-
-    def test_caches_load_study_per_name(self, mocker):
-        loader = mocker.patch.object(
-            svc, '_load_study_from_storage', side_effect=[object(), object()],
-        )
-
-        first = svc.load_study('a')
-        second = svc.load_study('a')
-        third = svc.load_study('b')
-
-        assert first is second
-        assert first is not third
-        assert loader.call_count == 2
-        loader.assert_any_call('a')
-        loader.assert_any_call('b')
-
-    def test_invalidate_single_study_evicts_only_that_entry(self, mocker):
-        loader = mocker.patch.object(
-            svc, '_load_study_from_storage',
-            side_effect=[object(), object(), object()],
-        )
-
-        a1 = svc.load_study('a')
-        b1 = svc.load_study('b')
-
-        svc.invalidate_study_cache('a')
-
-        a2 = svc.load_study('a')
-        b2 = svc.load_study('b')
-
-        assert a1 is not a2  # 'a' was evicted and reloaded
-        assert b1 is b2      # 'b' was untouched
-        assert loader.call_count == 3
-
-    def test_invalidate_without_arg_clears_all(self, mocker):
-        loader = mocker.patch.object(
-            svc, '_load_study_from_storage',
-            side_effect=[object(), object(), object(), object()],
-        )
-
-        svc.load_study('a')
-        svc.load_study('b')
-        svc.invalidate_study_cache()
-        svc.load_study('a')
-        svc.load_study('b')
-
-        assert loader.call_count == 4
-
-    def test_invalidate_missing_entry_is_noop(self):
-        svc.invalidate_study_cache('does-not-exist')
 
 
 @pytest.mark.ui
@@ -401,9 +271,3 @@ class TestIoBoundOffloading:
         assert asyncio.run(
             svc.get_top_trials_with_oos('s', None, 5, MagicMock())
         ) == []
-
-    def test_wrapper_coerces_cancelled_none_to_empty_dict(self, mocker):
-        mocker.patch.object(svc.run, 'io_bound', new=AsyncMock(return_value=None))
-
-        assert asyncio.run(svc.get_trial_params_bulk('s', [1, 2])) == {}
-        assert asyncio.run(svc.get_trial_params('s', 1)) == {}
