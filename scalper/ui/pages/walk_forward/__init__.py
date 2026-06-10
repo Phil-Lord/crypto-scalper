@@ -22,7 +22,6 @@ from data_system import (
     SQLAlchemyOutOfSampleEvaluationRepository,
 )
 from ui.components import render_header
-from ui.services.walk_forward import invalidate_study_cache
 from utils import StudySummary
 
 from . import context_strip, detail, new_study, rail
@@ -30,7 +29,10 @@ from .components import IsPanel, OosPanel
 from .phase_mutex import PhaseMutex
 
 
-LIVE_REFRESH_INTERVAL_S = 5.0
+# Live IS-run refresh cadence. Each tick runs a cheap top-N query against the
+# RDB (not a full study materialise), so this is just a sensible polling
+# interval rather than a cost-driven one.
+LIVE_REFRESH_INTERVAL_S = 30.0
 
 
 class WalkForwardPage:
@@ -171,14 +173,7 @@ class WalkForwardPage:
                 self._live_timer.deactivate()
         else:
             self._live_timer.deactivate()
-            finished_study = self._running_study_name
             self._running_study_name = None
-            # Drop the cached Study for the just-finished run so the OOS
-            # panel's phase-done re-render reads the trials the worker
-            # subprocesses just persisted. Optuna's _CachedStorage view
-            # held by the cached Study can otherwise lag the database.
-            if finished_study is not None:
-                invalidate_study_cache(finished_study)
             self.new_study_button.enable()
             # Held on self so the task isn't garbage-collected mid-flight.
             self._phase_refresh_task = asyncio.create_task(rail.refresh_rail(self))
@@ -190,17 +185,15 @@ class WalkForwardPage:
         surface without a manual refresh. Defensive guard against a stray
         tick after deactivation: only fires while IS is the active phase.
 
-        Invalidates the cached Study for the running run before refreshing
-        so ``get_top_trials_with_oos`` sees the trials the IS workers have
-        persisted since the last tick. The refresh itself offloads its reads
-        off the event loop, so a 4000-trial study no longer blocks the tick.
+        ``OosPanel.refresh`` runs a fresh top-N query against the RDB, so it
+        picks up the trials the IS workers have persisted since the last tick.
+        The query offloads off the event loop and reads only the top-N, so even
+        a 100k-trial study no longer blocks the tick.
         '''
         if not self.phase_mutex.is_active('is'):
             return
         if not self._can_render():
             return
-        if self._running_study_name is not None:
-            invalidate_study_cache(self._running_study_name)
         await self.oos_panel.refresh()
 
 

@@ -6,7 +6,6 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Callable
 
-import optuna
 import pandas as pd
 
 from data_system import (
@@ -17,7 +16,7 @@ from data_system import (
     SQLAlchemyTradeRepository
 )
 from strategy_manager import create_strategy
-from utils import load_study, parse_study_name
+from utils import fetch_top_param_sets, parse_study_name
 
 from .backtesting_engine import BacktestingEngine
 from .parameter_optimisation import create_windows
@@ -181,13 +180,15 @@ def evaluate_out_of_sample(
         installs no default progress bar.
     '''
     parsed = parse_study_name(study_name)
-    study = load_study(study_name, application_name='out_of_sample_evaluation')
 
     client = SQLAlchemyClient()
     eval_repo = SQLAlchemyOutOfSampleEvaluationRepository(client)
 
     evaluated_trials = eval_repo.get_evaluated_trial_numbers(study_name, start, end)
-    top_param_sets = get_top_param_sets(study, num_sets, evaluated_trials)
+    top_param_sets = get_top_param_sets(
+        study_name, num_sets, evaluated_trials,
+        application_name='out_of_sample_evaluation',
+    )
     if len(top_param_sets) == 0:
         return
 
@@ -210,38 +211,40 @@ def evaluate_out_of_sample(
 
 
 def get_top_param_sets(
-    study: optuna.Study, n: int, evaluated_trials: set[int] | None = None
+    study_name: str,
+    n: int,
+    evaluated_trials: set[int] | None = None,
+    *,
+    application_name: str = 'scalper',
 ) -> list[dict]:
     '''
-    Return the top ``n`` completed trials of ``study`` as parameter-set dicts,
-    highest objective first (or lowest if the study minimises).
+    Return the top ``n`` completed trials of ``study_name`` as parameter-set
+    dicts, highest objective first (or lowest if the study minimises).
 
     :param evaluated_trials: Trial numbers to exclude (already evaluated). Pass
         ``None`` to include every completed trial — used by the UI preview which
         shows what *would* be evaluated, regardless of prior evaluation state.
+    :param application_name: Postgres ``application_name`` for the underlying
+        RDB read, so call sites stay distinguishable in ``pg_stat_activity``.
     '''
     logger.info(f'Extracting top {n} parameter sets from study...')
-    completed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
-    reverse = study.direction == optuna.study.StudyDirection.MAXIMIZE
-    top_trials = sorted(completed_trials, key=lambda t: t.value, reverse=reverse)[:n]
-    if evaluated_trials is not None:
-        top_trials = [t for t in top_trials if t.number not in evaluated_trials]
-    logger.info(f'Selected {len(top_trials)} parameter sets for evaluation.')
-
-    return [
-        {'trial_number': t.number, 'value': t.value, 'params': t.params}
-        for t in top_trials
-    ]
+    top_param_sets = fetch_top_param_sets(
+        study_name, n,
+        exclude_trial_numbers=evaluated_trials,
+        application_name=application_name,
+    )
+    logger.info(f'Selected {len(top_param_sets)} parameter sets for evaluation.')
+    return top_param_sets
 
 
 def get_top_trials_with_oos(
-    study: optuna.Study,
+    study_name: str,
     window: tuple[float, float] | None,
     n_trials: int,
     oos_repo: OutOfSampleEvaluationRepository,
 ) -> list[TrialWithOos]:
     '''
-    Top ``n_trials`` trials of ``study``, left-joined with OOS scores from ``window``.
+    Top ``n_trials`` trials of ``study_name``, left-joined with OOS scores from ``window``.
 
     Trials are picked by Optuna direction (max vs min); the OOS join adds a
     ``delta`` (``oos - is``) and ``verdict`` per row. ``window=None`` returns
@@ -252,12 +255,12 @@ def get_top_trials_with_oos(
         returned by :meth:`OutOfSampleEvaluationRepository.aggregate_windows`,
         or ``None``.
     '''
-    top_trials = get_top_param_sets(study, n_trials)
+    top_trials = get_top_param_sets(study_name, n_trials)
 
     if window is None:
         oos_by_trial: dict[int, float] = {}
     else:
-        evaluations = oos_repo.get(study.study_name, window[0], window[1])
+        evaluations = oos_repo.get(study_name, window[0], window[1])
         oos_by_trial = {e.trial_number: e.oos_balance_ratio for e in evaluations}
 
     return [

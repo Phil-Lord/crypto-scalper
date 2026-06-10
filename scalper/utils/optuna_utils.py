@@ -1,10 +1,16 @@
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 
 import optuna
 import pandas as pd
+from optuna.distributions import json_to_distribution
+from optuna.storages._rdb.models import TrialModel, TrialParamModel, TrialValueModel
+from optuna.trial import TrialState
 from questionary import Choice
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from utils import OptunaConfig
 
@@ -135,21 +141,17 @@ def parse_study_name(study_name: str) -> ParsedStudyName:
     )
 
 
-def load_study(study_name: str, application_name: str = 'scalper') -> optuna.Study:
+def _make_rdb_storage(application_name: str = 'scalper') -> optuna.storages.RDBStorage:
     '''
-    Load an Optuna study from the project's configured RDB storage.
+    Build an :class:`optuna.storages.RDBStorage` against the project's
+    configured Optuna database.
 
     - Tags the Postgres connection with ``application_name`` so call sites
         remain distinguishable in ``pg_stat_activity``.
     - Enables ``keepalives`` / ``pool_pre_ping`` to survive idle/dropped
         connections under long-running UI sessions.
-
-    :param application_name: Postgres ``application_name`` to tag the
-        connection with. Defaults to ``'scalper'``.
-    :raises StudyNotFoundError: If no study with ``study_name`` exists in storage.
     '''
-    logger.info(f'Loading study: {study_name}')
-    storage = optuna.storages.RDBStorage(
+    return optuna.storages.RDBStorage(
         url=OptunaConfig.DB_URL,
         engine_kwargs={
             'pool_pre_ping': True,
@@ -159,12 +161,129 @@ def load_study(study_name: str, application_name: str = 'scalper') -> optuna.Stu
             }
         }
     )
+
+
+def load_study(study_name: str, application_name: str = 'scalper') -> optuna.Study:
+    '''
+    Load an Optuna study from the project's configured RDB storage.
+
+    :param application_name: Postgres ``application_name`` to tag the
+        connection with. Defaults to ``'scalper'``.
+    :raises StudyNotFoundError: If no study with ``study_name`` exists in storage.
+    '''
+    logger.info(f'Loading study: {study_name}')
+    storage = _make_rdb_storage(application_name)
     try:
         return optuna.load_study(study_name=study_name, storage=storage)
     except KeyError as e:
         # Optuna's RDBStorage raises a bare KeyError('Record does not exist.')
         # when the study name isn't in storage. Translate to discern from real failures.
         raise StudyNotFoundError(study_name) from e
+
+
+def fetch_top_param_sets(
+    study_name: str,
+    n: int,
+    exclude_trial_numbers: set[int] | None = None,
+    *,
+    application_name: str = 'scalper',
+    storage: optuna.storages.RDBStorage | None = None,
+) -> list[dict]:
+    '''
+    Return the top ``n`` completed trials of a study as parameter-set dicts,
+    highest objective first (or lowest if the study minimises), via a top-N
+    query against the Optuna RDB.
+
+    Only the ``n`` ranked rows (and their params) are pulled out of the
+    database, so this stays cheap on studies with tens of thousands of trials:
+    materialising ``study.trials`` is O(total trials) in DB transfer, Python
+    object construction, and memory, whereas this is O(``n``) plus an
+    in-database sort.
+
+    Mirrors the historical ``study.trials`` selection: the top ``n`` are
+    chosen first, *then* ``exclude_trial_numbers`` are dropped, so fewer than
+    ``n`` rows may come back. Objective values are assumed finite (balance
+    ratios); non-finite objectives are not expected and would not rank
+    meaningfully.
+
+    :param exclude_trial_numbers: Trial numbers to drop from the top ``n``
+        (e.g. already-evaluated trials). ``None`` keeps the full top ``n``.
+    :param application_name: Postgres ``application_name`` to tag the read with
+        in ``pg_stat_activity``. Ignored when ``storage`` is injected.
+    :param storage: Injectable RDB storage — tests pass a SQLite-backed study.
+        Defaults to the project's configured Postgres storage.
+    :return: ``[{'trial_number': int, 'value': float, 'params': dict}, ...]``.
+    :raises StudyNotFoundError: If no study named ``study_name`` exists.
+    '''
+    storage = storage or _make_rdb_storage(application_name)
+    try:
+        study_id = storage.get_study_id_from_name(study_name)
+    except KeyError as e:
+        raise StudyNotFoundError(study_name) from e
+
+    maximises = (
+        storage.get_study_directions(study_id)[0] == optuna.study.StudyDirection.MAXIMIZE
+    )
+    value_order = TrialValueModel.value.desc() if maximises else TrialValueModel.value.asc()
+
+    with Session(storage.engine) as session:
+        ranked = session.execute(
+            select(
+                TrialModel.trial_id,
+                TrialModel.number,
+                TrialValueModel.value,
+                TrialValueModel.value_type,
+            )
+            .join(TrialValueModel, TrialValueModel.trial_id == TrialModel.trial_id)
+            .where(
+                TrialModel.study_id == study_id,
+                TrialModel.state == TrialState.COMPLETE,
+                TrialValueModel.objective == 0,
+            )
+            # Secondary key keeps tied objective values deterministic across
+            # calls, so repeated renders show a stable selection.
+            .order_by(value_order, TrialModel.number.asc())
+            .limit(n)
+        ).all()
+
+        exclude = exclude_trial_numbers or set()
+        ranked = [row for row in ranked if row.number not in exclude]
+        if not ranked:
+            return []
+
+        params_by_trial = _params_by_trial_id(session, [row.trial_id for row in ranked])
+
+    return [
+        {
+            'trial_number': row.number,
+            'value': TrialValueModel.stored_repr_to_value(row.value, row.value_type),
+            'params': params_by_trial.get(row.trial_id, {}),
+        }
+        for row in ranked
+    ]
+
+
+def _params_by_trial_id(session: Session, trial_ids: list[int]) -> dict[int, dict]:
+    '''
+    Reconstruct external-repr param dicts for ``trial_ids`` in a single query.
+
+    ``trial_params.param_value`` is Optuna's internal float encoding; the
+    external value (e.g. a categorical choice or an int) is recovered via the
+    per-param ``distribution_json``.
+    '''
+    rows = session.execute(
+        select(
+            TrialParamModel.trial_id,
+            TrialParamModel.param_name,
+            TrialParamModel.param_value,
+            TrialParamModel.distribution_json,
+        ).where(TrialParamModel.trial_id.in_(trial_ids))
+    ).all()
+    params: dict[int, dict] = defaultdict(dict)
+    for trial_id, name, value, distribution_json in rows:
+        distribution = json_to_distribution(distribution_json)
+        params[trial_id][name] = distribution.to_external_repr(value)
+    return dict(params)
 
 
 def list_studies() -> list[StudySummary]:
@@ -175,7 +294,7 @@ def list_studies() -> list[StudySummary]:
     studies that don't match :data:`STUDY_NAME_FORMAT` are returned with
     empty pair/strategy strings.
     '''
-    storage = optuna.storages.RDBStorage(url=OptunaConfig.DB_URL)
+    storage = _make_rdb_storage()
     summaries = optuna.get_all_study_summaries(storage)
     return [_to_study_summary(summary) for summary in summaries]
 

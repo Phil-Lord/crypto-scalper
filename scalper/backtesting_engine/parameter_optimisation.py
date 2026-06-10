@@ -75,12 +75,12 @@ def create_study(storage: optuna.storages.RDBStorage, study_name: str, n_trials:
 
 
 def validate_search_space(study: optuna.study.Study, param_grid: dict[str, list[Any]]) -> None:
-    ''' Validate param_grid matches existing study search space. '''
-    trials = study.get_trials(deepcopy=False)
-    if not trials:
+    ''' Validate ``param_grid`` matches the existing study's search space. '''
+    completed = study.get_trials(deepcopy=False, states=(optuna.trial.TrialState.COMPLETE,))
+    if not completed:
         return
 
-    param_dists = trials[-1].distributions
+    param_dists = completed[-1].distributions
     if set(param_grid.keys()) != set(param_dists.keys()):
         raise ValueError('Parameter names conflict with existing study search space.')
 
