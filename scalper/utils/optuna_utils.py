@@ -240,7 +240,9 @@ def fetch_top_param_sets(
                 TrialModel.state == TrialState.COMPLETE,
                 TrialValueModel.objective == 0,
             )
-            .order_by(value_order)
+            # Secondary key keeps tied objective values deterministic across
+            # calls, so repeated renders show a stable selection.
+            .order_by(value_order, TrialModel.number.asc())
             .limit(n)
         ).all()
 

@@ -476,6 +476,19 @@ class TestFetchTopParamSets:
 
         assert [r['value'] for r in result] == [1.0, 2.0]
 
+    def test_breaks_objective_ties_by_trial_number(self, tmp_path):
+        # Three trials tie on value; the lowest trial numbers must win the
+        # LIMIT cut deterministically, not whichever rows the DB returns first.
+        storage, name = _seed_sqlite_study(tmp_path, [
+            (2.0, {'sma_period': 5}, True),
+            (2.0, {'sma_period': 10}, True),
+            (2.0, {'sma_period': 20}, True),
+        ])
+
+        result = fetch_top_param_sets(name, n=2, storage=storage)
+
+        assert [r['trial_number'] for r in result] == [0, 1]
+
     def test_excludes_evaluated_after_taking_top_n(self, tmp_path):
         storage, name = _seed_sqlite_study(tmp_path, [
             (3.0, {'sma_period': 5}, True),
