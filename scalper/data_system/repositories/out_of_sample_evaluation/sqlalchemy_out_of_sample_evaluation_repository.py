@@ -44,6 +44,15 @@ class SQLAlchemyOutOfSampleEvaluationRepository(OutOfSampleEvaluationRepository)
 
             return {row[0] for row in rows}
 
+    def get_trial_numbers(self, study_name: str) -> set[int]:
+        with self.client.session() as session:
+            query = text("""
+                SELECT DISTINCT trial_number FROM out_of_sample_evaluation
+                WHERE study_name = :study_name
+            """)
+            result = session.execute(query, {'study_name': study_name})
+            return {row[0] for row in result.fetchall()}
+
     def get(self, study_name: str, start: float, end: float) -> list[OutOfSampleEvaluation]:
         with self.client.session() as session:
             query = text("""

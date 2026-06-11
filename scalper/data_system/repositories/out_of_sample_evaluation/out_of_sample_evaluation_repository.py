@@ -26,6 +26,17 @@ class OutOfSampleEvaluationRepository(ABC):
         pass
 
     @abstractmethod
+    def get_trial_numbers(self, study_name: str) -> set[int]:
+        '''
+        Fetches every trial number with at least one evaluation for a study,
+        across all time windows.
+
+        :param study_name: Name of the Optuna study.
+        :return: Set of distinct trial numbers with stored evaluations.
+        '''
+        pass
+
+    @abstractmethod
     def get(self, study_name: str, start: float, end: float) -> list[OutOfSampleEvaluation]:
         '''
         Fetches all stored evaluation rows for a study and time range.
