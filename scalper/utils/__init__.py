@@ -8,6 +8,7 @@ from .optuna_utils import (
     get_study_choices,
     list_studies,
     load_study,
+    make_rdb_storage,
     parse_study_name,
     ParsedStudyName,
     STUDY_NAME_FORMAT,
