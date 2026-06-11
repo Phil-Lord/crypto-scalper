@@ -271,6 +271,15 @@ class TestLoadStudy:
 
         assert exc_info.value.study_name == 'missing-study'
 
+    def test_uses_injected_storage_instead_of_building_one(self, tmp_path):
+        ''' Callers sharing one storage across several operations (e.g. study
+        compaction) inject it; no project-configured storage is built. '''
+        storage, name = _seed_sqlite_study(tmp_path, [(1.0, {'sma_period': 5}, True)])
+
+        study = load_study(name, storage=storage)
+
+        assert len(study.trials) == 1
+
 
 @pytest.mark.utils
 @pytest.mark.optuna_utils
