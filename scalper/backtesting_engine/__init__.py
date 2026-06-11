@@ -6,6 +6,12 @@ from .in_sample_evaluation import (
     run_in_sample_workers,
     split_trials,
 )
+from .study_compaction import (
+    CompactionError,
+    CompactionPlan,
+    execute_compaction,
+    plan_compaction,
+)
 from .out_of_sample_evaluation import (
     OOS_DRAWDOWN_LIMIT,
     OOS_FLOOR,
