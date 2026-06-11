@@ -163,16 +163,23 @@ def make_rdb_storage(application_name: str = 'scalper') -> optuna.storages.RDBSt
     )
 
 
-def load_study(study_name: str, application_name: str = 'scalper') -> optuna.Study:
+def load_study(
+    study_name: str,
+    application_name: str = 'scalper',
+    *,
+    storage: optuna.storages.RDBStorage | None = None,
+) -> optuna.Study:
     '''
     Load an Optuna study from the project's configured RDB storage.
 
-    :param application_name: Postgres ``application_name`` to tag the
-        connection with. Defaults to ``'scalper'``.
+    :param application_name: Postgres ``application_name`` to tag the connection with.
+        Defaults to ``'scalper'``. Ignored when ``storage`` is injected.
+    :param storage: Injectable RDB storage, defaulting to
+        the project's configured Optuna db.
     :raises StudyNotFoundError: If no study with ``study_name`` exists in storage.
     '''
     logger.info(f'Loading study: {study_name}')
-    storage = make_rdb_storage(application_name)
+    storage = storage or make_rdb_storage(application_name)
     try:
         return optuna.load_study(study_name=study_name, storage=storage)
     except KeyError as e:
