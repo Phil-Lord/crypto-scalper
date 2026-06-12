@@ -17,13 +17,6 @@ from .objective import WINDOW_TRADES_ATTR
 logger = logging.getLogger(__name__)
 
 
-LEGACY_TRADES_PREFIX = 'trades_'
-'''
-Prefix of the retired per-window trade-count user attributes (one attribute
-per window per trial). Compaction folds them into a single
-:data:`~backtesting_engine.objective.WINDOW_TRADES_ATTR` dict.
-'''
-
 SOURCE_TRIAL_ATTR = 'source_trial_number'
 '''
 User attribute written to every copied trial, holding its trial number in the
@@ -162,8 +155,7 @@ def execute_compaction(plan: CompactionPlan) -> None:
     under the same name and drop everything else.
 
     The copy reduces each trial's user attributes to :data:`SOURCE_TRIAL_ATTR`
-    plus a single window-trade-counts dict (legacy per-window ``trades_*``
-    attributes are folded into it), renumbers trials from 0, and remaps the
+    plus its window-trade-counts dict, renumbers trials from 0, and remaps the
     out-of-sample evaluation rows in local SQLite to the new numbers (rows for
     dropped trials are deleted, so stale evaluations can't join against
     unrelated trials that reuse a number).
@@ -222,30 +214,18 @@ def _strip_user_attrs(trials: list[FrozenTrial]) -> list[FrozenTrial]:
     '''
     Copy ``trials``, reducing each trial's user attributes to a
     :data:`SOURCE_TRIAL_ATTR` recording its original trial number, plus its
-    window trade counts as a single dict attribute. Legacy per-window
-    ``trades_*`` attributes — the format whose row-per-window bloat motivated
-    compaction — are folded into the dict rather than dropped.
+    window-trade-counts dict if it has one.
     '''
     stripped = []
     for trial in trials:
         clone = copy.deepcopy(trial)
         attrs: dict[str, int | dict[str, int]] = {SOURCE_TRIAL_ATTR: trial.number}
-        counts = _window_trade_counts(trial)
+        counts = trial.user_attrs.get(WINDOW_TRADES_ATTR)
         if counts:
             attrs[WINDOW_TRADES_ATTR] = counts
         clone.user_attrs = attrs
         stripped.append(clone)
     return stripped
-
-
-def _window_trade_counts(trial: FrozenTrial) -> dict[str, int]:
-    ''' The trial's window-trade-counts dict, merged with any legacy per-window attrs. '''
-    legacy = {
-        key.removeprefix(LEGACY_TRADES_PREFIX): value
-        for key, value in trial.user_attrs.items()
-        if key.startswith(LEGACY_TRADES_PREFIX)
-    }
-    return legacy | trial.user_attrs.get(WINDOW_TRADES_ATTR, {})
 
 
 def _source_number_mapping(study: optuna.Study) -> dict[int, int]:
