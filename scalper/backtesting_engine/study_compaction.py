@@ -42,9 +42,13 @@ class CompactionPlan:
 
     Attributes:
         study_name (str): Optuna study to compact.
+        total_count (int): All trials in the study before compaction,
+            regardless of state (completed plus pruned/failed).
         completed_count (int): COMPLETE trials in the study before compaction.
         top_count (int): Trials kept from the top of the objective ranking
             (the ``top_fraction`` share of the target).
+        top_oos_count (int): How many of the top trials have out-of-sample evaluations.
+            Informational — they are kept via the top share either way.
         oos_count (int): Trials outside the top force-kept because they have
             out-of-sample evaluations.
         random_count (int): Uniform random sample kept from the remainder —
@@ -54,8 +58,10 @@ class CompactionPlan:
             trial-number order.
     '''
     study_name: str
+    total_count: int
     completed_count: int
     top_count: int
+    top_oos_count: int
     oos_count: int
     random_count: int
     kept_trials: list[FrozenTrial]
@@ -128,8 +134,10 @@ def plan_compaction(
     kept = sorted(top + oos_evaluated + random_sample, key=lambda t: t.number)
     return CompactionPlan(
         study_name=study_name,
+        total_count=len(trials),
         completed_count=len(completed),
         top_count=top_count,
+        top_oos_count=sum(1 for trial in top if trial.number in oos_evaluated_numbers),
         oos_count=len(oos_evaluated),
         random_count=sample_size,
         kept_trials=kept,

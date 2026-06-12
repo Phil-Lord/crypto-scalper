@@ -173,7 +173,19 @@ class TestPlanCompaction:
         plan = plan_compaction(STUDY_NAME, target_total=5, top_fraction=0.2)
 
         assert plan.oos_count == 0
+        assert plan.top_oos_count == 1
         assert len(plan.kept_trials) == 5
+
+    def test_oos_trials_counted_separately_inside_and_outside_top(self, tmp_path, mocker):
+        # Given trial 9 (best, lands in the top) and trial 0 (worst) both have OOS evaluations
+        storage, _ = _seed_study(tmp_path, [float(i) for i in range(10)])
+        _wire_dependencies(mocker, storage, FakeOosRepository(trial_numbers={9, 0}))
+
+        plan = plan_compaction(STUDY_NAME, target_total=5, top_fraction=0.2)
+
+        assert plan.top_oos_count == 1
+        assert plan.oos_count == 1
+        assert {9, 0} <= {t.number for t in plan.kept_trials}
 
     def test_random_sample_fills_to_target(self, tmp_path, mocker):
         storage, _ = _seed_study(tmp_path, [float(i) for i in range(20)])
@@ -204,6 +216,7 @@ class TestPlanCompaction:
         plan = plan_compaction(STUDY_NAME, target_total=5, top_fraction=0.2)
 
         assert plan.completed_count == 10
+        assert plan.total_count == 15
         failed_numbers = set(range(10, 15))
         assert failed_numbers.isdisjoint({t.number for t in plan.kept_trials})
 
