@@ -66,7 +66,7 @@ def compact_study():
         return
 
     execute_compaction(plan)
-    print(f'Study {plan.study_name} compacted: {plan.completed_count} -> {kept} trials.')
+    print(f'Study {plan.study_name} compacted: {plan.total_count} -> {kept} trials.')
 
 
 if __name__ == '__main__':

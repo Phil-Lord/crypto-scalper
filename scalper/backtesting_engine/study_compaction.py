@@ -187,10 +187,13 @@ def execute_compaction(plan: CompactionPlan) -> None:
     _swap_study_names(storage, plan.study_name, tmp_name, old_name)
     oos_repository.remap_trial_numbers(plan.study_name, mapping)
 
-    logger.info(f'Deleting original study ({plan.completed_count} completed trials)...')
+    logger.info(
+        f'Deleting original study ({plan.total_count} trials, '
+        f'{plan.completed_count} completed)...'
+    )
     optuna.delete_study(study_name=old_name, storage=storage)
     logger.info(
-        f'Compacted {plan.study_name}: {plan.completed_count} -> {len(plan.kept_trials)} trials.'
+        f'Compacted {plan.study_name}: {plan.total_count} -> {len(plan.kept_trials)} trials.'
     )
 
 
