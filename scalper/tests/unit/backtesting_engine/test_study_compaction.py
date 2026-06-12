@@ -1,7 +1,10 @@
+from typing import Any, Callable
+
 import optuna
 import pytest
 
 import backtesting_engine.study_compaction as study_compaction
+from backtesting_engine.objective import WINDOW_TRADES_ATTR
 from backtesting_engine.study_compaction import (
     COMPACTING_SUFFIX,
     CompactionError,
@@ -54,13 +57,17 @@ def _seed_study(
     name: str = STUDY_NAME,
     direction: str = 'maximize',
     n_failed: int = 0,
+    trial_attrs: Callable[[int], dict[str, Any]] | None = None,
 ) -> tuple[optuna.storages.RDBStorage, optuna.Study]:
     '''
     Build a real SQLite-backed study with one COMPLETE trial per value (trial
-    numbers follow insertion order), each carrying a per-window ``trades_*``
-    user attribute like the production objective writes. ``n_failed`` extra
+    numbers follow insertion order), each carrying user attributes from
+    ``trial_attrs(trial_number)`` — by default a legacy per-window ``trades_*``
+    attribute like the retired objective format wrote. ``n_failed`` extra
     FAIL trials are appended after the completed ones.
     '''
+    if trial_attrs is None:
+        trial_attrs = lambda i: {'trades_2025-01-01_2025-03-31': i}
     storage = optuna.storages.RDBStorage(url=f'sqlite:///{tmp_path}/optuna.db')
     study = optuna.create_study(study_name=name, storage=storage, direction=direction)
     for i, value in enumerate(values):
@@ -70,7 +77,7 @@ def _seed_study(
                 distributions={'sma_period': optuna.distributions.IntDistribution(1, 10_000)},
                 value=value,
                 state=optuna.trial.TrialState.COMPLETE,
-                user_attrs={'trades_2025-01-01_2025-03-31': i},
+                user_attrs=trial_attrs(i),
             )
         )
     for _ in range(n_failed):
@@ -270,11 +277,48 @@ class TestExecuteCompaction:
         assert sources == sorted(sources)
         assert {8, 9, 0} <= set(sources)  # Top two plus the OOS-forced trial.
 
-    def test_per_window_user_attrs_dropped(self, compacted):
+    def test_legacy_per_window_attrs_folded_into_window_trades_dict(self, compacted):
+        # Given the seeded trials carry legacy trades_* attrs valued by trial number
         storage, _ = compacted
 
         trials = optuna.load_study(study_name=STUDY_NAME, storage=storage).trials
 
+        for trial in trials:
+            assert set(trial.user_attrs) == {SOURCE_TRIAL_ATTR, WINDOW_TRADES_ATTR}
+            source = trial.user_attrs[SOURCE_TRIAL_ATTR]
+            assert trial.user_attrs[WINDOW_TRADES_ATTR] == {'2025-01-01_2025-03-31': source}
+
+    def test_window_trades_dict_attr_preserved(self, tmp_path, mocker):
+        # Given trials carrying the current single-dict attr format
+        storage, _ = _seed_study(
+            tmp_path,
+            [float(i) for i in range(10)],
+            trial_attrs=lambda i: {WINDOW_TRADES_ATTR: {'2025-01-01_2025-03-31': i}},
+        )
+        _wire_dependencies(mocker, storage, FakeOosRepository())
+        plan = plan_compaction(STUDY_NAME, target_total=5, top_fraction=0.2)
+
+        # When
+        execute_compaction(plan)
+
+        # Then
+        trials = optuna.load_study(study_name=STUDY_NAME, storage=storage).trials
+        for trial in trials:
+            source = trial.user_attrs[SOURCE_TRIAL_ATTR]
+            assert trial.user_attrs[WINDOW_TRADES_ATTR] == {'2025-01-01_2025-03-31': source}
+
+    def test_trials_without_counts_get_no_window_trades_attr(self, tmp_path, mocker):
+        storage, _ = _seed_study(
+            tmp_path, [float(i) for i in range(10)], trial_attrs=lambda i: {}
+        )
+        _wire_dependencies(mocker, storage, FakeOosRepository())
+        plan = plan_compaction(STUDY_NAME, target_total=5, top_fraction=0.2)
+
+        # When
+        execute_compaction(plan)
+
+        # Then
+        trials = optuna.load_study(study_name=STUDY_NAME, storage=storage).trials
         for trial in trials:
             assert set(trial.user_attrs) == {SOURCE_TRIAL_ATTR}
 
