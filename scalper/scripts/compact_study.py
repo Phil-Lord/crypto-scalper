@@ -32,7 +32,7 @@ def compact_study():
 
     target_total = int(text('Target trial count after compaction:', default='1500').ask())
     top_fraction = float(
-        text('Share of target kept from the top of the ranking:', default='0.5').ask())
+        text('Share of target kept from the top of the ranking:', default='0.2').ask())
 
     try:
         plan = plan_compaction(study_name, target_total, top_fraction)

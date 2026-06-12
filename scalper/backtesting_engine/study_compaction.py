@@ -70,7 +70,7 @@ class CompactionPlan:
 def plan_compaction(
     study_name: str,
     target_total: int = 1500,
-    top_fraction: float = 0.5,
+    top_fraction: float = 0.2,
 ) -> CompactionPlan:
     '''
     Select the trials a compaction of ``study_name`` would keep.
@@ -87,7 +87,10 @@ def plan_compaction(
     :param target_total: Trial count to aim for after compaction. OOS-evaluated
         trials are always kept, even if they alone exceed the budget.
     :param top_fraction: Share of ``target_total`` kept from the top of the
-        ranking, in ``(0, 1)``.
+        ranking, in ``(0, 1)``. The default is deliberately small: TPE's
+        "good" density only ever uses the top 25 trials (Optuna's default
+        gamma cap), so the top share exists for ranking/OOS analysis depth,
+        and a large one skews the "bad" density toward elite regions.
     :raises StudyNotFoundError: If no study named ``study_name`` exists.
     :raises CompactionError: If the study has running/waiting trials or is
         already at or below ``target_total`` completed trials.
