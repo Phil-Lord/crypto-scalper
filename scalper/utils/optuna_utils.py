@@ -141,7 +141,7 @@ def parse_study_name(study_name: str) -> ParsedStudyName:
     )
 
 
-def _make_rdb_storage(application_name: str = 'scalper') -> optuna.storages.RDBStorage:
+def make_rdb_storage(application_name: str = 'scalper') -> optuna.storages.RDBStorage:
     '''
     Build an :class:`optuna.storages.RDBStorage` against the project's
     configured Optuna database.
@@ -163,16 +163,23 @@ def _make_rdb_storage(application_name: str = 'scalper') -> optuna.storages.RDBS
     )
 
 
-def load_study(study_name: str, application_name: str = 'scalper') -> optuna.Study:
+def load_study(
+    study_name: str,
+    application_name: str = 'scalper',
+    *,
+    storage: optuna.storages.RDBStorage | None = None,
+) -> optuna.Study:
     '''
     Load an Optuna study from the project's configured RDB storage.
 
-    :param application_name: Postgres ``application_name`` to tag the
-        connection with. Defaults to ``'scalper'``.
+    :param application_name: Postgres ``application_name`` to tag the connection with.
+        Defaults to ``'scalper'``. Ignored when ``storage`` is injected.
+    :param storage: Injectable RDB storage, defaulting to
+        the project's configured Optuna db.
     :raises StudyNotFoundError: If no study with ``study_name`` exists in storage.
     '''
     logger.info(f'Loading study: {study_name}')
-    storage = _make_rdb_storage(application_name)
+    storage = storage or make_rdb_storage(application_name)
     try:
         return optuna.load_study(study_name=study_name, storage=storage)
     except KeyError as e:
@@ -215,7 +222,7 @@ def fetch_top_param_sets(
     :return: ``[{'trial_number': int, 'value': float, 'params': dict}, ...]``.
     :raises StudyNotFoundError: If no study named ``study_name`` exists.
     '''
-    storage = storage or _make_rdb_storage(application_name)
+    storage = storage or make_rdb_storage(application_name)
     try:
         study_id = storage.get_study_id_from_name(study_name)
     except KeyError as e:
@@ -294,7 +301,7 @@ def list_studies() -> list[StudySummary]:
     studies that don't match :data:`STUDY_NAME_FORMAT` are returned with
     empty pair/strategy strings.
     '''
-    storage = _make_rdb_storage()
+    storage = make_rdb_storage()
     summaries = optuna.get_all_study_summaries(storage)
     return [_to_study_summary(summary) for summary in summaries]
 

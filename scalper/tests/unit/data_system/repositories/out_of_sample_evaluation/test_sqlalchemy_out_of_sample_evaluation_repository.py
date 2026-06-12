@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy import text
 
 from data_system.clients.sqlalchemy_client import SQLAlchemyClient
 from data_system.models.oos_window_aggregate_model import OosWindowAggregate
@@ -205,3 +206,119 @@ class TestSQLAlchemyOutOfSampleEvaluationRepository:
         assert params['study_name'] == 'study-x'
         assert params['floor'] == 1.1
         assert params['drawdown_limit'] == 0.75
+
+
+@pytest.mark.data_system
+@pytest.mark.repositories
+@pytest.mark.sqlalchemy_out_of_sample_evaluation_repository
+class TestTrialNumberRemapping:
+    '''
+    Compaction-support methods exercised against a real SQLite database —
+    remapping rewrites primary-key columns, which mock-based tests can't
+    meaningfully verify.
+    '''
+
+    @pytest.fixture
+    def repository(self, tmp_path) -> SQLAlchemyOutOfSampleEvaluationRepository:
+        client = SQLAlchemyClient(url=f'sqlite:///{tmp_path}/scalper.db')
+        with client.session() as session:
+            session.execute(text("""
+                CREATE TABLE out_of_sample_evaluation (
+                    study_name TEXT NOT NULL,
+                    trial_number INTEGER NOT NULL,
+                    start_timestamp REAL NOT NULL,
+                    end_timestamp REAL NOT NULL,
+                    is_value REAL NOT NULL,
+                    oos_balance_ratio REAL NOT NULL,
+                    PRIMARY KEY (study_name, trial_number, start_timestamp, end_timestamp)
+                )
+            """))
+        return SQLAlchemyOutOfSampleEvaluationRepository(client)
+
+    def _evaluation(
+        self, trial_number: int, study_name: str = 'study-a', start: float = 1.0
+    ) -> OutOfSampleEvaluation:
+        return OutOfSampleEvaluation(
+            study_name=study_name,
+            trial_number=trial_number,
+            start_timestamp=start,
+            end_timestamp=start + 1.0,
+            is_value=1.15,
+            oos_balance_ratio=1.0025,
+        )
+
+    def test_get_trial_numbers_returns_empty_set_when_no_rows(self, repository):
+        assert repository.get_trial_numbers('study-a') == set()
+
+    def test_get_trial_numbers_returns_distinct_numbers_across_windows(self, repository):
+        # Given trial 5 evaluated in two windows, trial 7 in one
+        repository.add([
+            self._evaluation(5, start=1.0),
+            self._evaluation(5, start=10.0),
+            self._evaluation(7, start=1.0),
+            self._evaluation(9, study_name='study-b'),
+        ])
+
+        # When / Then
+        assert repository.get_trial_numbers('study-a') == {5, 7}
+
+    def test_remap_rewrites_numbers_and_deletes_unmapped_rows(self, repository):
+        # Given trials 5 and 7 are kept by compaction, trial 3 is dropped
+        repository.add([
+            self._evaluation(3),
+            self._evaluation(5),
+            self._evaluation(7),
+        ])
+
+        # When
+        repository.remap_trial_numbers('study-a', {5: 0, 7: 1})
+
+        # Then
+        assert repository.get_trial_numbers('study-a') == {0, 1}
+
+    def test_remap_handles_overlapping_old_and_new_ranges(self, repository):
+        # Given a swap where each trial's new number is another's old number
+        repository.add([self._evaluation(0), self._evaluation(1)])
+
+        # When
+        repository.remap_trial_numbers('study-a', {0: 1, 1: 0})
+
+        # Then
+        rows = repository.get('study-a', 1.0, 2.0)
+        assert {r.trial_number for r in rows} == {0, 1}
+
+    def test_remap_preserves_row_values_under_new_number(self, repository):
+        # Given
+        original = self._evaluation(5)
+        repository.add([original])
+
+        # When
+        repository.remap_trial_numbers('study-a', {5: 2})
+
+        # Then
+        (row,) = repository.get('study-a', 1.0, 2.0)
+        assert row.trial_number == 2
+        assert row.is_value == original.is_value
+        assert row.oos_balance_ratio == original.oos_balance_ratio
+
+    def test_remap_with_empty_mapping_deletes_all_rows_for_study(self, repository):
+        repository.add([self._evaluation(5), self._evaluation(7)])
+
+        repository.remap_trial_numbers('study-a', {})
+
+        assert repository.get_trial_numbers('study-a') == set()
+
+    def test_remap_leaves_other_studies_untouched(self, repository):
+        repository.add([
+            self._evaluation(5),
+            self._evaluation(5, study_name='study-b'),
+        ])
+
+        repository.remap_trial_numbers('study-a', {5: 0})
+
+        assert repository.get_trial_numbers('study-b') == {5}
+
+    def test_remap_with_no_rows_is_a_no_op(self, repository):
+        repository.remap_trial_numbers('study-a', {5: 0})
+
+        assert repository.get_trial_numbers('study-a') == set()

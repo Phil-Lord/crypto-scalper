@@ -77,6 +77,25 @@ class TestGetObjective:
         engine_patch.run.assert_called_once()
         engine_patch.get_final_quote_balance.assert_called_once_with(1000)
 
+    def test_get_objective_logs_all_window_trade_counts_as_single_attr(self, engine_patch):
+        # Given two windows and three non-hold signals per window run
+        engine_patch.get_final_quote_balance.return_value = 1500
+        engine_patch.results = pd.DataFrame({'signal': ['buy', 'sell', 'hold', 'buy']})
+        param_grid = {'short_ema': [1, 10], 'long_ema': [20, 30]}
+        windows = [
+            (pd.Timestamp('2021-01-01'), pd.Timestamp('2021-03-31 23:59:59')),
+            (pd.Timestamp('2021-02-01'), pd.Timestamp('2021-04-30 23:59:59')),
+        ]
+        trial = optuna.trial.FixedTrial({'short_ema': 9, 'long_ema': 25})
+
+        # When
+        get_objective(engine_patch, param_grid, windows)(trial)
+
+        # Then — one attribute holding every window's count, not one attribute per window
+        assert trial.user_attrs == {
+            'window_trades': {'2021-01-01_2021-03-31': 3, '2021-02-01_2021-04-30': 3},
+        }
+
     def test_get_objective_prunes_when_config_validation_fails(self, engine_patch, mocker):
         # Given
         param_grid = {'short_ema': [1, 25], 'long_ema': [10, 30]}

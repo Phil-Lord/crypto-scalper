@@ -44,6 +44,54 @@ class SQLAlchemyOutOfSampleEvaluationRepository(OutOfSampleEvaluationRepository)
 
             return {row[0] for row in rows}
 
+    def get_trial_numbers(self, study_name: str) -> set[int]:
+        with self.client.session() as session:
+            query = text("""
+                SELECT DISTINCT trial_number FROM out_of_sample_evaluation
+                WHERE study_name = :study_name
+            """)
+            result = session.execute(query, {'study_name': study_name})
+            return {row[0] for row in result.fetchall()}
+
+    def remap_trial_numbers(self, study_name: str, mapping: dict[int, int]) -> None:
+        # Delete-and-reinsert rather than UPDATE: old and new number ranges
+        # overlap, so in-place updates can transiently collide on the
+        # (study_name, trial_number, start, end) primary key.
+        with self.client.session() as session:
+            query = text("""
+                SELECT trial_number, start_timestamp, end_timestamp, is_value, oos_balance_ratio
+                FROM out_of_sample_evaluation
+                WHERE study_name = :study_name
+            """)
+            rows = session.execute(query, {'study_name': study_name}).fetchall()
+            if not rows:
+                return
+
+            session.execute(
+                text('DELETE FROM out_of_sample_evaluation WHERE study_name = :study_name'),
+                {'study_name': study_name},
+            )
+
+            remapped = [
+                {
+                    'study_name': study_name,
+                    'trial_number': mapping[row[0]],
+                    'start_timestamp': row[1],
+                    'end_timestamp': row[2],
+                    'is_value': row[3],
+                    'oos_balance_ratio': row[4],
+                }
+                for row in rows
+                if row[0] in mapping
+            ]
+            if remapped:
+                stmt = text("""
+                    INSERT INTO out_of_sample_evaluation
+                    (study_name, trial_number, start_timestamp, end_timestamp, is_value, oos_balance_ratio)
+                    VALUES (:study_name, :trial_number, :start_timestamp, :end_timestamp, :is_value, :oos_balance_ratio)
+                """)
+                session.execute(stmt, remapped)
+
     def get(self, study_name: str, start: float, end: float) -> list[OutOfSampleEvaluation]:
         with self.client.session() as session:
             query = text("""

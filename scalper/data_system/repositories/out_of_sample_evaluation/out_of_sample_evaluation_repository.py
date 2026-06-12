@@ -26,6 +26,32 @@ class OutOfSampleEvaluationRepository(ABC):
         pass
 
     @abstractmethod
+    def get_trial_numbers(self, study_name: str) -> set[int]:
+        '''
+        Fetches every trial number with at least one evaluation for a study,
+        across all time windows.
+
+        :param study_name: Name of the Optuna study.
+        :return: Set of distinct trial numbers with stored evaluations.
+        '''
+        pass
+
+    @abstractmethod
+    def remap_trial_numbers(self, study_name: str, mapping: dict[int, int]) -> None:
+        '''
+        Rewrites trial numbers for a study after compaction renumbers its trials.
+
+        Rows whose trial number is absent from ``mapping`` belong to trials
+        dropped by the compaction and are deleted — leaving them would let
+        stale evaluations join against unrelated trials that reuse the number.
+
+        :param study_name: Name of the Optuna study.
+        :param mapping: Old trial number → new trial number. May be empty, in
+            which case every row for the study is deleted.
+        '''
+        pass
+
+    @abstractmethod
     def get(self, study_name: str, start: float, end: float) -> list[OutOfSampleEvaluation]:
         '''
         Fetches all stored evaluation rows for a study and time range.

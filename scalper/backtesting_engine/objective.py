@@ -10,6 +10,12 @@ from .window_evaluation import run_strategy_on_window
 
 INITIAL_BALANCE = 1000
 
+WINDOW_TRADES_ATTR = 'window_trades'
+'''
+User attribute holding every window's trade count as a single
+``{'<start>_<end>': count}`` dict, written once per trial.
+'''
+
 
 def get_objective(
         engine,
@@ -26,18 +32,20 @@ def get_objective(
             raise optuna.TrialPruned()
 
         adjusted_window_returns = []
+        window_trade_counts: dict[str, int] = {}
         for window_start, window_end in windows:
             run_strategy_on_window(engine, window_start, window_end)
 
             # Calculate penalty.
             trade_count = engine.results['signal'].ne('hold').sum()
             penalty = calculate_penalty(trade_count, window_start, window_end)
-            log_window_trial_count(trial, window_start, window_end, trade_count)
+            window_trade_counts[f'{window_start.date()}_{window_end.date()}'] = int(trade_count)
 
             # Calculate return ratio and apply penalty.
             final_balance = engine.get_final_quote_balance(INITIAL_BALANCE)
             adjusted_window_returns.append(calculate_adjusted_return(final_balance, penalty))
 
+        log_window_trade_counts(trial, window_trade_counts)
         return calculate_geometric_mean(adjusted_window_returns)
     return objective
 
@@ -68,9 +76,15 @@ def calculate_penalty(trade_count: int, start: pd.Timestamp, end: pd.Timestamp) 
     return min(1.0, raw * 2)  # Scale to [0,2], cap = 1, ideal = 1
 
 
-def log_window_trial_count(trial: optuna.Trial, start: pd.Timestamp, end: pd.Timestamp, count: int) -> None:
-    ''' Log window trade count as user attribute. '''
-    trial.set_user_attr(f'trades_{start.date()}_{end.date()}', int(count))
+def log_window_trade_counts(trial: optuna.Trial, counts: dict[str, int]) -> None:
+    '''
+    Log all window trade counts as a single user attribute.
+
+    One attribute per trial rather than one per window: each ``set_user_attr``
+    is a storage round trip, and every attribute is a row that study reads
+    load back, so per-window attributes multiplied both costs as studies grew.
+    '''
+    trial.set_user_attr(WINDOW_TRADES_ATTR, counts)
 
 
 def calculate_adjusted_return(final_balance: float, penalty: float) -> float:
