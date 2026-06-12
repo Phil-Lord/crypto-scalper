@@ -53,8 +53,15 @@ def compact_study():
         )
     print('Trial numbers restart from 0; OOS evaluations are remapped to the new numbers.')
 
-    dropped = plan.completed_count - kept
-    if not confirm(f'Compact {plan.study_name}? {dropped} trials are deleted permanently.').ask():
+    dropped = plan.total_count - kept
+    non_complete = plan.total_count - plan.completed_count
+    breakdown = (
+        f' ({dropped - non_complete} completed, {non_complete} pruned/failed)'
+        if non_complete else ''
+    )
+    if not confirm(
+        f'Compact {plan.study_name}? {dropped} trials are deleted permanently{breakdown}.'
+    ).ask():
         print('Compaction cancelled.')
         return
 
