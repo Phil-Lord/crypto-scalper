@@ -19,19 +19,22 @@ PRECISION_TREND_CONFIG = {
     'sell_threshold': -0.1288225552454357
 }
 PRECISION_TREND_GRID = {
-    'short_ema': [5, 50],
-    'long_ema': [30, 150],
-    'rsi_window': [5, 40],
-    'rsi_oversold': [10.0, 40.0],
-    'rsi_overbought': [55.0, 75.0],
-    'adx_window': [5, 50],
-    'adx_threshold': [10, 40],
+    'short_ema': [10, 150],
+    'long_ema': [60, 400],
+    'rsi_window': [2, 20],
+    'rsi_oversold': [5.0, 40.0],
+    'rsi_overbought': [45.0, 70.0],
+    'adx_window': [10, 100],
+    'adx_threshold': [15, 60],
     'atr_window': [5, 50],
-    'atr_threshold': [0.002, 0.02],
+    # atr_threshold compares against ATR/close on 1-minute candles, where the ratio's median is
+    # ~0.0003 and its 99th percentile ~0.002 (XXBTZGBP 2024-25) — thresholds above ~0.002 make
+    # the ATR rule a permanent HOLD vote.
+    'atr_threshold': [0.0002, 0.002],
     'weight_crossover': [0.1, 1.0],
     'weight_rsi': [0.1, 1.0],
     'weight_adx': [0.1, 1.0],
     'weight_atr': [0.1, 1.0],
     'buy_threshold': [0.1, 0.7],
-    'sell_threshold': [-0.5, -0.05]
+    'sell_threshold': [-0.75, -0.05]
 }
