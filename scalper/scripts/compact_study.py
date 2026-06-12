@@ -42,8 +42,9 @@ def compact_study():
 
     kept = len(plan.kept_trials)
     print(
-        f'{plan.study_name}: {plan.completed_count} completed trials -> keeping {kept} '
-        f'(top {plan.top_count}, OOS-evaluated {plan.oos_count}, random {plan.random_count}).'
+        f'{plan.study_name}: {plan.total_count} trials ({plan.completed_count} completed) '
+        f'-> {kept} (top {plan.top_count} of which {plan.top_oos_count} OOS-evaluated, '
+        f'force-kept OOS {plan.oos_count}, random {plan.random_count}).'
     )
     if plan.random_count == 0:
         print(
