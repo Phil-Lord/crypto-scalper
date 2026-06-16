@@ -1,14 +1,18 @@
 import pandas as pd
 
 
-def calculate_position_profits(results: pd.DataFrame, initial_quote_balance: float = 1000) -> pd.DataFrame:
+def calculate_position_profits(
+    results: pd.DataFrame, initial_quote_balance: float = 1000, fee: float = 0.004
+) -> pd.DataFrame:
     '''
     Calculate profit for each completed position (buy → sell cycle).
 
-    Applies 0.4% trading fee on both buy and sell sides.
+    Applies the trading fee on both buy and sell sides.
 
     :param results: DataFrame with 'signal' and 'price' columns, indexed by timestamp.
     :param initial_quote_balance: Starting balance in quote currency (default: 1000).
+    :param fee: Per-side trading fee as a fraction, e.g. 0.004 taker, 0.0016 maker
+        (default: 0.004).
     :return: DataFrame with columns 'entry_time', 'exit_time', 'profit'.
     '''
     positions = []
@@ -16,7 +20,6 @@ def calculate_position_profits(results: pd.DataFrame, initial_quote_balance: flo
     base_balance = 0.0
     entry_price = None
     entry_time = None
-    fee = 0.004
 
     for row in results.itertuples():
         signal, price, index = row.signal, row.price, row.Index
@@ -37,20 +40,23 @@ def calculate_position_profits(results: pd.DataFrame, initial_quote_balance: flo
     return pd.DataFrame(positions)
 
 
-def get_final_quote_balance(results: pd.DataFrame, initial_quote_balance: float = 1000) -> float:
+def get_final_quote_balance(
+    results: pd.DataFrame, initial_quote_balance: float = 1000, fee: float = 0.004
+) -> float:
     '''
     Calculate final quote balance after executing all signals.
 
     If still holding a position at the end, values it at the final market price.
-    Applies 0.4% trading fee on both buy and sell sides.
+    Applies the trading fee on both buy and sell sides.
 
     :param results: DataFrame with 'signal' and 'price' columns, indexed by timestamp.
     :param initial_quote_balance: Starting balance in quote currency (default: 1000).
+    :param fee: Per-side trading fee as a fraction, e.g. 0.004 taker, 0.0016 maker
+        (default: 0.004).
     :return: Final balance in quote currency.
     '''
     quote_balance = initial_quote_balance
     base_balance = 0.0
-    fee = 0.004
 
     for row in results.itertuples():
         if row.signal == 'buy' and quote_balance > 0:

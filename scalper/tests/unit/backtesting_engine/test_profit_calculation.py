@@ -100,6 +100,41 @@ class TestCalculatePositionProfits:
         # Larger initial balance should lead to larger absolute profit
         assert abs(profits.iloc[0]['profit']) > 0
 
+    def test_calculate_position_profits_default_fee_is_taker(self, sample_results_with_profit):
+        # Given - explicit taker fee matches the default
+        explicit = calculate_position_profits(sample_results_with_profit, fee=0.004)
+
+        # When
+        defaulted = calculate_position_profits(sample_results_with_profit)
+
+        # Then
+        assert defaulted.iloc[0]['profit'] == pytest.approx(explicit.iloc[0]['profit'])
+
+    def test_calculate_position_profits_maker_fee_beats_taker(self, sample_results_with_profit):
+        # When - lower maker fee leaves more profit than the taker default
+        maker = calculate_position_profits(sample_results_with_profit, fee=0.0016)
+        taker = calculate_position_profits(sample_results_with_profit, fee=0.004)
+
+        # Then
+        assert maker.iloc[0]['profit'] > taker.iloc[0]['profit']
+
+    def test_calculate_position_profits_fee_applied_both_sides(self):
+        # Given - buy and sell at the same price isolates the fee impact
+        results = pd.DataFrame([
+            {'signal': 'buy', 'price': 100.0},
+            {'signal': 'sell', 'price': 100.0},
+        ])
+        fee = 0.0016
+        initial = 1000.0
+
+        # When
+        profits = calculate_position_profits(results, initial, fee=fee)
+
+        # Then - fee is charged on both the buy and the sell
+        base = (initial / 100.0) * (1 - fee)
+        expected = base * 100.0 * (1 - fee) - (100.0 * base)
+        assert profits.iloc[0]['profit'] == pytest.approx(expected, rel=1e-9)
+
 
 @pytest.mark.backtesting_engine
 @pytest.mark.profit_calculation
@@ -202,4 +237,38 @@ class TestGetFinalQuoteBalance:
         # final = 9.96 * 100 * (1 - 0.004) = 992.0160
         base = (initial / 100.0) * (1 - fee)
         expected = base * 100.0 * (1 - fee)
+        assert balance == pytest.approx(expected, rel=1e-9)
+
+    def test_get_final_quote_balance_default_fee_is_taker(self, sample_results_with_profit):
+        # Given - explicit taker fee matches the default
+        explicit = get_final_quote_balance(sample_results_with_profit, fee=0.004)
+
+        # When
+        defaulted = get_final_quote_balance(sample_results_with_profit)
+
+        # Then
+        assert defaulted == pytest.approx(explicit)
+
+    def test_get_final_quote_balance_maker_fee_beats_taker(self, sample_results_with_profit):
+        # When - lower maker fee leaves a higher final balance than the taker default
+        maker = get_final_quote_balance(sample_results_with_profit, fee=0.0016)
+        taker = get_final_quote_balance(sample_results_with_profit, fee=0.004)
+
+        # Then
+        assert maker > taker
+
+    def test_get_final_quote_balance_maker_fee_exact(self):
+        # Given - same-price round trip isolates the fee impact at maker rate
+        results = pd.DataFrame([
+            {'signal': 'buy', 'price': 100.0},
+            {'signal': 'sell', 'price': 100.0},
+        ])
+        fee = 0.0016
+        initial = 1000.0
+
+        # When
+        balance = get_final_quote_balance(results, initial, fee=fee)
+
+        # Then - both sides charged: 1000 * (1-fee)^2
+        expected = initial * (1 - fee) ** 2
         assert balance == pytest.approx(expected, rel=1e-9)
