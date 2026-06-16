@@ -1,7 +1,11 @@
 import pandas as pd
 import pytest
 
-from backtesting_engine.profit_calculation import calculate_position_profits, get_final_quote_balance
+from backtesting_engine.profit_calculation import (
+    calculate_position_profits,
+    get_final_quote_balance,
+    strategy_equity_curve,
+)
 
 
 @pytest.mark.backtesting_engine
@@ -272,3 +276,62 @@ class TestGetFinalQuoteBalance:
         # Then - both sides charged: 1000 * (1-fee)^2
         expected = initial * (1 - fee) ** 2
         assert balance == pytest.approx(expected, rel=1e-9)
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.profit_calculation
+class TestStrategyEquityCurve:
+    @pytest.fixture
+    def buy_hold_sell(self) -> pd.DataFrame:
+        '''Buy, hold through a rise, then sell.'''
+        index = pd.date_range('2024-01-01', periods=4, freq='D')
+        return pd.DataFrame(
+            {'signal': ['buy', 'hold', 'hold', 'sell'], 'price': [100.0, 120.0, 150.0, 200.0]},
+            index=index,
+        )
+
+    def test_indexed_like_results(self, buy_hold_sell):
+        curve = strategy_equity_curve(buy_hold_sell)
+        assert list(curve.index) == list(buy_hold_sell.index)
+
+    def test_final_value_reconciles_with_final_quote_balance(self, buy_hold_sell):
+        # The last point of the curve must match the scalar final-balance function.
+        for fee in (0.0, 0.0016, 0.004):
+            curve = strategy_equity_curve(buy_hold_sell, fee=fee)
+            final = get_final_quote_balance(buy_hold_sell, fee=fee)
+            assert curve.iloc[-1] == pytest.approx(final)
+
+    def test_cash_periods_are_flat(self):
+        # Given - no position taken, equity must stay at the initial balance throughout
+        index = pd.date_range('2024-01-01', periods=3, freq='D')
+        results = pd.DataFrame(
+            {'signal': ['hold', 'hold', 'hold'], 'price': [100.0, 200.0, 50.0]}, index=index
+        )
+
+        # When
+        curve = strategy_equity_curve(results, 1000.0)
+
+        # Then
+        assert (curve == 1000.0).all()
+
+    def test_holding_tracks_price_while_in_position(self, buy_hold_sell):
+        # Given - while holding, equity should move with price (net of constant exit fee)
+        curve = strategy_equity_curve(buy_hold_sell, fee=0.0)
+
+        # Then - bars 0..2 are in-position; bar 1/bar 0 ratio matches 120/100
+        assert curve.iloc[1] / curve.iloc[0] == pytest.approx(120.0 / 100.0)
+
+    def test_open_position_valued_net_of_exit_fee(self):
+        # Given - buy then hold to the end without selling
+        index = pd.date_range('2024-01-01', periods=2, freq='D')
+        results = pd.DataFrame(
+            {'signal': ['buy', 'hold'], 'price': [100.0, 100.0]}, index=index
+        )
+        fee = 0.004
+        initial = 1000.0
+
+        # When
+        curve = strategy_equity_curve(results, initial, fee=fee)
+
+        # Then - both entry and (unrealised) exit fee applied: 1000 * (1-fee)^2
+        assert curve.iloc[-1] == pytest.approx(initial * (1 - fee) ** 2)
