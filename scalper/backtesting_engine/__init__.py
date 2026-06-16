@@ -1,6 +1,11 @@
 from .backtesting_engine import BacktestingEngine
 from .benchmark import buy_and_hold_equity_curve, buy_and_hold_ratio
 from .metrics import sharpe_ratio, sortino_ratio
+from .profit_calculation import (
+    calculate_position_profits,
+    get_final_quote_balance,
+    strategy_equity_curve,
+)
 from .in_sample_evaluation import (
     InSampleArgs,
     build_in_sample_command,
