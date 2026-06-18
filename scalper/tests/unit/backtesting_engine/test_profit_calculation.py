@@ -1,7 +1,11 @@
 import pandas as pd
 import pytest
 
-from backtesting_engine.profit_calculation import calculate_position_profits, get_final_quote_balance
+from backtesting_engine.profit_calculation import (
+    calculate_position_profits,
+    get_final_quote_balance,
+    strategy_equity_curve,
+)
 
 
 @pytest.mark.backtesting_engine
@@ -99,6 +103,41 @@ class TestCalculatePositionProfits:
         assert len(profits) == 1
         # Larger initial balance should lead to larger absolute profit
         assert abs(profits.iloc[0]['profit']) > 0
+
+    def test_calculate_position_profits_default_fee_is_taker(self, sample_results_with_profit):
+        # Given - explicit taker fee matches the default
+        explicit = calculate_position_profits(sample_results_with_profit, fee=0.004)
+
+        # When
+        defaulted = calculate_position_profits(sample_results_with_profit)
+
+        # Then
+        assert defaulted.iloc[0]['profit'] == pytest.approx(explicit.iloc[0]['profit'])
+
+    def test_calculate_position_profits_maker_fee_beats_taker(self, sample_results_with_profit):
+        # When - lower maker fee leaves more profit than the taker default
+        maker = calculate_position_profits(sample_results_with_profit, fee=0.0016)
+        taker = calculate_position_profits(sample_results_with_profit, fee=0.004)
+
+        # Then
+        assert maker.iloc[0]['profit'] > taker.iloc[0]['profit']
+
+    def test_calculate_position_profits_fee_applied_both_sides(self):
+        # Given - buy and sell at the same price isolates the fee impact
+        results = pd.DataFrame([
+            {'signal': 'buy', 'price': 100.0},
+            {'signal': 'sell', 'price': 100.0},
+        ])
+        fee = 0.0016
+        initial = 1000.0
+
+        # When
+        profits = calculate_position_profits(results, initial, fee=fee)
+
+        # Then - fee is charged on both the buy and the sell
+        base = (initial / 100.0) * (1 - fee)
+        expected = base * 100.0 * (1 - fee) - (100.0 * base)
+        assert profits.iloc[0]['profit'] == pytest.approx(expected, rel=1e-9)
 
 
 @pytest.mark.backtesting_engine
@@ -203,3 +242,96 @@ class TestGetFinalQuoteBalance:
         base = (initial / 100.0) * (1 - fee)
         expected = base * 100.0 * (1 - fee)
         assert balance == pytest.approx(expected, rel=1e-9)
+
+    def test_get_final_quote_balance_default_fee_is_taker(self, sample_results_with_profit):
+        # Given - explicit taker fee matches the default
+        explicit = get_final_quote_balance(sample_results_with_profit, fee=0.004)
+
+        # When
+        defaulted = get_final_quote_balance(sample_results_with_profit)
+
+        # Then
+        assert defaulted == pytest.approx(explicit)
+
+    def test_get_final_quote_balance_maker_fee_beats_taker(self, sample_results_with_profit):
+        # When - lower maker fee leaves a higher final balance than the taker default
+        maker = get_final_quote_balance(sample_results_with_profit, fee=0.0016)
+        taker = get_final_quote_balance(sample_results_with_profit, fee=0.004)
+
+        # Then
+        assert maker > taker
+
+    def test_get_final_quote_balance_maker_fee_exact(self):
+        # Given - same-price round trip isolates the fee impact at maker rate
+        results = pd.DataFrame([
+            {'signal': 'buy', 'price': 100.0},
+            {'signal': 'sell', 'price': 100.0},
+        ])
+        fee = 0.0016
+        initial = 1000.0
+
+        # When
+        balance = get_final_quote_balance(results, initial, fee=fee)
+
+        # Then - both sides charged: 1000 * (1-fee)^2
+        expected = initial * (1 - fee) ** 2
+        assert balance == pytest.approx(expected, rel=1e-9)
+
+
+@pytest.mark.backtesting_engine
+@pytest.mark.profit_calculation
+class TestStrategyEquityCurve:
+    @pytest.fixture
+    def buy_hold_sell(self) -> pd.DataFrame:
+        '''Buy, hold through a rise, then sell.'''
+        index = pd.date_range('2024-01-01', periods=4, freq='D')
+        return pd.DataFrame(
+            {'signal': ['buy', 'hold', 'hold', 'sell'], 'price': [100.0, 120.0, 150.0, 200.0]},
+            index=index,
+        )
+
+    def test_indexed_like_results(self, buy_hold_sell):
+        curve = strategy_equity_curve(buy_hold_sell)
+        assert list(curve.index) == list(buy_hold_sell.index)
+
+    def test_final_value_reconciles_with_final_quote_balance(self, buy_hold_sell):
+        # The last point of the curve must match the scalar final-balance function.
+        for fee in (0.0, 0.0016, 0.004):
+            curve = strategy_equity_curve(buy_hold_sell, fee=fee)
+            final = get_final_quote_balance(buy_hold_sell, fee=fee)
+            assert curve.iloc[-1] == pytest.approx(final)
+
+    def test_cash_periods_are_flat(self):
+        # Given - no position taken, equity must stay at the initial balance throughout
+        index = pd.date_range('2024-01-01', periods=3, freq='D')
+        results = pd.DataFrame(
+            {'signal': ['hold', 'hold', 'hold'], 'price': [100.0, 200.0, 50.0]}, index=index
+        )
+
+        # When
+        curve = strategy_equity_curve(results, 1000.0)
+
+        # Then
+        assert (curve == 1000.0).all()
+
+    def test_holding_tracks_price_while_in_position(self, buy_hold_sell):
+        # Given - while holding, equity should move with price (net of constant exit fee)
+        curve = strategy_equity_curve(buy_hold_sell, fee=0.0)
+
+        # Then - bars 0..2 are in-position; bar 1/bar 0 ratio matches 120/100
+        assert curve.iloc[1] / curve.iloc[0] == pytest.approx(120.0 / 100.0)
+
+    def test_open_position_valued_net_of_exit_fee(self):
+        # Given - buy then hold to the end without selling
+        index = pd.date_range('2024-01-01', periods=2, freq='D')
+        results = pd.DataFrame(
+            {'signal': ['buy', 'hold'], 'price': [100.0, 100.0]}, index=index
+        )
+        fee = 0.004
+        initial = 1000.0
+
+        # When
+        curve = strategy_equity_curve(results, initial, fee=fee)
+
+        # Then - both entry and (unrealised) exit fee applied: 1000 * (1-fee)^2
+        assert curve.iloc[-1] == pytest.approx(initial * (1 - fee) ** 2)
